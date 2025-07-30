@@ -4,10 +4,10 @@ import mysql from "mysql2/promise";
 
 // สร้าง connection pool ไปยังฐานข้อมูล
 const pool = mysql.createPool({
-  host: "localhost",
-  user: "root",
-  password: "", // หรือใส่รหัสผ่านถ้ามี
-  database: "massage_booking",
+  host: "35.240.229.188",
+  user: "dev",
+  password: "4Bh4gEh.kV7PJ{91",
+  database: "massage",
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,

@@ -4,10 +4,10 @@ import bcrypt from "bcryptjs"; // เปลี่ยนมาใช้ bcrypt
 import crypto from "crypto";
 
 const pool = mysql.createPool({
-  host: "localhost",
-  user: "root",
-  password: "", 
-  database: "massage_booking",
+  host: "35.240.229.188",
+  user: "dev",
+  password: "4Bh4gEh.kV7PJ{91",
+  database: "massage",
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,

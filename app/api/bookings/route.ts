@@ -47,7 +47,7 @@ export async function POST(request: Request) {
     try {
       // เช็คสถานะ Reservation ของ user
       const [userRows] = await conn.query(
-        "SELECT * FROM bookings WHERE phone = ? LIMIT 1",
+        "SELECT * FROM bookings WHERE phone = ? AND status = 'รอดำเนินการ' LIMIT 1",
         [phone]
       );
       const user = (userRows as any)[0];

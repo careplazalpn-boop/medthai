@@ -44,9 +44,7 @@ export async function DELETE(req: NextRequest) {
     const count = (activeBookings as any)[0].count;
 
     // ถ้าไม่มี booking ที่ active อยู่แล้ว ให้ตั้ง Reservation = 0
-    if (count === 0) {
       await conn.query("UPDATE users SET Reservation = 0 WHERE phone = ?", [phone]);
-    }
 
     conn.release();
 

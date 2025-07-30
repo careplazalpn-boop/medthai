@@ -47,11 +47,11 @@ export async function POST(request: Request) {
     try {
       // เช็คสถานะ Reservation ของ user
       const [userRows] = await conn.query(
-        "SELECT Reservation FROM users WHERE phone = ? LIMIT 1",
+        "SELECT * FROM bookings WHERE phone = ? LIMIT 1",
         [phone]
       );
       const user = (userRows as any)[0];
-      if (user?.Reservation) {
+      if (user) {
         return NextResponse.json({ success: false, error: "คุณมีการจองอยู่แล้ว ไม่สามารถจองเพิ่มได้" }, { status: 409 });
       }
 

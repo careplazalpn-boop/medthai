@@ -30,9 +30,8 @@ export async function GET(request: Request) {
     // ฟังก์ชันแปลง time_slot เช่น "8.00-9.30" -> เวลาเริ่มต้น Date object
     function parseStartTime(timeSlot: string, dateStr: string): Date {
       const [start] = timeSlot.split("-");
-      // รองรับกรณี "8.00" หรือ "8" ได้
-      let [hourStr, minStr] = start.split(".");
-      if (!minStr) minStr = "00";
+      const [hourStr, minStrRaw] = start.split(".");
+      const minStr = minStrRaw ?? "00"; // ถ้า minStrRaw เป็น undefined หรือ null จะใช้ "00"
       const date = new Date(dateStr);
       date.setHours(parseInt(hourStr, 10), parseInt(minStr, 10), 0, 0);
       return date;

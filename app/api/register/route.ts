@@ -3,10 +3,10 @@ import bcrypt from "bcryptjs";
 import mysql from "mysql2/promise";
 
 const db = await mysql.createConnection({
-  host: "35.240.229.188",
-  user: "dev",
-  password: "4Bh4gEh.kV7PJ{91",
-  database: "massage",
+  host: "lmwcc.synology.me",
+  user: "medthai",
+  password: "I4FEtUu*-uB-hAK0",
+  database: "medthai",
 });
 
 export async function POST(req: Request) {

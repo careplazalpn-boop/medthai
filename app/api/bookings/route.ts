@@ -37,15 +37,15 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const data = await request.json();
-    const { name, phone, therapist, time, date } = data;
+    const { hn, name, phone, therapist, time, date } = data;
 
-    if (!name || !phone || !therapist || !time || !date) {
+    if (!hn || !name || !phone || !therapist || !time || !date) {
       return NextResponse.json({ success: false, error: "ข้อมูลไม่ครบถ้วน" }, { status: 400 });
     }
 
     const conn = await pool.getConnection();
     try {
-      // เช็คสถานะ Reservation ของ user
+      // เช็คว่าผู้ใช้มีการจองที่รอดำเนินการอยู่หรือไม่
       const [userRows] = await conn.query(
         "SELECT * FROM bookings WHERE phone = ? AND status = 'รอดำเนินการ' LIMIT 1",
         [phone]
@@ -57,7 +57,7 @@ export async function POST(request: Request) {
 
       // เช็คช่วงเวลาว่าง (ไม่รวม booking ที่ถูกยกเลิก)
       const [rows] = await conn.query(
-        "SELECT COUNT(*) as count FROM bookings WHERE therapist = ? AND time_slot = ? AND date = ? AND status != 'ยกเลิก'",
+        "SELECT COUNT(*) as count FROM bookings WHERE therapist = ? AND time_slot = ? AND date = ? AND status != 'ยกเลิน'",
         [therapist, time, date]
       );
 
@@ -66,10 +66,10 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: false, error: "ช่วงเวลานี้ถูกจองไปแล้ว" }, { status: 409 });
       }
 
-      // บันทึกการจอง
+      // บันทึกการจอง ลงตาราง bookings โดยเพิ่ม hn ด้วย
       await conn.query(
-        "INSERT INTO bookings (name, phone, therapist, time_slot, date, status) VALUES (?, ?, ?, ?, ?, 'รอดำเนินการ')",
-        [name, phone, therapist, time, date]
+        "INSERT INTO bookings (hn, name, phone, therapist, time_slot, date, status) VALUES (?, ?, ?, ?, ?, ?, 'รอดำเนินการ')",
+        [hn, name, phone, therapist, time, date]
       );
 
       // อัปเดตสถานะ Reservation ใน users เป็น TRUE
@@ -77,7 +77,6 @@ export async function POST(request: Request) {
         "UPDATE users SET Reservation = TRUE WHERE phone = ?",
         [phone]
       );
-
     } finally {
       conn.release();
     }

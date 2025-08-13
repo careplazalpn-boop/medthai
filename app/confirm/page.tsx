@@ -22,6 +22,7 @@ export default function ConfirmPage() {
   const params = useSearchParams();
   const { user } = useContext(AuthContext);
 
+  const hn = params.get("hn");  // เพิ่มรับ hn
   const name = params.get("name");
   const phone = params.get("phone");
   const date = params.get("date");
@@ -34,10 +35,10 @@ export default function ConfirmPage() {
   const isAdmin = user?.role === "admin";
 
   useEffect(() => {
-    if (!name || !phone || !date || !therapist || !time) {
+    if (!hn || !name || !phone || !date || !therapist || !time) {
       router.push(isAdmin ? "/admin-booking" : "/booking");
     }
-  }, [name, phone, date, therapist, time, router, isAdmin]);
+  }, [hn, name, phone, date, therapist, time, router, isAdmin]);
 
   const handleConfirm = async () => {
     setLoading(true);
@@ -46,7 +47,7 @@ export default function ConfirmPage() {
       const res = await fetch("/api/bookings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, phone, date, therapist, time }),
+        body: JSON.stringify({ hn, name, phone, date, therapist, time }),  // ส่ง hn ไปด้วย
       });
 
       const data = await res.json();
@@ -76,6 +77,10 @@ export default function ConfirmPage() {
         </h2>
 
         <ul className="text-gray-700 space-y-4 mb-8 text-left">
+          <li className="flex items-center gap-3">
+            <User className="text-emerald-600 w-5 h-5" />
+            <span className="font-semibold text-emerald-600 min-w-[120px]">HN:</span> {hn}
+          </li>
           <li className="flex items-center gap-3">
             <User className="text-emerald-600 w-5 h-5" />
             <span className="font-semibold text-emerald-600 min-w-[120px]">ชื่อ-นามสกุล:</span> {name}

@@ -14,7 +14,19 @@ import {
 } from "lucide-react";
 import { FaHistory } from "react-icons/fa";
 
-const therapists = Array.from({ length: 13 }, (_, i) => `หมอ ${i + 1}`);
+const therapists = [
+  "นายโอภาส ทาแก้ว",
+  "นางสาววรรณนิสา เนตรษุ",
+  "นางสาวเพ็ญนภา นุ่มนวล",
+  "นางสาววรานันทน์ ยอดลิลา",
+  "นางสาวเรนุกา เขียววงศ์ตัน",
+  "นางสาวอารยา  พิหก",
+  "นางสาวกานต์พิชา จุมป๋าน้ำ",
+  "นางสาวธิดารัตน์ ใจชื้น",
+  "นางสาวภัทรวดี จันทร์น้อย",
+  "นายนฤเทพ แสงสุวรรณ",
+];
+
 const timeSlots = [
   "8.00-9.30",
   "9.30-11.00",
@@ -84,9 +96,7 @@ export default function BookingPage() {
   const [showBookedPopup, setShowBookedPopup] = useState(false);
 
   useEffect(() => {
-    if (!user) {
-      router.push("/login");
-    }
+    if (!user) router.push("/login");
   }, [user, router]);
 
   useEffect(() => {
@@ -97,7 +107,9 @@ export default function BookingPage() {
         return;
       }
       try {
-        const res = await fetch(`/api/check-reservation-status?phone=${encodeURIComponent(user.phone)}`);
+        const res = await fetch(
+          `/api/check-reservation-status?phone=${encodeURIComponent(user.phone)}`
+        );
         const data = await res.json();
         setHasReservation(data.success ? data.hasActiveBooking : false);
       } catch {
@@ -148,17 +160,30 @@ export default function BookingPage() {
     }
   }, [showAlert]);
 
+  function isTimeSlotPast(slot: string): boolean {
+    if (!date) return false;
+
+    const [startStr] = slot.split("-");
+    const [hourStr, minuteStr] = startStr.split(".");
+    const hour = parseInt(hourStr, 10);
+    const minute = parseInt(minuteStr.padEnd(2, "0"), 10);
+
+    const now = new Date();
+    const selectedDate = new Date(date);
+    selectedDate.setHours(hour, minute, 0, 0);
+
+    return now > selectedDate && now.toDateString() === selectedDate.toDateString();
+  }
+
   const handleSelect = (therapist: string, time: string) => {
     if (!date) {
       setShowAlert(true);
       return;
     }
-
     if (hasReservation) {
       setShowBookedPopup(true);
       return;
     }
-
     setSelectedTherapist(therapist);
     setSelectedTime(time);
   };
@@ -168,17 +193,14 @@ export default function BookingPage() {
       alert("กำลังตรวจสอบสถานะการจอง กรุณารอสักครู่...");
       return;
     }
-
     if (hasReservation) {
       alert("คุณมีการจองที่ยังไม่เสร็จสิ้น ไม่สามารถจองเพิ่มได้");
       return;
     }
-
     if (!user || !date || !therapist || selectedTherapist !== therapist || !selectedTime) {
       alert("กรุณาเลือกวันที่ หมอ และช่วงเวลาก่อนจอง");
       return;
     }
-
     const params = new URLSearchParams();
     params.append("name", user.name);
     params.append("phone", user.phone ?? "");
@@ -188,26 +210,6 @@ export default function BookingPage() {
 
     router.push(`/confirm?${params.toString()}`);
   };
-
-  function getStartHour(slot: string): number {
-    return parseFloat(slot.split("-")[0].replace(".", "."));
-  }
-
-function isTimeSlotPast(slot: string): boolean {
-  if (!date) return false;
-
-  const [startStr] = slot.split("-");
-  const [hourStr, minuteStr] = startStr.split(".");
-  const hour = parseInt(hourStr, 10);
-  const minute = parseInt(minuteStr.padEnd(2, "0"), 10); // "30" จาก ".30"
-
-  const now = new Date();
-  const selectedDate = new Date(date);
-  selectedDate.setHours(hour, minute, 0, 0);
-
-  return now > selectedDate && now.toDateString() === selectedDate.toDateString();
-}
-
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-white to-emerald-100 relative overflow-hidden">

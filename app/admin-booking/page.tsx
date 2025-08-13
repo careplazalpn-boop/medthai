@@ -8,7 +8,19 @@ import { CalendarIcon, UserIcon, Clock, Home, AlertCircle } from "lucide-react";
 import { FaHistory } from "react-icons/fa";
 import * as Dialog from "@radix-ui/react-dialog";
 
-const therapists = Array.from({ length: 13 }, (_, i) => `หมอ ${i + 1}`);
+const therapists = [
+  "นายโอภาส ทาแก้ว",
+  "นางสาววรรณนิสา เนตรษุ",
+  "นางสาวเพ็ญนภา นุ่มนวล",
+  "นางสาววรานันทน์ ยอดลิลา",
+  "นางสาวเรนุกา เขียววงศ์ตัน",
+  "นางสาวอารยา  พิหก",
+  "นางสาวกานต์พิชา จุมป๋าน้ำ",
+  "นางสาวธิดารัตน์ ใจชื้น",
+  "นางสาวภัทรวดี จันทร์น้อย",
+  "นายนฤเทพ แสงสุวรรณ",
+];
+
 const timeSlots = [
   "8.00-9.30",
   "9.30-11.00",
@@ -28,6 +40,9 @@ export default function AdminBookingPage() {
   const [bookedSlots, setBookedSlots] = useState<Record<string, string[]>>({});
   const [showAlert, setShowAlert] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+
+  // เพิ่ม state สำหรับ hn
+  const [clientHN, setClientHN] = useState("");
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
 
@@ -42,11 +57,9 @@ export default function AdminBookingPage() {
       setSelectedTime("");
       return;
     }
-
-    async function fetchBooked() {
-      try {
-        const res = await fetch(`/api/bookings?date=${encodeURIComponent(date)}`);
-        const data = await res.json();
+    fetch(`/api/bookings?date=${encodeURIComponent(date)}`)
+      .then((res) => res.json())
+      .then((data) => {
         if (data.success) {
           const grouped: Record<string, string[]> = {};
           data.bookings.forEach((b: any) => {
@@ -54,28 +67,41 @@ export default function AdminBookingPage() {
             grouped[b.therapist].push(b.time_slot);
           });
           setBookedSlots(grouped);
-        } else {
-          setBookedSlots({});
-        }
-      } catch {
-        setBookedSlots({});
-      }
-      setSelectedTherapist("");
-      setSelectedTime("");
-    }
-
-    fetchBooked();
+        } else setBookedSlots({});
+      })
+      .catch(() => setBookedSlots({}));
+    setSelectedTherapist("");
+    setSelectedTime("");
   }, [date]);
+
+  // เพิ่ม useEffect หรือฟังก์ชันเรียกใช้
+useEffect(() => {
+  if (clientPhone.length >= 9) { // หรือเงื่อนไขความยาวเบอร์โทรที่เหมาะสม
+    fetch(`/api/user-info?phone=${encodeURIComponent(clientPhone)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) {
+          setClientHN(data.hn);
+          setClientName(data.name);
+        } else {
+          setClientHN("");
+          // ไม่ลบชื่อผู้ใช้อัตโนมัติ เพื่อไม่ลบข้อมูลที่อาจพิมพ์เอง
+        }
+      })
+      .catch(() => {
+        setClientHN("");
+      });
+  } else {
+    setClientHN("");
+  }
+}, [clientPhone]);
 
   const isTimeSlotPast = (slot: string): boolean => {
     if (!date) return false;
-
     const [startStr] = slot.split("-");
-    const [startHourStr, startMinStr = "00"] = startStr.split(".");
-
+    const [hourStr, minStr = "00"] = startStr.split(".");
     const slotStart = new Date(date);
-    slotStart.setHours(parseInt(startHourStr), parseInt(startMinStr), 0, 0);
-
+    slotStart.setHours(parseInt(hourStr), parseInt(minStr), 0, 0);
     return new Date() > slotStart;
   };
 
@@ -89,19 +115,18 @@ export default function AdminBookingPage() {
   };
 
   const handleSubmit = () => {
-    if (!clientName || !clientPhone || !date || !selectedTherapist || !selectedTime) {
+    if (!clientHN || !clientName || !clientPhone || !date || !selectedTherapist || !selectedTime) {
       alert("กรุณากรอกข้อมูลให้ครบถ้วน");
       return;
     }
-
     const params = new URLSearchParams({
+      hn: clientHN,
       name: clientName,
       phone: clientPhone,
       date,
       therapist: selectedTherapist,
       time: selectedTime,
     });
-
     router.push(`/confirm?${params.toString()}`);
   };
 
@@ -144,7 +169,7 @@ export default function AdminBookingPage() {
           จองคิวนวดแผนไทย (Admin)
         </motion.h1>
 
-        <div className="mb-8 max-w-sm mx-auto relative">
+        <div className="mb-8 max-w-sm mx-auto">
           <label className="block mb-2 font-medium text-gray-700 flex items-center gap-2">
             <CalendarIcon className="w-4 h-4" />
             วันที่ต้องการนวด
@@ -236,10 +261,20 @@ export default function AdminBookingPage() {
               <Dialog.Title className="text-xl font-bold mb-4 text-emerald-700">
                 กรอกข้อมูลผู้รับบริการ
               </Dialog.Title>
+
               <label className="block mb-3">
-                <span className="text-sm font-medium text-emerald-800">
-                  ชื่อผู้รับบริการ
-                </span>
+                <span className="text-sm font-medium text-emerald-800">HN</span>
+                <input
+                  type="text"
+                  value={clientHN}
+                  onChange={(e) => setClientHN(e.target.value)}
+                  className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900"
+                  placeholder="กรอก HN"
+                />
+              </label>
+
+              <label className="block mb-3">
+                <span className="text-sm font-medium text-emerald-800">ชื่อผู้รับบริการ</span>
                 <input
                   type="text"
                   value={clientName}

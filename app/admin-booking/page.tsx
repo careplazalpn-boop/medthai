@@ -34,6 +34,7 @@ export default function AdminBookingPage() {
   const router = useRouter();
   const { user } = useContext(AuthContext);
 
+  // --- State ---
   const [date, setDate] = useState("");
   const [selectedTherapist, setSelectedTherapist] = useState("");
   const [selectedTime, setSelectedTime] = useState("");
@@ -41,15 +42,17 @@ export default function AdminBookingPage() {
   const [showAlert, setShowAlert] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  // เพิ่ม state สำหรับ hn
   const [clientHN, setClientHN] = useState("");
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
 
+  // --- Effects ---
+  // Redirect ถ้าไม่ login
   useEffect(() => {
     if (!user) router.push("/login");
   }, [user, router]);
 
+  // ดึงข้อมูล booking ตามวันที่
   useEffect(() => {
     if (!date) {
       setBookedSlots({});
@@ -57,6 +60,7 @@ export default function AdminBookingPage() {
       setSelectedTime("");
       return;
     }
+
     fetch(`/api/bookings?date=${encodeURIComponent(date)}`)
       .then((res) => res.json())
       .then((data) => {
@@ -70,33 +74,44 @@ export default function AdminBookingPage() {
         } else setBookedSlots({});
       })
       .catch(() => setBookedSlots({}));
+
     setSelectedTherapist("");
     setSelectedTime("");
   }, [date]);
 
-  // เพิ่ม useEffect หรือฟังก์ชันเรียกใช้
-useEffect(() => {
-  if (clientPhone.length >= 9) { // หรือเงื่อนไขความยาวเบอร์โทรที่เหมาะสม
-    fetch(`/api/user-info?phone=${encodeURIComponent(clientPhone)}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success) {
-          setClientHN(data.hn);
-          setClientName(data.name);
-        } else {
-          setClientHN("");
-          // ไม่ลบชื่อผู้ใช้อัตโนมัติ เพื่อไม่ลบข้อมูลที่อาจพิมพ์เอง
-        }
-      })
-      .catch(() => {
-        setClientHN("");
-      });
-  } else {
-    setClientHN("");
-  }
-}, [clientPhone]);
+  // ดึง user-info จากเบอร์โทร
+  useEffect(() => {
+    const cleanPhone = clientPhone.replace(/-/g, "");
+    if (cleanPhone.length >= 9) {
+      fetch(`/api/user-info?phone=${encodeURIComponent(cleanPhone)}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success) {
+            setClientHN(data.hn);
+            setClientName(data.name);
+          } else {
+            setClientHN("");
+          }
+        })
+        .catch(() => setClientHN(""));
+    } else {
+      setClientHN("");
+    }
+  }, [clientPhone]);
 
-  const isTimeSlotPast = (slot: string): boolean => {
+  // --- Functions ---
+  const formatPhone = (value: string) => {
+    const digits = value.replace(/\D/g, "");
+    if (digits.length <= 3) return digits;
+    return digits.slice(0, 3) + "-" + digits.slice(3, 10);
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawValue = e.target.value;
+    setClientPhone(formatPhone(rawValue));
+  };
+
+  const isTimeSlotPast = (slot: string) => {
     if (!date) return false;
     const [startStr] = slot.split("-");
     const [hourStr, minStr = "00"] = startStr.split(".");
@@ -130,6 +145,14 @@ useEffect(() => {
     router.push(`/confirm?${params.toString()}`);
   };
 
+  const handleOpenDialog = () => {
+    setClientHN("");
+    setClientName("");
+    setClientPhone("");
+    setDialogOpen(true);
+  };
+
+  // --- JSX ---
   return (
     <div className="min-h-screen bg-gradient-to-br from-white to-emerald-100 relative overflow-hidden">
       <motion.div
@@ -139,6 +162,7 @@ useEffect(() => {
         className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,_#a7f3d0,_transparent_70%)]"
       />
 
+      {/* ปุ่มหน้าแรก / ประวัติ */}
       <motion.button
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
@@ -169,6 +193,7 @@ useEffect(() => {
           จองคิวนวดแผนไทย (Admin)
         </motion.h1>
 
+        {/* เลือกวันที่ */}
         <div className="mb-8 max-w-sm mx-auto">
           <label className="block mb-2 font-medium text-gray-700 flex items-center gap-2">
             <CalendarIcon className="w-4 h-4" />
@@ -185,10 +210,12 @@ useEffect(() => {
           />
         </div>
 
+        {/* เลือก therapist / time */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {therapists.map((t) => {
             const booked = bookedSlots[t] || [];
             const isSelected = selectedTherapist === t;
+
             return (
               <motion.div
                 key={t}
@@ -203,11 +230,13 @@ useEffect(() => {
                   <UserIcon className="w-5 h-5 text-emerald-600" />
                   <h2 className="text-lg font-semibold text-emerald-700">{t}</h2>
                 </div>
+
                 <div className="grid grid-cols-2 gap-2">
                   {timeSlots.map((slot) => {
                     const isBooked = booked.includes(slot);
                     const isPast = isTimeSlotPast(slot);
                     const isActive = isSelected && selectedTime === slot;
+
                     return (
                       <button
                         key={slot}
@@ -239,7 +268,7 @@ useEffect(() => {
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.97 }}
-                  onClick={() => setDialogOpen(true)}
+                  onClick={handleOpenDialog}
                   disabled={!(isSelected && selectedTime && date)}
                   className={`mt-5 w-full py-2 rounded-xl font-bold shadow transition text-center ${
                     isSelected && selectedTime && date
@@ -254,6 +283,7 @@ useEffect(() => {
           })}
         </div>
 
+        {/* Dialog กรอกข้อมูลผู้รับบริการ */}
         <Dialog.Root open={dialogOpen} onOpenChange={setDialogOpen}>
           <Dialog.Portal>
             <Dialog.Overlay className="fixed inset-0 bg-black/30 z-40" />
@@ -283,16 +313,19 @@ useEffect(() => {
                   placeholder="กรอกชื่อ"
                 />
               </label>
+
               <label className="block mb-4">
                 <span className="text-sm font-medium text-emerald-800">เบอร์โทร</span>
                 <input
                   type="text"
                   value={clientPhone}
-                  onChange={(e) => setClientPhone(e.target.value)}
-                  className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900"
+                  onChange={handlePhoneChange}
+                  maxLength={11}
                   placeholder="กรอกเบอร์โทร"
+                  className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900"
                 />
               </label>
+
               <div className="flex justify-end gap-3">
                 <Dialog.Close asChild>
                   <button className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300">
@@ -310,6 +343,7 @@ useEffect(() => {
           </Dialog.Portal>
         </Dialog.Root>
 
+        {/* Alert เลือกวันที่ */}
         <AnimatePresence>
           {showAlert && (
             <motion.div

@@ -13,16 +13,18 @@ const pool = mysql.createPool({
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const phone = searchParams.get("phone");
+  let phone = searchParams.get("phone");
 
   if (!phone) {
     return NextResponse.json({ success: false, error: "กรุณาระบุเบอร์โทร" }, { status: 400 });
   }
 
+  phone = phone.replace(/-/g, "");
+
   try {
     const conn = await pool.getConnection();
     const [rows] = await conn.query(
-      "SELECT hn, pname, fname, lname FROM med_user WHERE mobile_phone_number = ? LIMIT 1",
+      "SELECT hn, pname, fname, lname FROM med_user WHERE REPLACE(mobile_phone_number, '-', '') = ? LIMIT 1",
       [phone]
     );
     conn.release();

@@ -23,14 +23,13 @@ export async function DELETE(req: NextRequest) {
   const conn = await pool.getConnection();
 
   try {
-    // หาเบอร์โทรและ therapist จาก booking ที่จะยกเลิก
-    const [rows] = await conn.query("SELECT phone, therapist FROM bookings WHERE id = ?", [id]);
+    // หาเบอร์โทรจาก booking ที่จะยกเลิก
+    const [rows] = await conn.query("SELECT phone FROM bookings WHERE id = ?", [id]);
     if ((rows as any).length === 0) {
       conn.release();
       return NextResponse.json({ success: false, message: "Booking not found" }, { status: 404 });
     }
     const phone = (rows as any)[0].phone;
-    const therapistName = (rows as any)[0].therapist;
 
     // อัปเดตสถานะ booking เป็น "ยกเลิก"
     await conn.query("UPDATE bookings SET status = 'ยกเลิก' WHERE id = ?", [id]);
@@ -46,9 +45,6 @@ export async function DELETE(req: NextRequest) {
     if (count === 0) {
       await conn.query("UPDATE users SET Reservation = 0 WHERE phone = ?", [phone]);
     }
-
-    // อัปเดต therapist.active_status = 0 (default) สำหรับ therapist ที่ถูกยกเลิก booking
-    await conn.query("UPDATE therapist SET active_status = 0 WHERE name = ?", [therapistName]);
 
     conn.release();
 

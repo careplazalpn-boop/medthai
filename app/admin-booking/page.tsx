@@ -8,27 +8,18 @@ import { CalendarIcon, UserIcon, Clock, Home, AlertCircle } from "lucide-react";
 import { FaHistory } from "react-icons/fa";
 import * as Dialog from "@radix-ui/react-dialog";
 
-const therapists = [
-  "นายดุสิทธิ์  ไชยศรีหา",
-  "นางสาววรรณนิสา เนตรษุ",
-  "นางสาววรานันทน์ ยอดลิลา",
-  "นางยุพิน พรมสนธิ",
-  "นางวิไลวรรณ กิติกาศ",
-  "นางสุมัชยา ชัยพนัส",
-  "นางรัตนาภรณ์ รวยกร",
-  "นางรุจิรา ถาน้อย",
-  "นางสาวณิชาภา ณชนกกรณัฐ",
-  "นางสาววัชรีพันธุ์  อุณเวทย์วานิช",
-  "นางสาวกนกรดา สินสุวรรณ",
-  "นางวราภรณ์ เทศสันเทียะ",
-];
-
-const timeSlots = ["8.00-9.30","9.30-11.00","11.00-12.30","13.00-14.30","14.30-16.00","16.00-17.30"];
+interface UserInfo {
+  hn: string;
+  name: string;
+  phone: string;
+}
 
 export default function AdminBookingPage() {
   const router = useRouter();
   const { user } = useContext(AuthContext);
 
+  const [therapists, setTherapists] = useState<string[]>([]);
+  const [timeSlots, setTimeSlots] = useState<string[]>([]);
   const [date, setDate] = useState("");
   const [selectedTherapist, setSelectedTherapist] = useState("");
   const [selectedTime, setSelectedTime] = useState("");
@@ -39,14 +30,22 @@ export default function AdminBookingPage() {
   const [clientHN, setClientHN] = useState("");
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
+  const [searchResults, setSearchResults] = useState<UserInfo[]>([]);
 
+  // ตรวจสอบ login
   useEffect(() => {
     if (!user) router.push("/login");
   }, [user, router]);
 
+  // ดึง therapist + time_slot
+  useEffect(() => {
+    fetch("/api/therapists").then(res => res.json()).then(data => data.success && setTherapists(data.therapists)).catch(() => setTherapists([]));
+    fetch("/api/time-slots").then(res => res.json()).then(data => data.success && setTimeSlots(data.timeSlots)).catch(() => setTimeSlots([]));
+  }, []);
+
+  // ดึงเวลาที่ถูกจองของแต่ละ therapist
   useEffect(() => {
     if (!date) return setBookedSlots({});
-
     fetch(`/api/bookings?date=${encodeURIComponent(date)}`)
       .then(res => res.json())
       .then(data => {
@@ -60,22 +59,21 @@ export default function AdminBookingPage() {
         } else setBookedSlots({});
       })
       .catch(() => setBookedSlots({}));
-
     setSelectedTherapist("");
     setSelectedTime("");
   }, [date]);
 
   const formatPhone = (value: string) => {
     const digits = value.replace(/\D/g, "");
-    return digits.length <= 3 ? digits : digits.slice(0,3) + "-" + digits.slice(3,10);
+    if (!digits) return "";
+    return digits.length <= 3 ? digits : `${digits.slice(0, 3)}-${digits.slice(3)}`;
   };
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => setClientPhone(formatPhone(e.target.value));
 
   const isTimeSlotPast = (slot: string) => {
     if (!date) return false;
-    const [startStr] = slot.split("-");
-    const [hourStr, minStr = "00"] = startStr.split(".");
+    const [hourStr, minStr = "00"] = slot.split("-")[0].split(".");
     const slotStart = new Date(date);
     slotStart.setHours(parseInt(hourStr), parseInt(minStr), 0, 0);
     return new Date() > slotStart;
@@ -92,51 +90,73 @@ export default function AdminBookingPage() {
       alert("กรุณากรอกข้อมูลให้ครบถ้วน");
       return;
     }
-    const params = new URLSearchParams({ hn: clientHN, name: clientName, phone: clientPhone, date, therapist: selectedTherapist, time: selectedTime });
-    router.push(`/confirm?${params.toString()}`);
+    router.push(`/confirm?${new URLSearchParams({
+      hn: clientHN,
+      name: clientName,
+      phone: clientPhone,
+      date,
+      therapist: selectedTherapist,
+      time: selectedTime,
+    }).toString()}`);
   };
 
   const handleOpenDialog = () => {
     setClientHN("");
     setClientName("");
     setClientPhone("");
+    setSearchResults([]);
     setDialogOpen(true);
   };
 
-  const handleAutoFillName = async () => {
-    if (!clientName.trim()) return;
+  const handleAutoFill = async (field: "hn" | "name" | "phone") => {
+    let query = "";
+    if (field === "hn" && clientHN.trim().length !== 9) return alert("กรุณากรอก HN ให้ครบ 9 หลัก");
+    if (field === "name" && !clientName.trim()) return;
+    if (field === "phone" && !clientPhone.trim()) return alert("กรุณากรอกเบอร์โทร");
+
+    query = encodeURIComponent(field === "hn" ? clientHN : field === "name" ? clientName : clientPhone);
     try {
-      const res = await fetch(`/api/user-info?name=${encodeURIComponent(clientName.trim())}`);
+      const res = await fetch(`/api/user-info?${field}=${query}`);
       const data = await res.json();
-      if (data.success && data.name === clientName.trim()) {
+      if (data.success) {
         setClientHN(data.hn);
-        setClientPhone(data.phone || "");
-      } else alert("ไม่พบข้อมูลผู้ใช้ตรงกับชื่อที่กรอก");
+        setClientName(data.name);
+        setClientPhone(formatPhone(data.phone || ""));
+      } else {
+        if (field === "phone") alert("ไม่พบข้อมูลผู้ใช้ตรงกับเบอร์โทรที่กรอก");
+        else if (field === "hn") alert("ไม่พบข้อมูลผู้ใช้ตรงกับ HN ที่กรอก");
+        else alert("ไม่พบข้อมูลผู้ใช้ตรงกับชื่อที่กรอก");
+      }
     } catch { alert("เกิดข้อผิดพลาดในการดึงข้อมูล"); }
   };
 
-  const handleAutoFillHN = async () => {
-    if (clientHN.trim().length !== 9) return alert("กรุณากรอก HN ให้ครบ 9 หลัก");
+  const handleSearchName = async () => {
+    if (!clientName.trim()) return;
     try {
-      const res = await fetch(`/api/user-info?hn=${encodeURIComponent(clientHN.trim())}`);
+      const res = await fetch(`/api/search-users?name=${encodeURIComponent(clientName.trim())}`);
       const data = await res.json();
-      if (data.success) { setClientName(data.name); setClientPhone(data.phone || ""); } 
-      else alert("ไม่พบข้อมูลผู้ใช้ตรงกับ HN ที่กรอก");
-    } catch { alert("เกิดข้อผิดพลาดในการดึงข้อมูล"); }
+      setSearchResults(data.success ? data.users : []);
+      if (!data.success) alert("ไม่พบข้อมูลผู้ใช้");
+    } catch { alert("เกิดข้อผิดพลาดในการค้นหา"); }
+  };
+
+  const handleSelectUser = (user: UserInfo) => {
+    setClientName(user.name);
+    setClientHN(user.hn);
+    setClientPhone(formatPhone(user.phone || ""));
+    setSearchResults([]);
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-white to-emerald-100 relative overflow-hidden">
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 0.15 }} transition={{ duration: 2 }} className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,_#a7f3d0,_transparent_70%)]"/>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 0.15 }} transition={{ duration: 2 }} className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,_#a7f3d0,_transparent_70%)]" />
 
-      <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => router.push("/")} className="absolute top-6 left-6 flex items-center space-x-2 px-5 py-2 bg-emerald-600 text-white rounded-lg shadow-md hover:bg-emerald-700 transition z-10">
-        <Home className="w-5 h-5"/>
-        <span>หน้าแรก</span>
+      {/* Navigation */}
+      <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => router.push("/")} className="absolute top-6 left-6 flex items-center gap-2 px-5 py-2 bg-emerald-600 text-white rounded-lg shadow-md hover:bg-emerald-700 z-10">
+        <Home className="w-5 h-5" /> หน้าแรก
       </motion.button>
-
-      <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => router.push("/all-bookings")} className="absolute top-6 right-6 flex items-center space-x-2 px-5 py-2 bg-emerald-600 text-white rounded-lg shadow-md hover:bg-emerald-700 transition z-10">
-        <FaHistory className="w-5 h-5"/>
-        <span>ประวัติการจองทั้งหมด</span>
+      <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => router.push("/all-bookings")} className="absolute top-6 right-6 flex items-center gap-2 px-5 py-2 bg-emerald-600 text-white rounded-lg shadow-md hover:bg-emerald-700 z-10">
+        <FaHistory className="w-5 h-5" /> ประวัติการจองทั้งหมด
       </motion.button>
 
       <div className="max-w-6xl mx-auto p-6 pt-20 relative z-10">
@@ -144,11 +164,15 @@ export default function AdminBookingPage() {
           จองคิวนวดแผนไทย (Admin)
         </motion.h1>
 
+        {/* เลือกวันที่ */}
         <div className="mb-8 max-w-sm mx-auto">
-          <label className="block mb-2 font-medium text-gray-700 flex items-center gap-2"><CalendarIcon className="w-4 h-4"/> วันที่ต้องการนวด</label>
-          <input type="date" value={date} min={new Date().toISOString().split("T")[0]} onChange={e => setDate(e.target.value)} className={`border border-gray-300 rounded-lg p-3 w-full focus:outline-none focus:ring-2 focus:ring-emerald-400 transition ${!date ? "text-gray-400" : "text-gray-900"}`}/>
+          <label className="block mb-2 font-medium text-gray-700 flex items-center gap-2">
+            <CalendarIcon className="w-4 h-4" /> วันที่ต้องการนวด
+          </label>
+          <input type="date" value={date} min={new Date().toISOString().split("T")[0]} onChange={e => setDate(e.target.value)} className={`border border-gray-300 rounded-lg p-3 w-full focus:outline-none focus:ring-2 focus:ring-emerald-400 transition ${!date ? "text-gray-400" : "text-gray-900"}`} />
         </div>
 
+        {/* เลือกหมอ + เวลา */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {therapists.map(t => {
             const booked = bookedSlots[t] || [];
@@ -156,34 +180,22 @@ export default function AdminBookingPage() {
             return (
               <motion.div key={t} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className={`border p-5 rounded-2xl bg-white shadow-lg ${isSelected ? "ring-4 ring-emerald-300" : ""}`}>
                 <div className="flex items-center gap-2 mb-3">
-                  <UserIcon className="w-5 h-5 text-emerald-600"/>
+                  <UserIcon className="w-5 h-5 text-emerald-600" />
                   <h2 className="text-lg font-semibold text-emerald-700">{t}</h2>
                 </div>
-
                 <div className="grid grid-cols-2 gap-2">
                   {timeSlots.map(slot => {
                     const isBooked = booked.includes(slot);
                     const isPast = isTimeSlotPast(slot);
                     const isActive = isSelected && selectedTime === slot;
-
                     return (
-                      <button key={slot} disabled={isBooked || isPast} onClick={() => handleSelect(t, slot)}
-                        className={`text-sm px-3 py-2 rounded-lg font-medium border flex items-center justify-center gap-1 transition shadow-sm ${
-                          isBooked ? "bg-red-100 text-red-600 border-red-400 cursor-not-allowed" :
-                          isPast ? "bg-yellow-100 text-yellow-700 border-yellow-400 cursor-not-allowed" :
-                          isActive ? "bg-emerald-600 text-white border-emerald-600" :
-                          "bg-white hover:bg-emerald-50 text-emerald-800 border-gray-300"
-                        }`}>
-                        <Clock className="w-4 h-4"/>
-                        <span>{slot}</span>
-                        {(isBooked || isPast) && <span className="text-xs font-semibold">({isBooked ? "ถูกจองแล้ว" : "หมดเวลาจอง"})</span>}
+                      <button key={slot} disabled={isBooked || isPast} onClick={() => handleSelect(t, slot)} className={`text-sm px-3 py-2 rounded-lg font-medium border flex items-center justify-center gap-1 transition shadow-sm ${isBooked ? "bg-red-100 text-red-600 border-red-400 cursor-not-allowed" : isPast ? "bg-yellow-100 text-yellow-700 border-yellow-400 cursor-not-allowed" : isActive ? "bg-emerald-600 text-white border-emerald-600" : "bg-white hover:bg-emerald-50 text-emerald-800 border-gray-300"}`}>
+                        <Clock className="w-4 h-4" /> {slot} {(isBooked || isPast) && <span className="text-xs font-semibold">({isBooked ? "ถูกจองแล้ว" : "หมดเวลาจอง"})</span>}
                       </button>
                     );
                   })}
                 </div>
-
-                <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} onClick={handleOpenDialog} disabled={!(isSelected && selectedTime && date)}
-                  className={`mt-5 w-full py-2 rounded-xl font-bold shadow transition text-center ${isSelected && selectedTime && date ? "bg-emerald-600 text-white hover:bg-emerald-700" : "bg-gray-300 text-gray-500 cursor-not-allowed"}`}>
+                <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} onClick={handleOpenDialog} disabled={!(isSelected && selectedTime && date)} className={`mt-5 w-full py-2 rounded-xl font-bold shadow transition text-center ${isSelected && selectedTime && date ? "bg-emerald-600 text-white hover:bg-emerald-700" : "bg-gray-300 text-gray-500 cursor-not-allowed"}`}>
                   เลือก
                 </motion.button>
               </motion.div>
@@ -191,28 +203,44 @@ export default function AdminBookingPage() {
           })}
         </div>
 
+        {/* Dialog กรอกข้อมูลผู้ป่วย */}
         <Dialog.Root open={dialogOpen} onOpenChange={setDialogOpen}>
           <Dialog.Portal>
-            <Dialog.Overlay className="fixed inset-0 bg-black/30 z-40"/>
+            <Dialog.Overlay className="fixed inset-0 bg-black/30 z-40" />
             <Dialog.Content className="fixed z-50 left-1/2 top-1/2 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white p-6 shadow-lg">
               <Dialog.Title className="text-xl font-bold mb-4 text-emerald-700">กรอกข้อมูลผู้รับบริการ</Dialog.Title>
 
-              <label className="block mb-3 relative">
-                <span className="text-sm font-medium text-emerald-800">HN</span>
-                <input type="text" value={clientHN} onChange={e=>setClientHN(e.target.value)} maxLength={9} placeholder="กรอก HN" className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900"/>
-                <button type="button" onClick={handleAutoFillHN} className="absolute top-0 right-0 mt-1 mr-1 px-2 py-1 bg-emerald-600 text-white rounded-md text-xs hover:bg-emerald-700">Auto-fill</button>
-              </label>
+              {["hn", "name", "phone"].map(field => (
+                <label key={field} className="block mb-3 relative">
+                  <span className="text-sm font-medium text-emerald-800">{field === "hn" ? "HN" : field === "name" ? "ชื่อผู้รับบริการ" : "เบอร์โทร"}</span>
+                  <input
+                    type="text"
+                    value={field === "hn" ? clientHN : field === "name" ? clientName : clientPhone}
+                    onChange={e => field === "hn" ? setClientHN(e.target.value) : field === "name" ? setClientName(e.target.value) : handlePhoneChange(e)}
+                    maxLength={field === "hn" ? 9 : field === "phone" ? 11 : undefined}
+                    placeholder={field === "hn" ? "กรอก HN" : field === "name" ? "กรอกชื่อ" : "กรอกเบอร์โทร"}
+                    className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900"
+                  />
+                  <div className="absolute top-0 right-0 mt-1 mr-1 flex gap-1">
+                    {field === "hn" && <button type="button" onClick={() => handleAutoFill("hn")} className="px-2 py-1 bg-emerald-600 text-white rounded-md text-xs hover:bg-emerald-700">Auto-fill</button>}
+                    {field === "name" && <>
+                      <button type="button" onClick={handleSearchName} className="px-2 py-1 bg-blue-600 text-white rounded-md text-xs hover:bg-blue-700">ค้นหา</button>
+                      <button type="button" onClick={() => handleAutoFill("name")} className="px-2 py-1 bg-emerald-600 text-white rounded-md text-xs hover:bg-emerald-700">Auto-fill</button>
+                    </>}
+                    {field === "phone" && <button type="button" onClick={() => handleAutoFill("phone")} className="px-2 py-1 bg-emerald-600 text-white rounded-md text-xs hover:bg-emerald-700">Auto-fill</button>}
+                  </div>
+                </label>
+              ))}
 
-              <label className="block mb-3 relative">
-                <span className="text-sm font-medium text-emerald-800">ชื่อผู้รับบริการ</span>
-                <input type="text" value={clientName} onChange={e=>setClientName(e.target.value)} placeholder="กรอกชื่อ" className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900"/>
-                <button type="button" onClick={handleAutoFillName} className="absolute top-0 right-0 mt-1 mr-1 px-2 py-1 bg-emerald-600 text-white rounded-md text-xs hover:bg-emerald-700">Auto-fill</button>
-              </label>
-
-              <label className="block mb-4">
-                <span className="text-sm font-medium text-emerald-800">เบอร์โทร</span>
-                <input type="text" value={clientPhone} onChange={handlePhoneChange} maxLength={11} placeholder="กรอกเบอร์โทร" className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900"/>
-              </label>
+              {searchResults.length > 0 && (
+                <ul className="border rounded mt-2 mb-3 max-h-48 overflow-auto bg-white shadow">
+                  {searchResults.map((u, idx) => (
+                    <li key={idx} className="p-2 hover:bg-gray-100 cursor-pointer text-sm text-black" onClick={() => handleSelectUser(u)}>
+                      {u.name} {u.phone && `(${formatPhone(u.phone)})`}
+                    </li>
+                  ))}
+                </ul>
+              )}
 
               <div className="flex justify-end gap-3">
                 <Dialog.Close asChild>
@@ -224,10 +252,11 @@ export default function AdminBookingPage() {
           </Dialog.Portal>
         </Dialog.Root>
 
+        {/* Alert */}
         <AnimatePresence>
           {showAlert && (
             <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="fixed top-20 left-1/2 -translate-x-1/2 bg-yellow-50 border border-yellow-400 text-yellow-700 px-6 py-4 rounded-lg flex items-center gap-3 shadow-lg max-w-md z-50">
-              <AlertCircle className="w-6 h-6"/>
+              <AlertCircle className="w-6 h-6" />
               <span>กรุณาเลือกวันที่ก่อนจองคิว</span>
               <button onClick={() => setShowAlert(false)} className="ml-auto text-yellow-700 font-bold hover:text-yellow-900">✕</button>
             </motion.div>

@@ -143,8 +143,38 @@ export default function AllBookingsPage() {
     return nameMatch && therapistMatch && dateMatch && timeSlotMatch;
   });
 
-  const attendedBookings = filteredBookings.filter(b => getStatusLabel(b) === "สำเร็จ");
-  const cancelledBookings = filteredBookings.filter(b => getStatusLabel(b) === "ยกเลิก");
+// แปลงวันที่ของแต่ละ booking ให้เป็น YYYY-MM-DD
+const formatDate = (dateStr: string) => {
+  const d = new Date(dateStr);
+  return `${d.getFullYear()}-${(d.getMonth() + 1)
+    .toString()
+    .padStart(2, "0")}-${d.getDate().toString().padStart(2, "0")}`;
+};
+
+  // หา key สำหรับคนที่มานวดจริงในวันนั้น
+  const attendedKeys = new Set<string>();
+  const attendedBookings: Booking[] = [];
+
+  bookings.forEach((b) => {
+    if (
+      getStatusLabel(b) === "สำเร็จ" &&
+      (!filterDate || formatDate(b.date) === filterDate)
+    ) {
+      const key = `${b.name}-${formatDate(b.date)}`;
+      if (!attendedKeys.has(key)) {
+        attendedKeys.add(key);
+        attendedBookings.push(b); // เก็บแค่ครั้งเดียวต่อคนต่อวัน
+      }
+    }
+  });
+
+  // นับไม่มานวดเฉพาะที่ไม่มีการมานวดจริงในวันเดียวกัน
+  const cancelledBookings = bookings.filter((b) => {
+    if (getStatusLabel(b) !== "ยกเลิก") return false;
+    if (filterDate && formatDate(b.date) !== filterDate) return false;
+    const key = `${b.name}-${formatDate(b.date)}`;
+    return !attendedKeys.has(key); // ถ้ามี record สำเร็จในวันนั้น จะไม่นับยกเลิกนี้
+  });
 
   const selectedBooking = bookings.find(b => b.id === selectedId);
 
@@ -199,7 +229,8 @@ export default function AllBookingsPage() {
         <div>
           <label className="block text-emerald-700 font-semibold mb-2">วันที่:</label>
           <input type="date" value={filterDate} onChange={e => setFilterDate(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900" />
+            placeholder="เลือกวันที่"
+            className={`px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 ${filterDate ? "text-gray-900" : "text-gray-400"}`} />
         </div>
         <div>
           <label className="block text-emerald-700 font-semibold mb-2">ช่วงเวลา:</label>
@@ -347,4 +378,4 @@ function Label({ icon, text }: { icon: React.ReactNode, text: string }) {
       {icon} {text}
     </div>
   );
-}
+} 

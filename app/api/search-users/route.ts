@@ -10,24 +10,35 @@ const pool = mysql.createPool({
 
 export async function GET(req: NextRequest) {
   const name = req.nextUrl.searchParams.get("name") || "";
-
   if (!name.trim()) {
     return NextResponse.json({ success: false, message: "No name" });
   }
 
   try {
+    // แยกคำจาก input
+    const terms = name.trim().split(/\s+/);
+
+    // สร้าง WHERE clause สำหรับแต่ละคำ
+const whereClause = terms
+  .map(() => `(CONCAT(pname, fname, lname) LIKE ? OR CONCAT(fname, ' ', lname) LIKE ?)` )
+  .join(" AND ");
+
+const params: string[] = [];
+terms.forEach(term => {
+  params.push(`%${term}%`, `%${term}%`);
+});
+
     const [rows]: any = await pool.query(
       `SELECT hn, pname, fname, lname, mobile_phone_number AS phone
        FROM med_user
-       WHERE fname LIKE ?
-       LIMIT 500`,
-      [`%${name}%`]
+       WHERE ${whereClause}
+       LIMIT 1000`,
+      params
     );
 
-    // รวมคำนำหน้า + ชื่อ + นามสกุล
     const users = rows.map((r: any) => ({
       hn: r.hn,
-      name: `${r.pname}${r.fname} ${r.lname}`, // รวมคำนำหน้า
+      name: `${r.pname}${r.fname} ${r.lname}`,
       phone: r.phone || "",
     }));
 

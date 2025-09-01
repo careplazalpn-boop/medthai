@@ -143,16 +143,6 @@ export default function HomePage() {
               <span>เข้าสู่ระบบ</span>
             </motion.button>
 
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => router.push("/register")}
-              className="flex items-center space-x-2 px-5 py-2 bg-white border border-emerald-600 text-emerald-700 rounded-lg shadow-md hover:bg-emerald-50 transition"
-              title="สมัครสมาชิก"
-            >
-              <FaUserPlus />
-              <span>สมัครสมาชิก</span>
-            </motion.button>
           </>
         )}
       </div>

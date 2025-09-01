@@ -8,7 +8,9 @@
     "dev:next": "next dev --turbopack",
     "dev:job": "node background-job.js",
     "build": "next build",
-    "start": "next start",
+    "start": "concurrently \"npm:start:next\" \"npm:start:job\"",
+    "start:next": "next start",
+    "start:job": "node background-job.js",
     "lint": "next lint"
   },
   "dependencies": {

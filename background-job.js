@@ -1,25 +1,21 @@
 import fetch from "node-fetch";
 import dotenv from "dotenv";
+import mysql from "mysql2/promise";
 
 dotenv.config();
 
-const API_URL = process.env.API_URL || "http://lmwcc.synology.me:3000/api/all-bookings";
+const API_URL = process.env.API_URL || "http://lmwcc.synology.me:3000/api/all-bookings"; 
 
-// เวลาช่วง [start, end] ในรูปแบบ "HH:MM"
-const timeSlots = [
-  ["08:00", "09:30"],
-  ["09:30", "11:00"],
-  ["11:00", "12:30"],
-  ["13:00", "14:30"],
-  ["14:30", "16:00"],
-  ["16:00", "17:30"]
-];
-
-// แปลง slot เป็นนาที
-const slotMinutes = timeSlots.map(([start, end]) => [
-  parseInt(start.split(":")[0]) * 60 + parseInt(start.split(":")[1]),
-  parseInt(end.split(":")[0]) * 60 + parseInt(end.split(":")[1]),
-]);
+// สร้าง connection pool ของ MySQL
+const pool = mysql.createPool({
+  host: process.env.DB_HOST || "lmwcc.synology.me",
+  user: process.env.DB_USER || "medthai",
+  password: process.env.DB_PASS || "I4FEtUu*-uB-hAK0",
+  database: process.env.DB_NAME || "medthai",
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
+});
 
 // เก็บ slot ที่เรียกไปแล้ววันนี้
 let calledSlots = new Set();
@@ -44,8 +40,28 @@ async function callApi(slotLabel) {
   }
 }
 
+// ดึงเวลาช่วงจาก DB
+async function getTimeSlotsFromDB() {
+  try {
+    const [rows] = await pool.query("SELECT slot FROM time_slot ORDER BY id ASC");
+    // rows = [{ slot: "08:00-09:30" }, ...]
+    return rows.map(r => r.slot.split("-")); // [["08:00","09:30"], ...]
+  } catch (err) {
+    console.error("Error fetching time slots from DB:", err);
+    return [];
+  }
+}
+
 // ตรวจเวลาปัจจุบันกับแต่ละ slot
-function checkTime() {
+async function checkTime() {
+  const slotTimes = await getTimeSlotsFromDB();
+  if (slotTimes.length === 0) return;
+
+  const slotMinutes = slotTimes.map(([start, end]) => [
+    parseInt(start.split(":")[0]) * 60 + parseInt(start.split(":")[1]),
+    parseInt(end.split(":")[0]) * 60 + parseInt(end.split(":")[1])
+  ]);
+
   const nowM = getMinutesNowTH();
   const todayTH = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
 
@@ -56,7 +72,7 @@ function checkTime() {
   }
 
   slotMinutes.forEach(([startM, endM], idx) => {
-    const slotLabel = `${timeSlots[idx][0]}-${timeSlots[idx][1]}`;
+    const slotLabel = `${slotTimes[idx][0]}-${slotTimes[idx][1]}`;
     if (nowM >= startM && nowM < endM && !calledSlots.has(slotLabel)) {
       calledSlots.add(slotLabel);
       callApi(slotLabel);
@@ -64,7 +80,8 @@ function checkTime() {
   });
 }
 
-setInterval(checkTime, 1000); // ทุก 1 วินาที
+// ตรวจทุก 1 วินาที
+setInterval(checkTime, 1000);
 
 // เรียกทันทีตอนเริ่ม
 checkTime();

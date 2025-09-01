@@ -3,7 +3,7 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const API_URL = process.env.API_URL || "http://127.0.0.1:3000/api/all-bookings";
+const API_URL = process.env.API_URL || "http://lmwcc.synology.me:3000/api/all-bookings";
 
 // เวลาช่วง [start, end] ในรูปแบบ "HH:MM"
 const timeSlots = [

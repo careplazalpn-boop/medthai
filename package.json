@@ -6,11 +6,11 @@
   "scripts": {
     "dev": "concurrently \"npm:dev:next\" \"npm:dev:job\"",
     "dev:next": "next dev --turbopack",
-    "dev:job": "node background-job.js",
+    "dev:job": "wait-on http://localhost:3000 && node background-job.js",
     "build": "next build",
     "start": "concurrently \"npm:start:next\" \"npm:start:job\"",
     "start:next": "next start",
-    "start:job": "node background-job.js",
+    "start:job": "wait-on http://localhost:3000 && node background-job.js",
     "lint": "next lint"
   },
   "dependencies": {
@@ -41,6 +41,7 @@
     "eslint": "^9",
     "eslint-config-next": "15.4.1",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "wait-on": "^8.0.4"
   }
 }

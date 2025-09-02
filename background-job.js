@@ -1,10 +1,11 @@
 import fetch from "node-fetch";
 import dotenv from "dotenv";
 import mysql from "mysql2/promise";
+import cron from "node-cron";
 
 dotenv.config();
 
-const API_URL = process.env.API_URL || "http://lmwcc.synology.me:3000/api/all-bookings"; 
+const API_URL = process.env.API_URL || "http://127.0.0.1:3000/api/all-bookings"; 
 
 // สร้าง connection pool ของ MySQL
 const pool = mysql.createPool({
@@ -17,9 +18,67 @@ const pool = mysql.createPool({
   queueLimit: 0,
 });
 
-// เก็บ slot ที่เรียกไปแล้ววันนี้
+// ----------------- Background Job: Clean old off_dates -----------------
+function getTodayTH() {
+  const nowTH = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Bangkok" }));
+  const y = nowTH.getFullYear();
+  const m = String(nowTH.getMonth() + 1).padStart(2, "0");
+  const d = String(nowTH.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+async function cleanOldDates() {
+  try {
+    const today = getTodayTH(); // yyyy-mm-dd
+    console.log(`[debug] Starting cleanOldDates job...`);
+    console.log(`[debug] Today (TH): ${today}`);
+
+    const [rows] = await pool.query("SELECT id, off_date FROM therapist");
+
+    for (const row of rows) {
+      if (!row.off_date || row.off_date.toLowerCase() === "null") continue;
+
+      const dates = row.off_date.split(",").map(d => d.trim());
+      const newDates = dates.filter(d => d >= today);
+
+      console.log();
+      console.log(`[therapist:${row.id}] Raw off_date: "${row.off_date}"`);
+      console.log(`[therapist:${row.id}] Filtered dates:`, newDates);
+
+      if (newDates.join(",") !== row.off_date) {
+        await pool.query("UPDATE therapist SET off_date = ? WHERE id = ?", [
+          newDates.join(","),
+          row.id,
+        ]);
+        console.log(`[therapist:${row.id}] DB updated successfully!`);
+      } else {
+        console.log(`[therapist:${row.id}] Dates unchanged, no update needed`);
+      }
+    }
+    console.log();
+    console.log(`[debug] cleanOldDates job finished successfully!`);
+  } catch (err) {
+    console.error("Error cleaning old dates:", err);
+  }
+  console.log();
+}
+
+// ตั้ง Cron Job รันทุกวันตอนเที่ยงคืนไทย
+cron.schedule(
+  "0 0 * * *",
+  () => {
+    console.log("Running scheduled job: cleanOldDates (Bangkok Time)");
+    cleanOldDates();
+  },
+  {
+    timezone: "Asia/Bangkok"
+  }
+);
+
+// ----------------- API Slot Checker -----------------
+
 let calledSlots = new Set();
-let todayDate = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
+let todayDate = getTodayTH();
 
 // แปลงเวลาปัจจุบันของไทยเป็นนาทีของวัน
 function getMinutesNowTH() {
@@ -34,9 +93,9 @@ async function callApi(slotLabel) {
     await new Promise(res => setTimeout(res, 2000)); // รอ 2 วินาที
     const res = await fetch(API_URL);
     const data = await res.json();
-    console.log(`[${new Date().toLocaleString()}] Called /api/all-bookings for slot ${slotLabel} - success: ${data.success}`);
+    console.log(`[${new Date().toLocaleString("en-CA", { timeZone: "Asia/Bangkok" })}] Called /api/all-bookings for slot ${slotLabel} - success: ${data.success}`);
   } catch (err) {
-    console.error(`[${new Date().toLocaleString()}] Error calling /api/all-bookings`, err);
+    console.error(`[${new Date().toLocaleString("en-CA", { timeZone: "Asia/Bangkok" })}] Error calling /api/all-bookings`, err);
   }
 }
 
@@ -44,7 +103,6 @@ async function callApi(slotLabel) {
 async function getTimeSlotsFromDB() {
   try {
     const [rows] = await pool.query("SELECT slot FROM time_slot ORDER BY id ASC");
-    // rows = [{ slot: "08:00-09:30" }, ...]
     return rows.map(r => r.slot.split("-")); // [["08:00","09:30"], ...]
   } catch (err) {
     console.error("Error fetching time slots from DB:", err);
@@ -63,7 +121,7 @@ async function checkTime() {
   ]);
 
   const nowM = getMinutesNowTH();
-  const todayTH = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
+  const todayTH = getTodayTH();
 
   // รีเซ็ต slot เรียกทุกวันใหม่
   if (todayTH !== todayDate) {
@@ -85,3 +143,6 @@ setInterval(checkTime, 1000);
 
 // เรียกทันทีตอนเริ่ม
 checkTime();
+
+// ----------------- รัน cleanOldDates ตอนเริ่มด้วย เผื่อ process เริ่มใหม่ -----------------
+cleanOldDates();

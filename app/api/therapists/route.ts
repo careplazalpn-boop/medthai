@@ -13,7 +13,7 @@ export async function GET() {
     const [rows] = await pool.query("SELECT name FROM therapist ORDER BY id ASC");
     const therapists = (rows as any[]).map(r => r.name);
     return NextResponse.json({ success: true, therapists });
-  } catch (e) {
+  } catch {
     return NextResponse.json({ success: false, error: "Failed to fetch therapists" });
   }
 }

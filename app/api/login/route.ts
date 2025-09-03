@@ -20,28 +20,28 @@ function generateToken() {
 
 export async function POST(request: Request) {
   try {
-    const { email, password } = await request.json();
+    const { username, password } = await request.json();
 
-    if (!email || !password) {
+    if (!username || !password) {
       return NextResponse.json(
-        { success: false, error: "กรุณากรอกอีเมลและรหัสผ่าน" },
+        { success: false, error: "กรุณากรอกชื่อผู้ใช้และรหัสผ่าน" },
         { status: 400 }
       );
     }
 
     const conn = await pool.getConnection();
 
-    // ดึงข้อมูล user โดย query จาก email เท่านั้น
+    // ดึงข้อมูล user โดย query จาก username
     const [rows] = await conn.query(
-      "SELECT id, email, name, phone, role, password FROM users WHERE email = ?",
-      [email]
+      "SELECT id, username, name, phone, role, password FROM users WHERE username = ?",
+      [username]
     );
 
     conn.release();
 
     if ((rows as any).length === 0) {
       return NextResponse.json(
-        { success: false, error: "อีเมลหรือรหัสผ่านไม่ถูกต้อง" },
+        { success: false, error: "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง" },
         { status: 401 }
       );
     }
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return NextResponse.json(
-        { success: false, error: "อีเมลหรือรหัสผ่านไม่ถูกต้อง" },
+        { success: false, error: "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง" },
         { status: 401 }
       );
     }

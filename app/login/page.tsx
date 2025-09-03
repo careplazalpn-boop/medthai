@@ -4,13 +4,13 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { motion } from "framer-motion";
-import { FaEnvelope, FaLock, FaArrowLeft } from "react-icons/fa";
+import { FaUser, FaLock, FaArrowLeft } from "react-icons/fa";
 
 export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuth();
 
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
@@ -21,7 +21,7 @@ export default function LoginPage() {
     try {
       const res = await fetch("/api/login", {
         method: "POST",
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ username, password }),
         headers: {
           "Content-Type": "application/json",
         },
@@ -33,9 +33,9 @@ export default function LoginPage() {
         setError(data.error || "เข้าสู่ระบบไม่สำเร็จ");
       } else {
         login(data.user);
-        router.push("/");  // ไปหน้า Home หลัง login
+        router.push("/"); // ไปหน้า Home หลัง login
       }
-    } catch (err) {
+    } catch {
       setError("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์");
     }
   };
@@ -68,15 +68,15 @@ export default function LoginPage() {
           whileFocus={{ scale: 1.03 }}
           className="mb-6 relative flex items-center border border-emerald-300 rounded-xl focus-within:ring-4 focus-within:ring-emerald-400 transition"
         >
-          <FaEnvelope className="absolute left-4 text-emerald-500" />
+          <FaUser className="absolute left-4 text-emerald-500" />
           <input
-            type="email"
-            placeholder="อีเมล"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            type="text"
+            placeholder="ชื่อผู้ใช้"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
             className="w-full p-4 pl-12 rounded-xl focus:outline-none text-gray-800"
             required
-            autoComplete="email"
+            autoComplete="username"
           />
         </motion.div>
 

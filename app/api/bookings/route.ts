@@ -46,9 +46,9 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const data = await request.json();
-    const { hn, name, phone, therapist, time, date } = data;
+    const { provider, hn, name, phone, therapist, time, date } = data; // ✅ เพิ่ม provider
 
-    if (!hn || !name || !phone || !therapist || !time || !date) {
+    if (!provider || !hn || !name || !phone || !therapist || !time || !date) { // ✅ ตรวจสอบ provider ด้วย
       return NextResponse.json(
         { success: false, error: "ข้อมูลไม่ครบถ้วน" },
         { status: 400 }
@@ -86,10 +86,10 @@ export async function POST(request: Request) {
         );
       }
 
-      // บันทึกข้อมูลการจอง
+      // บันทึกข้อมูลการจอง พร้อม provider ✅
       await conn.query(
-        "INSERT INTO bookings (hn, name, phone, therapist, time_slot, date, status) VALUES (?, ?, ?, ?, ?, ?, 'รอดำเนินการ')",
-        [hn, name, phone, therapist, time, date]
+        "INSERT INTO bookings (provider, hn, name, phone, therapist, time_slot, date, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'รอดำเนินการ')",
+        [provider, hn, name, phone, therapist, time, date]
       );
 
       // อัปเดตสถานะการจองใน users

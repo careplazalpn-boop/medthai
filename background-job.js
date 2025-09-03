@@ -30,8 +30,8 @@ function getTodayTH() {
 async function cleanOldDates() {
   try {
     const today = getTodayTH(); // yyyy-mm-dd
-    console.log(`[debug] Starting cleanOldDates job...`);
-    console.log(`[debug] Today (TH): ${today}`);
+    console.log(`Starting cleanOldDates job...`);
+    console.log(`Today (TH): ${today}`);
 
     const [rows] = await pool.query("SELECT id, off_date FROM therapist");
 
@@ -56,7 +56,7 @@ async function cleanOldDates() {
       }
     }
     console.log();
-    console.log(`[debug] cleanOldDates job finished successfully!`);
+    console.log(`cleanOldDates job finished successfully!`);
   } catch (err) {
     console.error("Error cleaning old dates:", err);
   }
@@ -93,9 +93,11 @@ async function callApi(slotLabel) {
     await new Promise(res => setTimeout(res, 2000)); // รอ 2 วินาที
     const res = await fetch(API_URL);
     const data = await res.json();
-    console.log(`[${new Date().toLocaleString("en-CA", { timeZone: "Asia/Bangkok" })}] Called /api/all-bookings for slot ${slotLabel} - success: ${data.success}`);
+    console.log(`[${new Date().toLocaleString("en-CA", { timeZone: "Asia/Bangkok" })}] called /api/all-bookings for slot ${slotLabel}`);
+    console.log('[all-bookings] update status success!')
   } catch (err) {
     console.error(`[${new Date().toLocaleString("en-CA", { timeZone: "Asia/Bangkok" })}] Error calling /api/all-bookings`, err);
+    console.log('[all-bookings] update status failed')
   }
 }
 
@@ -131,7 +133,19 @@ async function checkTime() {
 
   slotMinutes.forEach(([startM, endM], idx) => {
     const slotLabel = `${slotTimes[idx][0]}-${slotTimes[idx][1]}`;
-    if (nowM >= startM && nowM < endM && !calledSlots.has(slotLabel)) {
+
+    if (calledSlots.has(slotLabel)) return; // ข้ามถ้าเรียกไปแล้ว
+
+    if (nowM === startM) {
+      // เริ่มช่วง
+      calledSlots.add(slotLabel);
+      callApi(slotLabel);
+    } else if (nowM > startM && nowM < endM) {
+      // ภายในช่วง
+      calledSlots.add(slotLabel);
+      callApi(slotLabel);
+    } else if (nowM === endM) {
+      // จบช่วง
       calledSlots.add(slotLabel);
       callApi(slotLabel);
     }

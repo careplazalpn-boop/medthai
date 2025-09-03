@@ -32,6 +32,9 @@ export default function AdminBookingPage() {
   const [clientPhone, setClientPhone] = useState("");
   const [searchResults, setSearchResults] = useState<UserInfo[]>([]);
 
+    // **เพิ่ม state ผู้รับผิดชอบใน Dialog**
+  const [dialogTherapist, setDialogTherapist] = useState("");
+
   // **เพิ่ม state หมอไม่มา**
   const [offTherapists, setOffTherapists] = useState<string[]>([]);
 
@@ -110,6 +113,7 @@ export default function AdminBookingPage() {
       date,
       therapist: selectedTherapist,
       time: selectedTime,
+      provider: dialogTherapist || "", // เพิ่มชื่อผู้รับผิดชอบที่เลือกจาก dropdown
     }).toString()}`);
   };
 
@@ -117,6 +121,7 @@ export default function AdminBookingPage() {
     setClientHN("");
     setClientName("");
     setClientPhone("");
+    setDialogTherapist(""); // reset therapist dropdown
     setSearchResults([]);
     setDialogOpen(true);
   };
@@ -263,6 +268,30 @@ export default function AdminBookingPage() {
             <Dialog.Overlay className="fixed inset-0 bg-black/30 z-40" />
             <Dialog.Content className="fixed z-50 left-1/2 top-1/2 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white p-6 shadow-lg">
               <Dialog.Title className="text-xl font-bold mb-4 text-emerald-700">กรอกข้อมูลผู้รับบริการ</Dialog.Title>
+
+              {/* 🔥 Dropdown ผู้รับผิดชอบ */}
+              <label className="block mb-3">
+                <span className="text-sm font-medium text-emerald-800">ผู้รับผิดชอบ</span>
+                <select
+                  value={dialogTherapist}
+                  onChange={(e) => setDialogTherapist(e.target.value)}
+                  className={`mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 ${
+                    dialogTherapist === "" ? "text-gray-400" : "text-gray-900"
+                  }`}
+                >
+                  {/* placeholder สีเทา กดไม่ได้ */}
+                  <option value="" disabled className="text-gray-400">
+                    -- เลือก --
+                  </option>
+
+                  {/* ชื่อหมอสีดำ */}
+                  {therapists.map((t) => (
+                    <option key={t} value={t} className="text-black">
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
               {["hn", "name", "phone"].map(field => (
                 <label key={field} className="block mb-3 relative">

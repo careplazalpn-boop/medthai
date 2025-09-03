@@ -17,6 +17,7 @@ export default function ConfirmPage() {
   const date = params.get("date");
   const therapist = params.get("therapist");
   const time = params.get("time");
+  const provider = params.get("provider"); // ✅ เพิ่มรับค่า provider
 
   const [success, setSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -36,7 +37,7 @@ export default function ConfirmPage() {
       const res = await fetch("/api/bookings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ hn, name, phone, date, therapist, time }),
+        body: JSON.stringify({ hn, name, phone, date, therapist, time, provider }), // ✅ ส่ง provider ด้วย
       });
       const data = await res.json();
       if (data.success) setSuccess(true);
@@ -64,6 +65,7 @@ export default function ConfirmPage() {
         <h2 className="text-3xl font-extrabold text-emerald-700 mb-6 tracking-wide">ข้อมูลการจองผู้รับบริการ</h2>
 
         <ul className="text-gray-700 space-y-4 mb-8 text-left">
+          <InfoItem icon={UserCheck} label="ผู้ให้บริการ:" value={provider} /> {/* ✅ เพิ่มตรงนี้ */}
           <InfoItem icon={User} label="HN:" value={hn} />
           <InfoItem icon={User} label="ชื่อ-นามสกุล:" value={name} />
           <InfoItem icon={Phone} label="เบอร์โทร:" value={phone} />

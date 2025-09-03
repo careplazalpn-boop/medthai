@@ -6,7 +6,6 @@ import {
   FaSpa,
   FaHistory,
   FaSignOutAlt,
-  FaUserPlus,
 } from "react-icons/fa";
 import { useAuth } from "@/context/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";

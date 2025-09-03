@@ -40,31 +40,37 @@ const getStatusColor = (b: Booking) => {
   }
 };
 
-function BookingSummary({ attended, cancelled }: { attended: Booking[], cancelled: Booking[] }) {
-  const total = attended.length + cancelled.length;
-  const attendedPercent = total ? Math.round((attended.length / total) * 100) : 0;
+interface SummaryProps { attended: Booking[]; cancelled: Booking[]; }
+function BookingSummary({ attended, cancelled }: SummaryProps) {
+  const totalAttended = attended.length;
+  const totalCancelled = cancelled.length;
+  const total = totalAttended + totalCancelled;
+  const attendedPercent = total ? Math.round((totalAttended / total) * 100) : 0;
   const cancelledPercent = total ? 100 - attendedPercent : 0;
-
-  const SummaryCard = ({ icon, title, count, percent, color, bgColor }: any) => (
-    <motion.div
-      initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-      transition={{ duration: 0.5 }}
-      className={`relative ${bgColor} text-${color}-900 rounded-2xl p-4 shadow-md flex flex-col items-center border-2 border-${color}-200 transition-transform`}
-    >
-      {icon}
-      <span className="text-xl font-bold">{count} คน</span>
-      <span className="text-sm font-medium mb-2">{title}</span>
-      <div className={`w-full h-3 bg-${color}-200 rounded-full overflow-hidden`}>
-        <motion.div className={`h-full bg-${color}-600 rounded-full`} initial={{ width: 0 }} animate={{ width: `${percent}%` }} transition={{ duration: 1 }} />
-      </div>
-      <span className="text-xs text-gray-600 mt-1">{percent}%</span>
-    </motion.div>
-  );
 
   return (
     <div className="max-w-6xl mx-auto mb-5 grid grid-cols-2 gap-2">
-      <SummaryCard icon={<Smile className="w-8 h-8 text-emerald-500 mb-1" />} title="มานวด" count={attended.length} percent={attendedPercent} color="emerald" bgColor="bg-emerald-50" />
-      <SummaryCard icon={<Frown className="w-8 h-8 text-red-500 mb-1" />} title="ไม่มานวด" count={cancelled.length} percent={cancelledPercent} color="red" bgColor="bg-red-50" />
+      <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.5 }}
+        className="relative bg-emerald-50 text-emerald-900 rounded-2xl p-4 shadow-md flex flex-col items-center border-2 border-emerald-200 transition-transform">
+        <Smile className="w-8 h-8 text-emerald-500 mb-1" />
+        <span className="text-xl font-bold">{totalAttended} คน</span>
+        <span className="text-sm font-medium text-emerald-700 mb-2">มานวด</span>
+        <div className="w-full h-3 bg-emerald-200 rounded-full overflow-hidden">
+          <motion.div className="h-full bg-emerald-600 rounded-full" initial={{ width: 0 }} animate={{ width: `${attendedPercent}%` }} transition={{ duration: 1 }} />
+        </div>
+        <span className="text-xs text-gray-600 mt-1">{attendedPercent}%</span>
+      </motion.div>
+
+      <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.5, delay: 0.2 }}
+        className="relative bg-red-50 text-red-900 rounded-2xl p-4 shadow-md flex flex-col items-center border-2 border-red-200 transition-transform">
+        <Frown className="w-8 h-8 text-red-500 mb-1" />
+        <span className="text-xl font-bold">{totalCancelled} คน</span>
+        <span className="text-sm font-medium text-red-700 mb-2">ไม่มานวด</span>
+        <div className="w-full h-3 bg-red-200 rounded-full overflow-hidden">
+          <motion.div className="h-full bg-red-600 rounded-full" initial={{ width: 0 }} animate={{ width: `${cancelledPercent}%` }} transition={{ duration: 1 }} />
+        </div>
+        <span className="text-xs text-gray-600 mt-1">{cancelledPercent}%</span>
+      </motion.div>
     </div>
   );
 }

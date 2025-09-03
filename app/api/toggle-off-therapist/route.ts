@@ -13,39 +13,48 @@ const pool = mysql.createPool({
 
 export async function POST(req: NextRequest) {
   try {
-    const { therapist, date }: { therapist: string; date: string } = await req.json();
+    const { therapist, date, slot }: { therapist: string; date: string; slot?: string } = await req.json();
     if (!therapist || !date) return NextResponse.json({ success: false, message: "Missing params" });
 
     const conn = await pool.getConnection();
 
-    // ดึงค่า off_date ปัจจุบัน
-    const [rows]: any = await conn.query("SELECT off_date FROM therapist WHERE name = ?", [therapist]);
+    // ดึงค่า off_date และ disabled_slots ปัจจุบัน
+    const [rows]: any = await conn.query("SELECT off_date, disabled_slots FROM therapist WHERE name = ?", [therapist]);
     let offDates: string[] = [];
+    let disabledSlots: string[] = [];
 
     if (rows[0]?.off_date) {
-      const val = rows[0].off_date;
-      // ตรวจสอบว่าเป็น string
-      if (typeof val === "string") offDates = val.split(",").map((d: string) => d.trim()).filter(Boolean);
+      offDates = rows[0].off_date.split(",").map((d: string) => d.trim()).filter(Boolean);
+    }
+    if (rows[0]?.disabled_slots) {
+      disabledSlots = rows[0].disabled_slots.split(",").map((d: string) => d.trim()).filter(Boolean);
     }
 
-    const formattedDate = date; // date ส่งมาเป็น "YYYY-MM-DD"
-
-    if (offDates.includes(formattedDate)) {
-      // ถ้าวันนี้อยู่ใน list → ลบออก (ยกเลิกไม่มา)
-      offDates = offDates.filter(d => d !== formattedDate);
+    if (slot) {
+      // toggle slot ปิด/เปิด
+      const key = `${date}|${slot}`;
+      if (disabledSlots.includes(key)) disabledSlots = disabledSlots.filter(d => d !== key);
+      else disabledSlots.push(key);
     } else {
-      // เพิ่มวันใหม่
-      offDates.push(formattedDate);
+      // toggle วันไม่มา → update off_date
+      if (offDates.includes(date)) offDates = offDates.filter(d => d !== date);
+      else offDates.push(date);
     }
 
-    // อัปเดตค่าใหม่ใน DB
-    const newOffDate = offDates.length > 0 ? offDates.join(",") : null;
-    await conn.query("UPDATE therapist SET off_date = ? WHERE name = ?", [newOffDate, therapist]);
+    // update DB ทั้งสองคอลัมน์
+    await conn.query(
+      "UPDATE therapist SET off_date = ?, disabled_slots = ? WHERE name = ?",
+      [
+        offDates.length > 0 ? offDates.join(",") : null,
+        disabledSlots.length > 0 ? disabledSlots.join(",") : null,
+        therapist
+      ]
+    );
 
     conn.release();
-    return NextResponse.json({ success: true, offDates });
+    return NextResponse.json({ success: true, offDates, disabledSlots, toggled: slot ? `${date}|${slot}` : date });
   } catch (err) {
     console.error(err);
-    return NextResponse.json({ success: false, message: "ไม่สามารถอัปเดตหมอไม่มาได้" });
+    return NextResponse.json({ success: false, message: "ไม่สามารถอัปเดตได้" });
   }
 }

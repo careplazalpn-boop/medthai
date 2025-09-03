@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { AuthContext } from "@/context/AuthContext";
 import { CalendarIcon, UserIcon, Clock, Home, AlertCircle, UserCheck, UserX } from "lucide-react";
-import { FaHistory } from "react-icons/fa";
+import { FaHistory, FaCheck, FaTimes } from "react-icons/fa";
 import * as Dialog from "@radix-ui/react-dialog";
 
 interface UserInfo {
@@ -24,6 +24,7 @@ export default function AdminBookingPage() {
   const [selectedTherapist, setSelectedTherapist] = useState("");
   const [selectedTime, setSelectedTime] = useState("");
   const [bookedSlots, setBookedSlots] = useState<Record<string, string[]>>({});
+  const [disabledSlots, setDisabledSlots] = useState<Record<string, string[]>>({});
   const [showAlert, setShowAlert] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -32,26 +33,34 @@ export default function AdminBookingPage() {
   const [clientPhone, setClientPhone] = useState("");
   const [searchResults, setSearchResults] = useState<UserInfo[]>([]);
 
-    // **เพิ่ม state ผู้รับผิดชอบใน Dialog**
   const [dialogTherapist, setDialogTherapist] = useState("");
-
-  // **เพิ่ม state หมอไม่มา**
   const [offTherapists, setOffTherapists] = useState<string[]>([]);
 
-  // ตรวจสอบ login
+  useEffect(() => {
+    if (!showAlert) return;
+    const timer = setTimeout(() => setShowAlert(false), 2000);
+    return () => clearTimeout(timer);
+  }, [showAlert]);
+
   useEffect(() => {
     if (!user) router.push("/login");
   }, [user, router]);
 
-  // ดึง therapist + time_slot
   useEffect(() => {
     fetch("/api/therapists").then(res => res.json()).then(data => data.success && setTherapists(data.therapists)).catch(() => setTherapists([]));
     fetch("/api/time-slots").then(res => res.json()).then(data => data.success && setTimeSlots(data.timeSlots)).catch(() => setTimeSlots([]));
   }, []);
 
-  // ดึงเวลาที่ถูกจองของแต่ละ therapist
   useEffect(() => {
-    if (!date) return setBookedSlots({});
+    if (!date) {
+      setBookedSlots({});
+      setOffTherapists([]);
+      setDisabledSlots({});
+      setSelectedTherapist("");
+      setSelectedTime("");
+      return;
+    }
+
     fetch(`/api/bookings?date=${encodeURIComponent(date)}`)
       .then(res => res.json())
       .then(data => {
@@ -65,18 +74,22 @@ export default function AdminBookingPage() {
         } else setBookedSlots({});
       })
       .catch(() => setBookedSlots({}));
-    setSelectedTherapist("");
-    setSelectedTime("");
 
-    // **ดึงหมอไม่มาของวันที่เลือก**
-    if (!date) return setOffTherapists([]);
     fetch(`/api/off-therapists?date=${encodeURIComponent(date)}`)
       .then(res => res.json())
       .then(data => {
-        if (data.success) setOffTherapists(data.offTherapists || []);
-        else setOffTherapists([]);
+        if (data.success) {
+          setOffTherapists(data.offTherapists || []);
+          setDisabledSlots(data.disabledSlotsByTherapist || {});
+        } else {
+          setOffTherapists([]);
+          setDisabledSlots({});
+        }
       })
-      .catch(() => setOffTherapists([]));
+      .catch(() => { setOffTherapists([]); setDisabledSlots({}); });
+
+    setSelectedTherapist("");
+    setSelectedTime("");
   }, [date]);
 
   const formatPhone = (value: string) => {
@@ -113,7 +126,7 @@ export default function AdminBookingPage() {
       date,
       therapist: selectedTherapist,
       time: selectedTime,
-      provider: dialogTherapist || "", // เพิ่มชื่อผู้รับผิดชอบที่เลือกจาก dropdown
+      provider: dialogTherapist || "",
     }).toString()}`);
   };
 
@@ -121,7 +134,7 @@ export default function AdminBookingPage() {
     setClientHN("");
     setClientName("");
     setClientPhone("");
-    setDialogTherapist(""); // reset therapist dropdown
+    setDialogTherapist("");
     setSearchResults([]);
     setDialogOpen(true);
   };
@@ -165,7 +178,6 @@ export default function AdminBookingPage() {
     setSearchResults([]);
   };
 
-  // **ฟังก์ชัน toggle หมอไม่มา**
   const toggleOffTherapist = async (therapist: string) => {
     if (!date) return alert("กรุณาเลือกวันที่ก่อน");
     try {
@@ -176,22 +188,35 @@ export default function AdminBookingPage() {
       });
       const data = await res.json();
       if (data.success) {
-        if (offTherapists.includes(therapist)) {
-          setOffTherapists(prev => prev.filter(t => t !== therapist));
-        } else {
-          setOffTherapists(prev => [...prev, therapist]);
-        }
+        if (offTherapists.includes(therapist)) setOffTherapists(prev => prev.filter(t => t !== therapist));
+        else setOffTherapists(prev => [...prev, therapist]);
       } else alert("ไม่สามารถอัปเดตหมอไม่มาได้");
-    } catch {
-      alert("เกิดข้อผิดพลาดในการอัปเดตหมอไม่มา");
-    }
+    } catch { alert("เกิดข้อผิดพลาดในการอัปเดตหมอไม่มา"); }
+  };
+
+  const toggleSlot = async (therapist: string, slot: string) => {
+    if (!date) return alert("กรุณาเลือกวันที่ก่อน");
+    try {
+      const res = await fetch("/api/toggle-off-therapist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ therapist, date, slot }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setDisabledSlots(prev => {
+          const current = prev[therapist] || [];
+          const updated = current.includes(slot) ? current.filter(s => s !== slot) : [...current, slot];
+          return { ...prev, [therapist]: updated };
+        });
+      } else alert("ไม่สามารถอัปเดต slot ได้");
+    } catch { alert("เกิดข้อผิดพลาดในการอัปเดต slot"); }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-white to-emerald-100 relative overflow-hidden">
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 0.15 }} transition={{ duration: 2 }} className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,_#a7f3d0,_transparent_70%)]" />
 
-      {/* Navigation */}
       <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => router.push("/")} className="absolute top-6 left-6 flex items-center gap-2 px-5 py-2 bg-emerald-600 text-white rounded-lg shadow-md hover:bg-emerald-700 z-10">
         <Home className="w-5 h-5" /> หน้าแรก
       </motion.button>
@@ -204,7 +229,6 @@ export default function AdminBookingPage() {
           จองคิวนวดแผนไทย (Admin)
         </motion.h1>
 
-        {/* เลือกวันที่ */}
         <div className="mb-8 max-w-sm mx-auto">
           <label className="block mb-2 font-medium text-gray-700 flex items-center gap-2">
             <CalendarIcon className="w-4 h-4" /> วันที่ต้องการนวด
@@ -212,14 +236,15 @@ export default function AdminBookingPage() {
           <input type="date" value={date} min={new Date().toISOString().split("T")[0]} onChange={e => setDate(e.target.value)} className={`border border-gray-300 rounded-lg p-3 w-full focus:outline-none focus:ring-2 focus:ring-emerald-400 transition ${!date ? "text-gray-400" : "text-gray-900"}`} />
         </div>
 
-        {/* เลือกหมอ + เวลา */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {therapists.map(t => {
             const booked = bookedSlots[t] || [];
             const isSelected = selectedTherapist === t;
             const isOff = offTherapists.includes(t);
+            const disabled = disabledSlots[t] || [];
+
             return (
-                <motion.div key={t} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className={`border p-5 rounded-2xl shadow-lg ${isOff ? "bg-gray-200" : "bg-white"} ${isSelected ? "ring-4 ring-emerald-300" : ""}`}>
+              <motion.div key={t} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className={`border p-5 rounded-2xl shadow-lg ${isOff ? "bg-gray-200" : "bg-white"} ${isSelected ? "ring-4 ring-emerald-300" : ""}`}>
                 <div className="flex items-center gap-2 mb-3">
                   <UserIcon className={`w-5 h-5 ${isOff ? "text-gray-500" : "text-emerald-600"}`} />
                   <h2 className={`text-lg font-semibold ${isOff ? "text-gray-500" : "text-emerald-700"}`}>{t}</h2>
@@ -243,18 +268,42 @@ export default function AdminBookingPage() {
                     const isBooked = booked.includes(slot);
                     const isPast = isTimeSlotPast(slot);
                     const isActive = isSelected && selectedTime === slot;
+                    const isSlotDisabled = disabled.includes(slot);
+
                     return (
-                      <button key={slot} disabled={isBooked || isPast || isOff} onClick={() => handleSelect(t, slot)} className={`text-sm px-3 py-2 rounded-lg font-medium border flex items-center justify-center gap-1 transition shadow-sm
-                        ${isOff ? "bg-gray-300 text-gray-500 border-gray-400 cursor-not-allowed" 
-                        : isBooked ? "bg-red-100 text-red-600 border-red-400 cursor-not-allowed" 
-                        : isPast ? "bg-yellow-100 text-yellow-700 border-yellow-400 cursor-not-allowed" 
-                        : isActive ? "bg-emerald-600 text-white border-emerald-600" 
-                        : "bg-white hover:bg-emerald-50 text-emerald-800 border-gray-300"}`}>
-                        <Clock className="w-4 h-4" /> {slot} {(isBooked || isPast) && <span className="text-xs font-semibold">({isBooked ? "ถูกจองแล้ว" : "หมดเวลาจอง"})</span>}
-                      </button>
+                      <div key={slot} className="flex gap-1 items-center">
+                        <button
+                          disabled={isBooked || isPast || isOff || isSlotDisabled}
+                          onClick={() => handleSelect(t, slot)}
+                          className={`text-sm px-3 py-2 rounded-lg font-medium border flex-1 flex items-center justify-center gap-1 transition shadow-sm
+                            ${isSlotDisabled ? "bg-gray-300 text-gray-500 border-gray-400 cursor-not-allowed"
+                            : isOff ? "bg-gray-300 text-gray-500 border-gray-400 cursor-not-allowed"
+                            : isBooked ? "bg-red-100 text-red-600 border-red-400 cursor-not-allowed"
+                            : isPast ? "bg-yellow-100 text-yellow-700 border-yellow-400 cursor-not-allowed"
+                            : isActive ? "bg-emerald-600 text-white border-emerald-600"
+                            : "bg-white hover:bg-emerald-50 text-emerald-800 border-gray-300"}`}>
+                          <Clock className="w-4 h-4" /> {slot} {(isBooked || isPast) && <span className="text-xs font-semibold">({isBooked ? "ถูกจองแล้ว" : "หมดเวลาจอง"})</span>}
+                        </button>
+                        {date && (
+                          <button
+                            disabled={isOff}
+                            onClick={() => toggleSlot(t, slot)}
+                            className={`px-2 py-1 rounded text-white ${
+                              isOff 
+                                ? "bg-gray-400 cursor-not-allowed" 
+                                : isSlotDisabled 
+                                  ? "bg-red-500 hover:bg-red-600" 
+                                  : "bg-green-500 hover:bg-green-600"
+                            }`}
+                          >
+                            {isSlotDisabled ? <FaTimes /> : <FaCheck />}
+                          </button>
+                        )}
+                      </div>
                     );
                   })}
                 </div>
+
                 <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} onClick={handleOpenDialog} disabled={!(isSelected && selectedTime && date) || isOff} className={`mt-5 w-full py-2 rounded-xl font-bold shadow transition text-center ${isSelected && selectedTime && date && !isOff ? "bg-emerald-600 text-white hover:bg-emerald-700" : "bg-gray-300 text-gray-500 cursor-not-allowed"}`}>
                   เลือก
                 </motion.button>
@@ -262,86 +311,67 @@ export default function AdminBookingPage() {
             );
           })}
         </div>
-        {/* Dialog กรอกข้อมูลผู้ป่วย */}
+
         <Dialog.Root open={dialogOpen} onOpenChange={setDialogOpen}>
           <Dialog.Portal>
             <Dialog.Overlay className="fixed inset-0 bg-black/30 z-40" />
             <Dialog.Content className="fixed z-50 left-1/2 top-1/2 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white p-6 shadow-lg">
               <Dialog.Title className="text-xl font-bold mb-4 text-emerald-700">กรอกข้อมูลผู้รับบริการ</Dialog.Title>
 
-              {/* 🔥 Dropdown ผู้รับผิดชอบ */}
               <label className="block mb-3">
                 <span className="text-sm font-medium text-emerald-800">ผู้รับผิดชอบ</span>
-                <select
-                  value={dialogTherapist}
-                  onChange={(e) => setDialogTherapist(e.target.value)}
-                  className={`mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 ${
-                    dialogTherapist === "" ? "text-gray-400" : "text-gray-900"
-                  }`}
-                >
-                  {/* placeholder สีเทา กดไม่ได้ */}
-                  <option value="" disabled className="text-gray-400">
-                    -- เลือก --
-                  </option>
-
-                  {/* ชื่อหมอสีดำ */}
-                  {therapists.map((t) => (
-                    <option key={t} value={t} className="text-black">
-                      {t}
-                    </option>
-                  ))}
+                <select value={dialogTherapist} onChange={(e) => setDialogTherapist(e.target.value)} className={`mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 ${dialogTherapist === "" ? "text-gray-400" : "text-gray-900"}`}>
+                  <option value="" disabled className="text-gray-400">-- เลือก --</option>
+                  {therapists.map((t) => <option key={t} value={t} className="text-black">{t}</option>)}
                 </select>
               </label>
 
               {["hn", "name", "phone"].map(field => (
                 <label key={field} className="block mb-3 relative">
                   <span className="text-sm font-medium text-emerald-800">{field === "hn" ? "HN" : field === "name" ? "ชื่อผู้รับบริการ" : "เบอร์โทร"}</span>
-                  <input
-                    type="text"
-                    value={field === "hn" ? clientHN : field === "name" ? clientName : clientPhone}
-                    onChange={e => field === "hn" ? setClientHN(e.target.value) : field === "name" ? setClientName(e.target.value) : handlePhoneChange(e)}
-                    maxLength={field === "hn" ? 9 : field === "phone" ? 11 : undefined}
-                    placeholder={field === "hn" ? "กรอก HN" : field === "name" ? "กรอกชื่อ" : "กรอกเบอร์โทร"}
-                    className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900"
-                  />
+                  <input type="text" value={field === "hn" ? clientHN : field === "name" ? clientName : clientPhone} onChange={e => field === "hn" ? setClientHN(e.target.value) : field === "name" ? setClientName(e.target.value) : handlePhoneChange(e)} maxLength={field === "hn" ? 9 : field === "phone" ? 11 : undefined} placeholder={field === "hn" ? "กรอก HN" : field === "name" ? "กรอกชื่อ" : "กรอกเบอร์โทร"} className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900" />
                   <div className="absolute top-0 right-0 mt-1 mr-1 flex gap-1">
-                    {field === "hn" && <button type="button" onClick={() => handleAutoFill("hn")} className="px-2 py-1 bg-emerald-600 text-white rounded-md text-xs hover:bg-emerald-700">Auto-fill</button>}
-                    {field === "name" && <>
-                      <button type="button" onClick={handleSearchName} className="px-2 py-1 bg-blue-600 text-white rounded-md text-xs hover:bg-blue-700">ค้นหา</button>
-                      <button type="button" onClick={() => handleAutoFill("name")} className="px-2 py-1 bg-emerald-600 text-white rounded-md text-xs hover:bg-emerald-700">Auto-fill</button>
-                    </>}
-                    {field === "phone" && <button type="button" onClick={() => handleAutoFill("phone")} className="px-2 py-1 bg-emerald-600 text-white rounded-md text-xs hover:bg-emerald-700">Auto-fill</button>}
+                    {field === "hn" && <button type="button" onClick={() => handleAutoFill("hn")} className="px-2 py-1 bg-emerald-500 text-white rounded hover:bg-emerald-600 text-xs">auto-fill</button>}
+                    {field === "name" && (
+                      <>
+                        <button type="button" onClick={handleSearchName} className="px-2 py-1 bg-emerald-500 text-white rounded hover:bg-emerald-600 text-xs">ค้นหา</button>
+                        <button type="button" onClick={() => handleAutoFill("name")} className="px-2 py-1 bg-emerald-500 text-white rounded hover:bg-emerald-600 text-xs">auto-fill</button>
+                      </>
+                    )}
+                    {field === "phone" && <button type="button" onClick={() => handleAutoFill("phone")} className="px-2 py-1 bg-emerald-500 text-white rounded hover:bg-emerald-600 text-xs">auto-fill</button>}
                   </div>
                 </label>
               ))}
 
               {searchResults.length > 0 && (
-                <ul className="border rounded mt-2 mb-3 max-h-48 overflow-auto bg-white shadow">
-                  {searchResults.map((u, idx) => (
-                    <li key={idx} className="p-2 hover:bg-gray-100 cursor-pointer text-sm text-black" onClick={() => handleSelectUser(u)}>
-                      {u.name} {u.phone && `(${formatPhone(u.phone)})`}
-                    </li>
+                <div className="border p-2 rounded max-h-40 overflow-y-auto mb-3">
+                  {searchResults.map(u => (
+                    <button key={u.hn} onClick={() => handleSelectUser(u)} className="block w-full text-left p-1 hover:bg-emerald-50 rounded text-gray-900">{u.name} (HN: {u.hn})</button>
                   ))}
-                </ul>
+                </div>
               )}
 
-              <div className="flex justify-end gap-3">
+              <div className="mt-4 flex justify-end gap-2">
                 <Dialog.Close asChild>
-                  <button className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300">ยกเลิก</button>
+                  <button className="px-4 py-2 rounded-lg bg-gray-300 hover:bg-gray-400 text-gray-800">ยกเลิก</button>
                 </Dialog.Close>
-                <button onClick={handleSubmit} className="px-4 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700">ยืนยัน</button>
+                <button onClick={handleSubmit} className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white">ยืนยัน</button>
               </div>
             </Dialog.Content>
           </Dialog.Portal>
         </Dialog.Root>
 
-        {/* Alert */}
         <AnimatePresence>
           {showAlert && (
-            <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="fixed top-20 left-1/2 -translate-x-1/2 bg-yellow-50 border border-yellow-400 text-yellow-700 px-6 py-4 rounded-lg flex items-center gap-3 shadow-lg max-w-md z-50">
-              <AlertCircle className="w-6 h-6" />
-              <span>กรุณาเลือกวันที่ก่อนจองคิว</span>
-              <button onClick={() => setShowAlert(false)} className="ml-auto text-yellow-700 font-bold hover:text-yellow-900">✕</button>
+            <motion.div
+              key={Date.now()}
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="fixed top-6 left-1/2 -translate-x-1/2 bg-red-500 text-white px-4 py-2 rounded shadow z-50 flex items-center gap-2"
+            >
+              <AlertCircle className="w-5 h-5" />
+              <span>กรุณาเลือกวันที่ก่อน</span>
             </motion.div>
           )}
         </AnimatePresence>

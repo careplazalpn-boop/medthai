@@ -59,8 +59,8 @@ export async function POST(request: Request) {
     try {
       // ตรวจสอบว่ามีการจองค้างอยู่หรือไม่
       const [userRows] = await conn.query(
-        "SELECT * FROM bookings WHERE phone = ? AND status = 'รอดำเนินการ' LIMIT 1",
-        [phone]
+        "SELECT * FROM bookings WHERE name = ? AND status = 'รอดำเนินการ' LIMIT 1",
+        [name]
       );
       const user = (userRows as any)[0];
       if (user) {

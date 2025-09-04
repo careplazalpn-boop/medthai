@@ -115,7 +115,7 @@ export default function AdminBookingPage() {
   };
 
   const handleSubmit = () => {
-    if (!clientHN || !clientName || !clientPhone || !date || !selectedTherapist || !selectedTime) {
+    if (!clientHN || !clientName || !clientPhone || !date || !selectedTherapist || !selectedTime || !dialogTherapist) {
       alert("กรุณากรอกข้อมูลให้ครบถ้วน");
       return;
     }
@@ -254,7 +254,7 @@ export default function AdminBookingPage() {
                       <button
                         onClick={() => toggleOffTherapist(t)}
                         className={`px-3 py-1.5 text-sm rounded flex items-center gap-2 font-semibold text-white hover:brightness-90
-                          ${isOff ? "bg-red-500 hover:bg-red-600" : "bg-green-500 hover:bg-green-600"}`}
+                          ${isOff ? "bg-red-500 hover:bg-red-600" : "bg-emerald-500 hover:bg-emerald-600"}`}
                       >
                         {isOff ? "ไม่มา" : "มา"}
                         {isOff ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
@@ -293,7 +293,7 @@ export default function AdminBookingPage() {
                                 ? "bg-gray-400 cursor-not-allowed" 
                                 : isSlotDisabled 
                                   ? "bg-red-500 hover:bg-red-600" 
-                                  : "bg-green-500 hover:bg-green-600"
+                                  : "bg-emerald-500 hover:bg-emerald-600"
                             }`}
                           >
                             {isSlotDisabled ? <FaTimes /> : <FaCheck />}
@@ -346,7 +346,9 @@ export default function AdminBookingPage() {
               {searchResults.length > 0 && (
                 <div className="border p-2 rounded max-h-40 overflow-y-auto mb-3">
                   {searchResults.map(u => (
-                    <button key={u.hn} onClick={() => handleSelectUser(u)} className="block w-full text-left p-1 hover:bg-emerald-50 rounded text-gray-900">{u.name} (HN: {u.hn})</button>
+                    <button key={u.hn || u.name} onClick={() => handleSelectUser(u)} className="w-full flex justify-between items-center px-2 py-1 hover:bg-emerald-100 rounded text-gray-900">
+                    <span className="font-medium text-left">{u.name}</span><span className="text-sm text-gray-500 text-right">{u.phone || "ไม่มีเบอร์"}</span>
+                    </button>
                   ))}
                 </div>
               )}

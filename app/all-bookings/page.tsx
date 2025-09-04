@@ -54,9 +54,9 @@ function BookingSummary({ attended, cancelled }: SummaryProps) {
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ duration: 0.5 }}
-        className="flex items-center gap-4 bg-emerald-50 text-emerald-900 rounded-xl p-4 shadow-sm border-2 border-emerald-200 min-w-[337px]"
+        className="flex items-center gap-4 bg-emerald-50 text-emerald-900 rounded-xl p-4 shadow-sm border-2 border-emerald-200 min-w-[396px]"
       >
-        <Smile className="w-10 h-10 text-emerald-500 flex-shrink-0" />
+        <Smile className="w-12 h-10 text-emerald-500 flex-shrink-0" />
         <div className="flex flex-col flex-grow justify-center">
           <div className="flex justify-center items-baseline gap-2">
             <span className="text-lg text-emerald-700">มานวด :</span>
@@ -79,9 +79,9 @@ function BookingSummary({ attended, cancelled }: SummaryProps) {
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ duration: 0.5, delay: 0.1 }}
-        className="flex items-center gap-4 bg-red-50 text-red-900 rounded-xl p-4 shadow-sm border-2 border-red-200 min-w-[337px]"
+        className="flex items-center gap-4 bg-red-50 text-red-900 rounded-xl p-4 shadow-sm border-2 border-red-200 min-w-[397px]"
       >
-        <Frown className="w-10 h-10 text-red-500 flex-shrink-0" />
+        <Frown className="w-12 h-10 text-red-500 flex-shrink-0" />
         <div className="flex flex-col flex-grow justify-center">
           <div className="flex justify-center items-baseline gap-2">
             <span className="text-lg text-red-700">ไม่มานวด :</span>
@@ -219,100 +219,141 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
 
   return (
     <div className="min-h-screen px-6 py-12 bg-gradient-to-br from-white to-emerald-50 relative">
-      <motion.button whileHover={{scale:1.05}} whileTap={{scale:0.95}} onClick={()=>router.back()} className="absolute top-6 left-6 flex items-center space-x-2 px-5 py-2 rounded-lg shadow-md text-white bg-emerald-600 hover:bg-emerald-700"><ChevronLeft className="w-5 h-5"/><span>ย้อนกลับ</span></motion.button>
-      <motion.button whileHover={{scale:1.05}} whileTap={{scale:0.95}} onClick={()=>router.push("/")} className="absolute top-6 right-6 flex items-center space-x-2 px-5 py-2 rounded-lg shadow-md text-white bg-emerald-600 hover:bg-emerald-700"><Home className="w-5 h-5"/><span>หน้าแรก</span></motion.button>
-      <h1 className="text-4xl md:text-5xl font-extrabold text-emerald-700 mb-10 text-center drop-shadow-sm">ประวัติการจองทั้งหมด (Admin)</h1>
-      <div className="max-w-5xl mx-auto mb-5 flex gap-4 flex-wrap items-end">
-        <div className="flex-grow flex gap-2 items-end">
-          <div className="flex-grow flex flex-col">
-            <label className="block text-emerald-700 font-semibold mb-2 text-lg">ผู้มารับบริการ:</label>
-            <input
-              type="text"
-              value={filterName}
-              onChange={e=>setFilterName(e.target.value)}
-              placeholder="พิมพ์ชื่อเพื่อกรอง..."
-              className="w-full h-10 px-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder:text-gray-400 text-gray-900"
-            />
-          </div>
-          <div className="flex flex-col">
-            <label className="block text-emerald-700 font-semibold mb-2 text-lg">ผู้รับผิดชอบ:</label>
-            <select
-              value={filterProvider}
-              onChange={e => setFilterProvider(e.target.value)}
-              className="h-10 px-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900"
-            >
-              <option value="all">ทั้งหมด</option>
-              {therapists.map((t,i) => <option key={i} value={t}>{t}</option>)}
-            </select>
-          </div>
-          <div className="flex flex-col">
-            <label className="block text-emerald-700 font-semibold mb-2 text-lg">ผู้ให้บริการ:</label>
-            <select
-              value={filterTherapist}
-              onChange={e=>setFilterTherapist(e.target.value)}
-              className="h-10 px-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900"
-            >
-              <option value="all">ทั้งหมด</option>
-              {therapists.map((t,i)=><option key={i} value={t}>{t}</option>)}
-            </select>
-          </div>
+      <div className="max-w-[92rem] mx-auto relative">
+        <div className="absolute top-0 left-0 right-0 flex justify-between px-6 z-50">
+          <motion.button 
+            whileHover={{ scale: 1.05 }} 
+            whileTap={{ scale: 0.95 }} 
+            onClick={() => router.back()} 
+            className="flex items-center space-x-2 px-5 py-2 rounded-lg shadow-md text-white bg-emerald-600 hover:bg-emerald-700"
+          >
+            <ChevronLeft className="w-5 h-5"/><span>ย้อนกลับ</span>
+          </motion.button>
+          <motion.button 
+            whileHover={{ scale: 1.05 }} 
+            whileTap={{ scale: 0.95 }} 
+            onClick={() => router.push("/")} 
+            className="flex items-center space-x-2 px-5 py-2 rounded-lg shadow-md text-white bg-emerald-600 hover:bg-emerald-700"
+          >
+            <Home className="w-5 h-5"/><span>หน้าแรก</span>
+          </motion.button>
         </div>
-        <div className="flex flex-col">
+      </div>
+      <h1 className="text-4xl font-extrabold text-emerald-700 mb-12 text-center drop-shadow-sm">ประวัติการจองทั้งหมด (Admin)</h1>
+      {/* ฟิลเตอร์แถวบน */}
+      <div className="max-w-6xl mx-auto mb-5 flex flex-wrap gap-4 items-end">
+        {/* ผู้มารับบริการ */}
+        <div className="min-w-[180px] flex-1">
+          <label className="block text-emerald-700 font-semibold mb-2 text-lg">ผู้มารับบริการ:</label>
+          <input 
+            type="text" 
+            placeholder="พิมพ์ชื่อเพื่อกรอง..." 
+            value={filterName} 
+            onChange={e => setFilterName(e.target.value)}
+            className="w-full px-4 h-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900 placeholder-gray-400"
+          />
+        </div>
+
+        {/* ผู้รับผิดชอบ */}
+        <div className="min-w-[180px]">
+          <label className="block text-emerald-700 font-semibold mb-2 text-lg">ผู้รับผิดชอบ:</label>
+          <select 
+            value={filterProvider} 
+            onChange={e => setFilterProvider(e.target.value)}
+            className="w-full px-4 h-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900 placeholder-gray-400"
+          >
+            <option value="all">ทั้งหมด</option>
+            {therapists.map((t,i)=><option key={i} value={t}>{t}</option>)}
+          </select>
+        </div>
+
+        {/* ผู้ให้บริการ */}
+        <div className="min-w-[180px]">
+          <label className="block text-emerald-700 font-semibold mb-2 text-lg">ผู้ให้บริการ:</label>
+          <select 
+            value={filterTherapist} 
+            onChange={e => setFilterTherapist(e.target.value)}
+            className="w-full px-4 h-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900 placeholder-gray-400"
+          >
+            <option value="all">ทั้งหมด</option>
+            {therapists.map((t,i)=><option key={i} value={t}>{t}</option>)}
+          </select>
+        </div>
+
+        {/* สถานะ */}
+        <div className="min-w-[150px]">
           <label className="block text-emerald-700 font-semibold mb-2 text-lg">สถานะ:</label>
-          <div className="flex gap-2">
-            <select
-              value={filterStatus}
-              onChange={e=>setFilterStatus(e.target.value)}
-              className="h-10 px-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900"
-            >
-              <option value="all">ทั้งหมด</option>
-              <option value="upcoming">รอดำเนินการ</option>
-              <option value="in_queue">อยู่ในคิว</option>
-              <option value="past">สำเร็จ</option>
-              <option value="cancelled">ยกเลิก</option>
-            </select>
-            <motion.button
-              whileHover={{scale:1.05}}
-              whileTap={{scale:0.95}}
-              onClick={()=>{setFilterName("");setFilterTherapist("all");setFilterStatus("all");setFilterDate("");setFilterTimeSlot("all");}}
-              className="h-10 px-4 bg-emerald-600 text-white rounded-md font-semibold hover:bg-emerald-700 transition"
-            >
-              รีเซ็ต
-            </motion.button>
-          </div>
+          <select 
+            value={filterStatus} 
+            onChange={e => setFilterStatus(e.target.value)}
+            className="w-full px-4 h-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900 placeholder-gray-400"
+          >
+            <option value="all">ทั้งหมด</option>
+            <option value="upcoming">รอดำเนินการ</option>
+            <option value="in_queue">อยู่ในคิว</option>
+            <option value="past">สำเร็จ</option>
+            <option value="cancelled">ยกเลิก</option>
+          </select>
         </div>
-        <div className="flex flex-col">
+
+        {/* ปุ่มรีเซ็ต */}
+        <div className="flex items-end">
+          <motion.button 
+            whileHover={{scale:1.05}} 
+            whileTap={{scale:0.95}}
+            onClick={() => {
+              setFilterName(""); 
+              setFilterTherapist("all"); 
+              setFilterStatus("all"); 
+              setFilterDate(""); 
+              setFilterTimeSlot("all"); 
+              setFilterProvider("all");
+            }}
+            className="h-10 px-4 bg-emerald-600 text-white rounded-md font-semibold hover:bg-emerald-700 transition"
+          >
+            รีเซ็ต
+          </motion.button>
+        </div>
+      </div>
+
+      {/* ฟิลเตอร์แถวล่าง + การ์ดสรุป */}
+      <div className="max-w-6xl mx-auto mb-5 flex flex-wrap gap-4 items-end">
+        {/* วันที่ */}
+        <div className="min-w-[150px]">
           <label className="block text-emerald-700 font-semibold mb-2 text-lg">วันที่:</label>
-            <input
-              type="date"
-              value={filterDate}
-              onChange={e => setFilterDate(e.target.value)}
-              className={`h-10 px-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
-                filterDate ? "text-gray-900" : "text-gray-400"
-              }`}
-            />
+          <input 
+            type="date" 
+            value={filterDate} 
+            onChange={e => setFilterDate(e.target.value)}
+            className="w-full px-4 h-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900 placeholder-gray-400"
+          />
         </div>
-        <div className="flex flex-col">
+
+        {/* ช่วงเวลา */}
+        <div className="min-w-[150px]">
           <label className="block text-emerald-700 font-semibold mb-2 text-lg">ช่วงเวลา:</label>
-          <select
-            value={filterTimeSlot}
-            onChange={e=>setFilterTimeSlot(e.target.value)}
-            className="h-10 px-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900"
+          <select 
+            value={filterTimeSlot} 
+            onChange={e => setFilterTimeSlot(e.target.value)}
+            className="w-full px-4 h-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900 placeholder-gray-400"
           >
             <option value="all">ทั้งหมด</option>
             {timeSlots.map((slot,i)=><option key={i} value={slot}>{slot}</option>)}
           </select>
         </div>
-        <div className="flex-grow">
+
+        {/* การ์ดสรุปคนมา / ไม่มา */}
+        <div className="flex-1 min-w-[337px] -mt-1">
           <BookingSummary attended={attendedBookings} cancelled={cancelledBookings} />
         </div>
       </div>
+      
       {filteredBookings.length===0?(
         <p className="text-center text-gray-500 italic select-none">ยังไม่มีประวัติ</p>
       ):(
-        <ul className="space-y-6 w-full px-6">
+        <ul className="space-y-4 w-full max-w-[92rem] mx-auto px-6">
           {filteredBookings.map(b=>(
-            <li key={b.id} className={`bg-white rounded-xl shadow-md p-5 hover:shadow-lg transition flex justify-between items-center border-l-8 ${getStatusColor(b)}`}>
+            <li key={b.id} className={`bg-white border rounded-xl p-5 flex justify-between items-center border-l-8 ${getStatusColor(b)}`}>
               <div className="grid grid-cols-[205px_185px_110px_205px_130px_130px_130px] gap-x-6 text-gray-700 flex-grow">
                 <Label icon={<UserCheck className="w-4 h-4"/>} text="ผู้รับผิดชอบ"/>
                 <Label icon={<User className="w-4 h-4"/>} text="ผู้มารับบริการ"/>

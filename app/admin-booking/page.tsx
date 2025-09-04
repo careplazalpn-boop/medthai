@@ -102,9 +102,11 @@ export default function AdminBookingPage() {
 
   const isTimeSlotPast = (slot: string) => {
     if (!date) return false;
-    const [hourStr, minStr = "00"] = slot.split("-")[0].split(".");
-    const slotStart = new Date(date);
-    slotStart.setHours(parseInt(hourStr), parseInt(minStr), 0, 0);
+    const [start] = slot.split("-"); // เวลาต้นของ slot
+    let [hourStr, minStr = "00"] = start.split(":");
+    if (hourStr.length === 1) hourStr = "0" + hourStr;
+    if (minStr.length === 1) minStr = "0" + minStr;
+    const slotStart = new Date(`${date}T${hourStr}:${minStr}:00`);
     return new Date() > slotStart;
   };
 
@@ -215,22 +217,35 @@ export default function AdminBookingPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-white to-emerald-100 relative overflow-hidden">
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 0.15 }} transition={{ duration: 2 }} className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,_#a7f3d0,_transparent_70%)]" />
+      <div className="max-w-[92rem] mx-auto relative">
+        <div className="absolute top-12 left-1 right-1 flex justify-between px-6 z-50">
+          <motion.button 
+            whileHover={{ scale: 1.05 }} 
+            whileTap={{ scale: 0.95 }} 
+            onClick={() => router.push("/")} 
+            className="flex items-center gap-2 px-5 py-2 rounded-lg shadow-md text-white bg-emerald-600 hover:bg-emerald-700"
+          >
+            <Home className="w-5 h-5"/><span>หน้าแรก</span>
+          </motion.button>
 
-      <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => router.push("/")} className="absolute top-6 left-6 flex items-center gap-2 px-5 py-2 bg-emerald-600 text-white rounded-lg shadow-md hover:bg-emerald-700 z-10">
-        <Home className="w-5 h-5" /> หน้าแรก
-      </motion.button>
-      <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => router.push("/all-bookings")} className="absolute top-6 right-6 flex items-center gap-2 px-5 py-2 bg-emerald-600 text-white rounded-lg shadow-md hover:bg-emerald-700 z-10">
-        <FaHistory className="w-5 h-5" /> ประวัติการจองทั้งหมด
-      </motion.button>
+          <motion.button 
+            whileHover={{ scale: 1.05 }} 
+            whileTap={{ scale: 0.95 }} 
+            onClick={() => router.push("/all-bookings")} 
+            className="flex items-center gap-2 px-5 py-2 rounded-lg shadow-md text-white bg-emerald-600 hover:bg-emerald-700"
+          >
+            <FaHistory className="w-5 h-5"/><span>ประวัติการจองทั้งหมด</span>
+          </motion.button>
+        </div>
+      </div>
 
-      <div className="max-w-6xl mx-auto p-6 pt-20 relative z-10">
-        <motion.h1 initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="text-4xl font-bold text-center mb-6 text-emerald-700">
+      <div className="max-w-6xl mx-auto p-6 pt-12 relative z-10">
+        <motion.h1 initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="text-4xl font-extrabold text-emerald-700 mb-12 text-center drop-shadow-sm">
           จองคิวนวดแผนไทย (Admin)
         </motion.h1>
 
         <div className="mb-8 max-w-sm mx-auto">
-          <label className="block mb-2 font-medium text-gray-700 flex items-center gap-2">
+          <label className="flex items-center gap-2 text-emerald-700 font-semibold mb-2 text-lg">
             <CalendarIcon className="w-4 h-4" /> วันที่ต้องการนวด
           </label>
           <input type="date" value={date} min={new Date().toISOString().split("T")[0]} onChange={e => setDate(e.target.value)} className={`border border-gray-300 rounded-lg p-3 w-full focus:outline-none focus:ring-2 focus:ring-emerald-400 transition ${!date ? "text-gray-400" : "text-gray-900"}`} />

@@ -96,55 +96,52 @@ export default function HomePage() {
       <BackgroundDecoration />
 
       {/* แถบเมนูขวาบน */}
-      <div className="absolute top-6 right-6 flex items-center space-x-3 z-10">
-        {user ? (
-          <>
-            <span className="font-semibold text-emerald-800 mr-2">
-              สวัสดี, {user.name}
-            </span>
+      <div className="max-w-[92rem] mx-auto relative w-full">
+        <div className="absolute -top-51 left-0 right-2 flex justify-end gap-3 px-6 z-50">
+          {user ? (
+            <>
+              <span className="text-emerald-700 font-semibold text-xl">
+                สวัสดี {user.name}!
+              </span>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() =>
+                  router.push(user.role === "admin" ? "/all-bookings" : "/booking-history")
+                }
+                className="flex items-center gap-2 px-5 py-2 bg-emerald-600 text-white rounded-lg shadow-md hover:bg-emerald-700 transition"
+                title={user.role === "admin" ? "ประวัติการจองทั้งหมด" : "ประวัติการจอง"}
+              >
+                <FaHistory className="w-5 h-5" />
+                <span>{user.role === "admin" ? "ประวัติการจองทั้งหมด" : "ประวัติการจอง"}</span>
+              </motion.button>
 
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() =>
-                router.push(
-                  user.role === "admin" ? "/all-bookings" : "/booking-history"
-                )
-              }
-              className="flex items-center space-x-2 px-5 py-2 bg-emerald-600 text-white rounded-lg shadow-md hover:bg-emerald-700 transition"
-              title={user.role === "admin" ? "ประวัติการจองทั้งหมด" : "ประวัติการจอง"}
-            >
-              <FaHistory />
-              <span>{user.role === "admin" ? "ประวัติการจองทั้งหมด" : "ประวัติการจอง"}</span>
-            </motion.button>
-
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={handleLogout}
-              className="flex items-center space-x-2 px-5 py-2 bg-red-500 text-white rounded-lg shadow-md hover:bg-red-600 transition"
-              title="ออกจากระบบ"
-            >
-              <FaSignOutAlt />
-              <span>ออกจากระบบ</span>
-            </motion.button>
-          </>
-        ) : (
-          <>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={handleLogout}
+                className="flex items-center gap-2 px-5 py-2 bg-red-500 text-white rounded-lg shadow-md hover:bg-red-600 transition"
+                title="ออกจากระบบ"
+              >
+                <FaSignOutAlt className="w-5 h-5" />
+                <span>ออกจากระบบ</span>
+              </motion.button>
+            </>
+          ) : (
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => router.push("/login")}
-              className="flex items-center space-x-2 px-5 py-2 bg-emerald-700 text-white rounded-lg shadow-md hover:bg-emerald-800 transition"
+              className="flex items-center gap-2 px-5 py-2 bg-emerald-700 text-white rounded-lg shadow-md hover:bg-emerald-800 transition"
               title="เข้าสู่ระบบ"
             >
-              <FaSignInAlt />
+              <FaSignInAlt className="w-5 h-5" />
               <span>เข้าสู่ระบบ</span>
             </motion.button>
-
-          </>
-        )}
+          )}
+        </div>
       </div>
+
 
       <motion.h1
         initial={{ opacity: 0, y: -20 }}

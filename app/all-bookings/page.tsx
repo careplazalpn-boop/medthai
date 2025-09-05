@@ -122,7 +122,6 @@ export default function AllBookingsPage() {
   const [filterTimeSlot, setFilterTimeSlot] = useState("all");
   const [filterProvider, setFilterProvider] = useState("all");
 
-  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
 
   useEffect(() => {

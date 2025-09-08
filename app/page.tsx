@@ -69,7 +69,7 @@ function BackgroundDecoration() {
 export default function HomePage() {
   const router = useRouter();
   const { user, logout } = useAuth();
-
+  const isAdminLike = user?.role === "admin" || user?.role === "user";
   const [showAlert, setShowAlert] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -83,7 +83,8 @@ export default function HomePage() {
       }, 5000);
       return;
     }
-    router.push(user.role === "admin" ? "/admin-booking" : "/booking");
+    const isAdminLike = user.role === "admin" || user.role === "user";
+    router.push(isAdminLike ? "/admin-booking" : "/booking");
   };
 
   const handleLogout = () => {
@@ -97,7 +98,8 @@ export default function HomePage() {
 
       {/* แถบเมนูขวาบน */}
       <div className="max-w-[92rem] mx-auto relative w-full">
-        <div className="absolute -top-51 left-0 right-2 flex justify-end gap-3 px-6 z-50">
+        {/* แถบเมนูขวาบน */}
+        <div className="fixed top-4 right-4 flex justify-end gap-3 z-50">
           {user ? (
             <>
               <span className="text-emerald-700 font-semibold text-xl">
@@ -106,14 +108,15 @@ export default function HomePage() {
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={() =>
-                  router.push(user.role === "admin" ? "/all-bookings" : "/booking-history")
-                }
+                onClick={() => {
+                  const isAdminLike = user?.role === "admin" || user?.role === "user";
+                  router.push(isAdminLike ? "/all-bookings" : "/booking-history");
+                }}
                 className="flex items-center gap-2 px-5 py-2 bg-emerald-600 text-white rounded-lg shadow-md hover:bg-emerald-700 transition"
-                title={user.role === "admin" ? "ประวัติการจองทั้งหมด" : "ประวัติการจอง"}
+                title={user?.role === "admin" || user?.role === "user" ? "ประวัติการจองทั้งหมด" : "ประวัติการจอง"}
               >
                 <FaHistory className="w-5 h-5" />
-                <span>{user.role === "admin" ? "ประวัติการจองทั้งหมด" : "ประวัติการจอง"}</span>
+                <span>{user?.role === "admin" || user?.role === "user" ? "ประวัติการจองทั้งหมด" : "ประวัติการจอง"}</span>
               </motion.button>
 
               <motion.button
@@ -141,7 +144,6 @@ export default function HomePage() {
           )}
         </div>
       </div>
-
 
       <motion.h1
         initial={{ opacity: 0, y: -20 }}

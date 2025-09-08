@@ -218,30 +218,35 @@ export default function AdminBookingPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-white to-emerald-100 relative overflow-hidden">
       <div className="max-w-[92rem] mx-auto relative">
-        <div className="absolute top-12 left-1 right-1 flex justify-between px-6 z-50">
+        <div className="fixed top-4 left-4 z-50">
           <motion.button 
             whileHover={{ scale: 1.05 }} 
             whileTap={{ scale: 0.95 }} 
             onClick={() => router.push("/")} 
             className="flex items-center gap-2 px-5 py-2 rounded-lg shadow-md text-white bg-emerald-600 hover:bg-emerald-700"
           >
-            <Home className="w-5 h-5"/><span>หน้าแรก</span>
+            <Home className="w-5 h-5"/>
+            <span>หน้าแรก</span>
           </motion.button>
+        </div>
 
+        {/* ปุ่มประวัติการจองทั้งหมด ชิดขวาบน */}
+        <div className="fixed top-4 right-4 z-50">
           <motion.button 
             whileHover={{ scale: 1.05 }} 
             whileTap={{ scale: 0.95 }} 
             onClick={() => router.push("/all-bookings")} 
             className="flex items-center gap-2 px-5 py-2 rounded-lg shadow-md text-white bg-emerald-600 hover:bg-emerald-700"
           >
-            <FaHistory className="w-5 h-5"/><span>ประวัติการจองทั้งหมด</span>
+            <FaHistory className="w-5 h-5"/>
+            <span>ประวัติการจองทั้งหมด</span>
           </motion.button>
         </div>
       </div>
 
       <div className="max-w-6xl mx-auto p-6 pt-12 relative z-10">
         <motion.h1 initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="text-4xl font-extrabold text-emerald-700 mb-12 text-center drop-shadow-sm">
-          จองคิวนวดแผนไทย (Admin)
+          จองคิวนวดแผนไทย
         </motion.h1>
 
         <div className="mb-8 max-w-sm mx-auto">

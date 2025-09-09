@@ -295,10 +295,10 @@ export default function AdminBookingPage() {
           <Dialog.Portal>
             <Dialog.Overlay className="fixed inset-0 bg-black/30 z-40" />
             <Dialog.Content className="fixed z-50 left-1/2 top-1/2 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white p-6 shadow-lg">
-              <Dialog.Title className="text-xl font-bold mb-4 text-emerald-700">กรอกข้อมูลผู้รับบริการ</Dialog.Title>
+              <Dialog.Title className="text-xl font-bold mb-4 text-emerald-700">กรอกข้อมูลผู้มารับบริการ</Dialog.Title>
 
               <label className="block mb-3">
-                <span className="text-sm font-medium text-emerald-800">ผู้จอง</span>
+                <span className="text-sm font-medium text-emerald-800">ผู้ให้บริการ</span>
                 <select
                   value={dialogTherapist}
                   onChange={e => setDialogTherapist(e.target.value)}
@@ -318,7 +318,7 @@ export default function AdminBookingPage() {
                 return (
                   <label key={field} className="block mb-3 relative">
                     <span className="text-sm font-medium text-emerald-800">
-                      {field === "hn" ? "HN" : field === "name" ? "ชื่อผู้รับบริการ" : "เบอร์โทร"}
+                      {field === "hn" ? "HN" : field === "name" ? "ผู้มารับบริการ" : "เบอร์โทร"}
                     </span>
                     <input
                       type="text"

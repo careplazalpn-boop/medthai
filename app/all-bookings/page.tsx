@@ -272,7 +272,7 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
           />
         </div>
         <div className="min-w-[256px]">
-          <label className="block text-emerald-700 font-semibold mb-2 text-lg">ผู้รับผิดชอบ:</label>
+          <label className="block text-emerald-700 font-semibold mb-2 text-lg">ผู้จอง:</label>
         <select 
           value={filterProvider} 
           onChange={e => setFilterProvider(e.target.value)}
@@ -362,7 +362,7 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
           {filteredBookings.map(b=>(
             <li key={b.id} className={`bg-white border rounded-xl p-5 flex justify-between items-center border-l-8 ${getStatusColor(b)}`}>
               <div className="grid grid-cols-[205px_185px_110px_205px_130px_130px_130px] gap-x-6 text-gray-700 flex-grow">
-                <Label icon={<UserCheck className="w-4 h-4"/>} text="ผู้รับผิดชอบ"/>
+                <Label icon={<UserCheck className="w-4 h-4"/>} text="ผู้จอง"/>
                 <Label icon={<User className="w-4 h-4"/>} text="ผู้มารับบริการ"/>
                 <Label icon={<Phone className="w-4 h-4"/>} text="เบอร์โทร"/>
                 <Label icon={<UserCheck className="w-4 h-4"/>} text="ผู้ให้บริการ"/>
@@ -500,7 +500,7 @@ function BookingDialog({ title, color, booking, onConfirm }: any) {
           <Dialog.Title className={`text-xl font-bold text-${color}-600 mb-4`}>{title}</Dialog.Title>
           <div className="mb-4 text-sm grid grid-cols-1 gap-2">
             {[
-              {icon:<UserCheck className="w-5 h-5 text-emerald-700"/>, label:"ผู้รับผิดชอบ", value:booking.provider},
+              {icon:<UserCheck className="w-5 h-5 text-emerald-700"/>, label:"ผู้จอง", value:booking.provider},
               {icon:<User className="w-5 h-5 text-emerald-700"/>, label:"ชื่อ", value:booking.name},
               {icon:<Phone className="w-5 h-5 text-emerald-700"/>, label:"เบอร์โทร", value:booking.phone},
               {icon:<UserCheck className="w-5 h-5 text-emerald-700"/>, label:"ผู้ให้บริการ", value:booking.therapist},

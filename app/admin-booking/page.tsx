@@ -298,7 +298,7 @@ export default function AdminBookingPage() {
               <Dialog.Title className="text-xl font-bold mb-4 text-emerald-700">กรอกข้อมูลผู้รับบริการ</Dialog.Title>
 
               <label className="block mb-3">
-                <span className="text-sm font-medium text-emerald-800">ผู้รับผิดชอบ</span>
+                <span className="text-sm font-medium text-emerald-800">ผู้จอง</span>
                 <select
                   value={dialogTherapist}
                   onChange={e => setDialogTherapist(e.target.value)}

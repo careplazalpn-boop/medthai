@@ -18,6 +18,7 @@ export default function AdminBookingPage() {
   const router = useRouter();
   const { user } = useContext(AuthContext);
 
+  const [idCardNumber, setIdCardNumber] = useState("");
   const [therapists, setTherapists] = useState<string[]>([]);
   const [timeSlots, setTimeSlots] = useState<string[]>([]);
   const [date, setDate] = useState("");
@@ -32,7 +33,6 @@ export default function AdminBookingPage() {
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
   const [searchResults, setSearchResults] = useState<UserInfo[]>([]);
-
   const [dialogTherapist, setDialogTherapist] = useState("");
   const [offTherapists, setOffTherapists] = useState<string[]>([]);
 
@@ -47,8 +47,14 @@ export default function AdminBookingPage() {
   }, [user, router]);
 
   useEffect(() => {
-    fetch("/api/therapists").then(res => res.json()).then(data => data.success && setTherapists(data.therapists)).catch(() => setTherapists([]));
-    fetch("/api/time-slots").then(res => res.json()).then(data => data.success && setTimeSlots(data.timeSlots)).catch(() => setTimeSlots([]));
+    fetch("/api/therapists")
+      .then(res => res.json())
+      .then(data => data.success && setTherapists(data.therapists))
+      .catch(() => setTherapists([]));
+    fetch("/api/time-slots")
+      .then(res => res.json())
+      .then(data => data.success && setTimeSlots(data.timeSlots))
+      .catch(() => setTimeSlots([]));
   }, []);
 
   useEffect(() => {
@@ -78,13 +84,8 @@ export default function AdminBookingPage() {
     fetch(`/api/off-therapists?date=${encodeURIComponent(date)}`)
       .then(res => res.json())
       .then(data => {
-        if (data.success) {
-          setOffTherapists(data.offTherapists || []);
-          setDisabledSlots(data.disabledSlotsByTherapist || {});
-        } else {
-          setOffTherapists([]);
-          setDisabledSlots({});
-        }
+        setOffTherapists(data.success ? data.offTherapists || [] : []);
+        setDisabledSlots(data.success ? data.disabledSlotsByTherapist || {} : {});
       })
       .catch(() => { setOffTherapists([]); setDisabledSlots({}); });
 
@@ -97,17 +98,15 @@ export default function AdminBookingPage() {
     if (!digits) return "";
     return digits.length <= 3 ? digits : `${digits.slice(0, 3)}-${digits.slice(3)}`;
   };
-
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => setClientPhone(formatPhone(e.target.value));
 
   const isTimeSlotPast = (slot: string) => {
     if (!date) return false;
-    const [start] = slot.split("-"); // เวลาต้นของ slot
+    const [start] = slot.split("-");
     let [hourStr, minStr = "00"] = start.split(":");
     if (hourStr.length === 1) hourStr = "0" + hourStr;
     if (minStr.length === 1) minStr = "0" + minStr;
-    const slotStart = new Date(`${date}T${hourStr}:${minStr}:00`);
-    return new Date() > slotStart;
+    return new Date() > new Date(`${date}T${hourStr}:${minStr}:00`);
   };
 
   const handleSelect = (therapist: string, time: string) => {
@@ -117,37 +116,35 @@ export default function AdminBookingPage() {
   };
 
   const handleSubmit = () => {
-    if (!clientHN || !clientName || !clientPhone || !date || !selectedTherapist || !selectedTime || !dialogTherapist) {
+    if (!clientName || !clientPhone || !date || !selectedTherapist || !selectedTime || !dialogTherapist) {
       alert("กรุณากรอกข้อมูลให้ครบถ้วน");
+      return;
+    }
+    if (clientHN.length !== 9 && !idCardNumber) {
+      alert("กรุณากรอก HN หรือ หมายเลขบัตรประชาชน");
       return;
     }
     router.push(`/confirm?${new URLSearchParams({
       hn: clientHN,
       name: clientName,
       phone: clientPhone,
+      idCard: idCardNumber,
       date,
       therapist: selectedTherapist,
       time: selectedTime,
-      provider: dialogTherapist || "",
+      provider: dialogTherapist,
     }).toString()}`);
   };
 
   const handleOpenDialog = () => {
-    setClientHN("");
-    setClientName("");
-    setClientPhone("");
-    setDialogTherapist("");
-    setSearchResults([]);
+    if (!selectedTherapist || !selectedTime || !date) return setShowAlert(true);
+    setClientHN(""); setClientName(""); setClientPhone(""); setDialogTherapist(""); setSearchResults([]);
     setDialogOpen(true);
   };
 
   const handleAutoFill = async (field: "hn" | "name" | "phone") => {
-    let query = "";
-    if (field === "hn" && clientHN.trim().length !== 9) return alert("กรุณากรอก HN ให้ครบ 9 หลัก");
-    if (field === "name" && !clientName.trim()) return;
-    if (field === "phone" && !clientPhone.trim()) return alert("กรุณากรอกเบอร์โทร");
-
-    query = encodeURIComponent(field === "hn" ? clientHN : field === "name" ? clientName : clientPhone);
+    if ((field === "hn" && clientHN.trim().length !== 9) || (field === "name" && !clientName.trim()) || (field === "phone" && !clientPhone.trim())) return alert("กรุณากรอกข้อมูลให้ถูกต้อง");
+    const query = encodeURIComponent(field === "hn" ? clientHN : field === "name" ? clientName : clientPhone);
     try {
       const res = await fetch(`/api/user-info?${field}=${query}`);
       const data = await res.json();
@@ -155,11 +152,7 @@ export default function AdminBookingPage() {
         setClientHN(data.hn);
         setClientName(data.name);
         setClientPhone(formatPhone(data.phone || ""));
-      } else {
-        if (field === "phone") alert("ไม่พบข้อมูลผู้ใช้ตรงกับเบอร์โทรที่กรอก");
-        else if (field === "hn") alert("ไม่พบข้อมูลผู้ใช้ตรงกับ HN ที่กรอก");
-        else alert("ไม่พบข้อมูลผู้ใช้ตรงกับชื่อที่กรอก");
-      }
+      } else alert(`ไม่พบข้อมูลผู้ใช้ตรงกับ ${field}`);
     } catch { alert("เกิดข้อผิดพลาดในการดึงข้อมูล"); }
   };
 
@@ -174,9 +167,7 @@ export default function AdminBookingPage() {
   };
 
   const handleSelectUser = (user: UserInfo) => {
-    setClientName(user.name);
-    setClientHN(user.hn);
-    setClientPhone(formatPhone(user.phone || ""));
+    setClientName(user.name); setClientHN(user.hn); setClientPhone(formatPhone(user.phone || ""));
     setSearchResults([]);
   };
 
@@ -190,8 +181,7 @@ export default function AdminBookingPage() {
       });
       const data = await res.json();
       if (data.success) {
-        if (offTherapists.includes(therapist)) setOffTherapists(prev => prev.filter(t => t !== therapist));
-        else setOffTherapists(prev => [...prev, therapist]);
+        setOffTherapists(prev => prev.includes(therapist) ? prev.filter(t => t !== therapist) : [...prev, therapist]);
       } else alert("ไม่สามารถอัปเดตหมอไม่มาได้");
     } catch { alert("เกิดข้อผิดพลาดในการอัปเดตหมอไม่มา"); }
   };
@@ -219,27 +209,13 @@ export default function AdminBookingPage() {
     <div className="min-h-screen bg-gradient-to-br from-white to-emerald-100 relative overflow-hidden">
       <div className="max-w-[92rem] mx-auto relative">
         <div className="fixed top-4 left-4 z-50">
-          <motion.button 
-            whileHover={{ scale: 1.05 }} 
-            whileTap={{ scale: 0.95 }} 
-            onClick={() => router.push("/")} 
-            className="flex items-center gap-2 px-5 py-2 rounded-lg shadow-md text-white bg-emerald-600 hover:bg-emerald-700"
-          >
-            <Home className="w-5 h-5"/>
-            <span>หน้าแรก</span>
+          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => router.push("/")} className="flex items-center gap-2 px-5 py-2 rounded-lg shadow-md text-white bg-emerald-600 hover:bg-emerald-700">
+            <Home className="w-5 h-5"/> หน้าแรก
           </motion.button>
         </div>
-
-        {/* ปุ่มประวัติการจองทั้งหมด ชิดขวาบน */}
         <div className="fixed top-4 right-4 z-50">
-          <motion.button 
-            whileHover={{ scale: 1.05 }} 
-            whileTap={{ scale: 0.95 }} 
-            onClick={() => router.push("/all-bookings")} 
-            className="flex items-center gap-2 px-5 py-2 rounded-lg shadow-md text-white bg-emerald-600 hover:bg-emerald-700"
-          >
-            <FaHistory className="w-5 h-5"/>
-            <span>ประวัติการจองทั้งหมด</span>
+          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => router.push("/all-bookings")} className="flex items-center gap-2 px-5 py-2 rounded-lg shadow-md text-white bg-emerald-600 hover:bg-emerald-700">
+            <FaHistory className="w-5 h-5"/> ประวัติการจองทั้งหมด
           </motion.button>
         </div>
       </div>
@@ -256,6 +232,7 @@ export default function AdminBookingPage() {
           <input type="date" value={date} min={new Date().toISOString().split("T")[0]} onChange={e => setDate(e.target.value)} className={`border border-gray-300 rounded-lg p-3 w-full focus:outline-none focus:ring-2 focus:ring-emerald-400 transition ${!date ? "text-gray-400" : "text-gray-900"}`} />
         </div>
 
+        {/* Therapist & slots rendering */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {therapists.map(t => {
             const booked = bookedSlots[t] || [];
@@ -269,17 +246,7 @@ export default function AdminBookingPage() {
                   <UserIcon className={`w-5 h-5 ${isOff ? "text-gray-500" : "text-emerald-600"}`} />
                   <h2 className={`text-lg font-semibold ${isOff ? "text-gray-500" : "text-emerald-700"}`}>{t}</h2>
                   <div className="ml-auto flex items-center gap-2">
-                    <span className="text-base text-emerald-800 font-semibold">วันนี้หมอ :</span>
-                    {date && (
-                      <button
-                        onClick={() => toggleOffTherapist(t)}
-                        className={`px-3 py-1.5 text-sm rounded flex items-center gap-2 font-semibold text-white hover:brightness-90
-                          ${isOff ? "bg-red-500 hover:bg-red-600" : "bg-emerald-500 hover:bg-emerald-600"}`}
-                      >
-                        {isOff ? "ไม่มา" : "มา"}
-                        {isOff ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
-                      </button>
-                    )}
+                    {date && <button onClick={() => toggleOffTherapist(t)} className={`px-3 py-1.5 text-sm rounded flex items-center gap-2 font-semibold text-white hover:brightness-90 ${isOff ? "bg-red-500 hover:bg-red-600" : "bg-emerald-500 hover:bg-emerald-600"}`}>{isOff ? "ไม่มา" : "มา"}{isOff ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}</button>}
                   </div>
                 </div>
 
@@ -292,33 +259,16 @@ export default function AdminBookingPage() {
 
                     return (
                       <div key={slot} className="flex gap-1 items-center">
-                        <button
-                          disabled={isBooked || isPast || isOff || isSlotDisabled}
-                          onClick={() => handleSelect(t, slot)}
-                          className={`text-sm px-3 py-2 rounded-lg font-medium border flex-1 flex items-center justify-center gap-1 transition shadow-sm
-                            ${isSlotDisabled ? "bg-gray-300 text-gray-500 border-gray-400 cursor-not-allowed"
-                            : isOff ? "bg-gray-300 text-gray-500 border-gray-400 cursor-not-allowed"
-                            : isBooked ? "bg-red-100 text-red-600 border-red-400 cursor-not-allowed"
-                            : isPast ? "bg-yellow-100 text-yellow-700 border-yellow-400 cursor-not-allowed"
-                            : isActive ? "bg-emerald-600 text-white border-emerald-600"
-                            : "bg-white hover:bg-emerald-50 text-emerald-800 border-gray-300"}`}>
+                        <button disabled={isBooked || isPast || isOff || isSlotDisabled} onClick={() => handleSelect(t, slot)} className={`text-sm px-3 py-2 rounded-lg font-medium border flex-1 flex items-center justify-center gap-1 transition shadow-sm
+                          ${isSlotDisabled ? "bg-gray-300 text-gray-500 border-gray-400 cursor-not-allowed"
+                          : isOff ? "bg-gray-300 text-gray-500 border-gray-400 cursor-not-allowed"
+                          : isBooked ? "bg-red-100 text-red-600 border-red-400 cursor-not-allowed"
+                          : isPast ? "bg-yellow-100 text-yellow-700 border-yellow-400 cursor-not-allowed"
+                          : isActive ? "bg-emerald-600 text-white border-emerald-600"
+                          : "bg-white hover:bg-emerald-50 text-emerald-800 border-gray-300"}`}>
                           <Clock className="w-4 h-4" /> {slot} {(isBooked || isPast) && <span className="text-xs font-semibold">({isBooked ? "ถูกจองแล้ว" : "หมดเวลาจอง"})</span>}
                         </button>
-                        {date && (
-                          <button
-                            disabled={isOff}
-                            onClick={() => toggleSlot(t, slot)}
-                            className={`px-2 py-1 rounded text-white ${
-                              isOff 
-                                ? "bg-gray-400 cursor-not-allowed" 
-                                : isSlotDisabled 
-                                  ? "bg-red-500 hover:bg-red-600" 
-                                  : "bg-emerald-500 hover:bg-emerald-600"
-                            }`}
-                          >
-                            {isSlotDisabled ? <FaTimes /> : <FaCheck />}
-                          </button>
-                        )}
+                        {date && <button disabled={isOff} onClick={() => toggleSlot(t, slot)} className={`px-2 py-1 rounded text-white ${isOff ? "bg-gray-400 cursor-not-allowed" : isSlotDisabled ? "bg-red-500 hover:bg-red-600" : "bg-emerald-500 hover:bg-emerald-600"}`}>{isSlotDisabled ? <FaTimes /> : <FaCheck />}</button>}
                       </div>
                     );
                   })}
@@ -332,6 +282,7 @@ export default function AdminBookingPage() {
           })}
         </div>
 
+        {/* Dialog */}
         <Dialog.Root open={dialogOpen} onOpenChange={setDialogOpen}>
           <Dialog.Portal>
             <Dialog.Overlay className="fixed inset-0 bg-black/30 z-40" />
@@ -340,10 +291,10 @@ export default function AdminBookingPage() {
 
               <label className="block mb-3">
                 <span className="text-sm font-medium text-emerald-800">ผู้รับผิดชอบ</span>
-                <select value={dialogTherapist} onChange={(e) => setDialogTherapist(e.target.value)} className={`mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 ${dialogTherapist === "" ? "text-gray-400" : "text-gray-900"}`}>
-                  <option value="" disabled className="text-gray-400">-- เลือก --</option>
-                  {therapists.map((t) => <option key={t} value={t} className="text-black">{t}</option>)}
-                </select>
+              <select value={dialogTherapist} onChange={e => setDialogTherapist(e.target.value)}
+                className={`mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 ${dialogTherapist === "" ? "text-gray-400" : "text-gray-900"}`}><option value="" disabled>-- เลือก --</option>{therapists.map(t => (<option key={t} value={t} className="text-gray-900">{t}</option>
+                ))}
+              </select>
               </label>
 
               {["hn", "name", "phone"].map(field => (
@@ -352,22 +303,28 @@ export default function AdminBookingPage() {
                   <input type="text" value={field === "hn" ? clientHN : field === "name" ? clientName : clientPhone} onChange={e => field === "hn" ? setClientHN(e.target.value) : field === "name" ? setClientName(e.target.value) : handlePhoneChange(e)} maxLength={field === "hn" ? 9 : field === "phone" ? 11 : undefined} placeholder={field === "hn" ? "กรอก HN" : field === "name" ? "กรอกชื่อ" : "กรอกเบอร์โทร"} className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900" />
                   <div className="absolute top-0 right-0 mt-1 mr-1 flex gap-1">
                     {field === "hn" && <button type="button" onClick={() => handleAutoFill("hn")} className="px-2 py-1 bg-emerald-500 text-white rounded hover:bg-emerald-600 text-xs">auto-fill</button>}
-                    {field === "name" && (
-                      <>
-                        <button type="button" onClick={handleSearchName} className="px-2 py-1 bg-emerald-500 text-white rounded hover:bg-emerald-600 text-xs">ค้นหา</button>
-                        <button type="button" onClick={() => handleAutoFill("name")} className="px-2 py-1 bg-emerald-500 text-white rounded hover:bg-emerald-600 text-xs">auto-fill</button>
-                      </>
-                    )}
+                    {field === "name" && <>
+                      <button type="button" onClick={handleSearchName} className="px-2 py-1 bg-emerald-500 text-white rounded hover:bg-emerald-600 text-xs">ค้นหา</button>
+                      <button type="button" onClick={() => handleAutoFill("name")} className="px-2 py-1 bg-emerald-500 text-white rounded hover:bg-emerald-600 text-xs">auto-fill</button>
+                    </>}
                     {field === "phone" && <button type="button" onClick={() => handleAutoFill("phone")} className="px-2 py-1 bg-emerald-500 text-white rounded hover:bg-emerald-600 text-xs">auto-fill</button>}
                   </div>
                 </label>
               ))}
 
+              {clientHN.length !== 9 && (
+                <label className="block mb-3">
+                  <span className="text-sm font-medium text-emerald-800">หมายเลขบัตรประชาชน</span>
+                  <input type="text" value={idCardNumber} onChange={e => setIdCardNumber(e.target.value.replace(/\D/g, "").slice(0, 13))} maxLength={13} placeholder="กรอกหมายเลขบัตรประชาชน" className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900" />
+                </label>
+              )}
+
               {searchResults.length > 0 && (
                 <div className="border p-2 rounded max-h-40 overflow-y-auto mb-3">
                   {searchResults.map(u => (
                     <button key={u.hn || u.name} onClick={() => handleSelectUser(u)} className="w-full flex justify-between items-center px-2 py-1 hover:bg-emerald-100 rounded text-gray-900">
-                    <span className="font-medium text-left">{u.name}</span><span className="text-sm text-gray-500 text-right">{u.phone || "ไม่มีเบอร์"}</span>
+                      <span className="font-medium text-left">{u.name}</span>
+                      <span className="text-sm text-gray-500 text-right">{u.phone || "ไม่มีเบอร์"}</span>
                     </button>
                   ))}
                 </div>
@@ -385,13 +342,7 @@ export default function AdminBookingPage() {
 
         <AnimatePresence>
           {showAlert && (
-            <motion.div
-              key={Date.now()}
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="fixed top-6 left-1/2 -translate-x-1/2 bg-red-500 text-white px-4 py-2 rounded shadow z-50 flex items-center gap-2"
-            >
+            <motion.div key={Date.now()} initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="fixed top-6 left-1/2 -translate-x-1/2 bg-red-500 text-white px-4 py-2 rounded shadow z-50 flex items-center gap-2">
               <AlertCircle className="w-5 h-5" />
               <span>กรุณาเลือกวันที่ก่อน</span>
             </motion.div>

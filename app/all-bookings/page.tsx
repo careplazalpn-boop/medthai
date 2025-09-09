@@ -116,6 +116,7 @@ export default function AllBookingsPage() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [showCancelSuccess, setShowCancelSuccess] = useState(false);
   const [showConfirmSuccess, setShowConfirmSuccess] = useState(false);
+  const [showDeleteSuccess, setShowDeleteSuccess] = useState(false);
 
   const [filterName, setFilterName] = useState("");
   const [filterTherapist, setFilterTherapist] = useState("all");
@@ -127,16 +128,18 @@ export default function AllBookingsPage() {
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
 
   useEffect(() => {
+    if (!filterDate) {setBookings([]); return;}
     (async () => {
       try {
-        const res = await fetch("/api/all-bookings");
+        const res = await fetch(`/api/all-bookings?date=${filterDate}`);
         const data = await res.json();
         if (!data.success) throw new Error(data.error || "เกิดข้อผิดพลาด");
         setBookings(data.bookings);
-      } catch (e: any) { setError(e.message || "เกิดข้อผิดพลาดไม่ทราบสาเหตุ"); }
-      finally { setLoading(false); }
+      } catch (e: any) {
+        setError(e.message || "เกิดข้อผิดพลาดไม่ทราบสาเหตุ");
+      }
     })();
-  }, []);
+  }, [filterDate]);
 
   useEffect(() => {
     (async () => {
@@ -215,7 +218,6 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
     } catch { alert(`ไม่สามารถ${action==="cancel"?"ยกเลิก":"ยืนยัน"}การจองได้`); }
   };
 
-  if (loading) return <p className="p-4 text-center text-gray-600">กำลังโหลดข้อมูล...</p>;
   if (error) return <p className="p-4 text-center text-red-600 font-semibold">Error: {error}</p>;
 
   return (
@@ -246,7 +248,7 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
       </div>
       <h1 className="text-4xl font-extrabold text-emerald-700 mb-12 text-center drop-shadow-sm">ประวัติการจองทั้งหมด</h1>
       <div className="max-w-6xl mx-auto mb-5 flex flex-wrap gap-4 items-end">
-        <div className="min-w-[180px] flex-1">
+        <div className="min-w-[356px]">
           <label className="block text-emerald-700 font-semibold mb-2 text-lg">ผู้มารับบริการ:</label>
           <input 
             type="text" 
@@ -256,7 +258,7 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
             className="w-full px-4 h-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900 placeholder-gray-400"
           />
         </div>
-        <div className="min-w-[180px]">
+        <div className="min-w-[256px]">
           <label className="block text-emerald-700 font-semibold mb-2 text-lg">ผู้รับผิดชอบ:</label>
           <select 
             value={filterProvider} 
@@ -267,7 +269,7 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
             {therapists.map((t,i)=><option key={i} value={t}>{t}</option>)}
           </select>
         </div>
-        <div className="min-w-[180px]">
+        <div className="min-w-[256px]">
           <label className="block text-emerald-700 font-semibold mb-2 text-lg">ผู้ให้บริการ:</label>
           <select 
             value={filterTherapist} 
@@ -368,84 +370,98 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
                 }`}>{getStatusLabel(b)}</span>
               </div>
               <div className="flex gap-2">
-  {user?.role !== "user" && getStatusLabel(b) === "ยกเลิก" && (
-    <Dialog.Root open={cancelDialogOpen && selectedId===b.id} onOpenChange={setCancelDialogOpen}>
-      <Dialog.Trigger asChild>
-        <motion.button
-          whileHover={{scale:1.05}} whileTap={{scale:0.95}}
-          onClick={()=>{setSelectedId(b.id); setCancelDialogOpen(true);}}
-          className="px-4 py-2 rounded-md flex items-center gap-2 bg-gray-300 text-gray-600"
-        >
-          <FaTimes className="text-red-500"/>
-          ยกเลิกแล้ว
-        </motion.button>
-      </Dialog.Trigger>
-      <BookingDialog
-        title="ต้องการลบรายการนี้หรือไม่?"
-        color="red"
-        booking={selectedBooking}
-        onConfirm={async ()=>{ /* ... */ }}
-      />
-    </Dialog.Root>
-  )}
+                {user?.role !== "user" && getStatusLabel(b) === "ยกเลิก" && (
+                  <Dialog.Root open={cancelDialogOpen && selectedId===b.id} onOpenChange={setCancelDialogOpen}>
+                    <Dialog.Trigger asChild>
+                      <motion.button
+                        whileHover={{scale:1.05}} whileTap={{scale:0.95}}
+                        onClick={()=>{setSelectedId(b.id); setCancelDialogOpen(true);}}
+                        className="px-4 py-2 rounded-md flex items-center gap-2 bg-gray-300 text-gray-600"
+                      >
+                        <FaTimes className="text-red-500"/>
+                        ยกเลิกแล้ว
+                      </motion.button>
+                    </Dialog.Trigger>
+                    <BookingDialog
+                      title="ต้องการลบรายการนี้หรือไม่?"
+                      color="red"
+                      booking={selectedBooking}
+                      onConfirm={async () => {
+                        try {
+                          const res = await fetch(`/api/all-bookings?id=${b.id}`, { method: "DELETE" });
+                          const data = await res.json();
+                          if (data.success) {
+                            setBookings(prev => prev.filter(x => x.id !== b.id));
+                            setSelectedId(null);
+                            setShowDeleteSuccess(true); // เพิ่มตรงนี้
+                            setTimeout(() => setShowDeleteSuccess(false), 3000); // ปิดหลัง 3 วินาที
+                          } else alert("เกิดข้อผิดพลาดในการลบรายการ");
+                        } catch {
+                          alert("ไม่สามารถลบรายการได้");
+                        }
+                      }}
+                    />
+                  </Dialog.Root>
+                )}
 
-  {user?.role !== "user" && getStatusLabel(b) === "รอดำเนินการ" && (
-    <Dialog.Root>
-      <Dialog.Trigger asChild>
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={() => setSelectedId(b.id)}
-          className="flex items-center justify-center w-15 h-10 bg-emerald-600 rounded-md shadow hover:bg-emerald-700 transition"
-        >
-          <FaCheck className="text-white w-5 h-5" />
-        </motion.button>
-      </Dialog.Trigger>
-      <BookingDialog
-        title="ต้องการยืนยันรายการนี้หรือไม่?"
-        color="emerald"
-        booking={b}
-        onConfirm={() => handleBookingAction("confirm")}
-      />
-    </Dialog.Root>
-  )}
+                {user?.role !== "user" && getStatusLabel(b) === "รอดำเนินการ" && (
+                  <Dialog.Root>
+                    <Dialog.Trigger asChild>
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => setSelectedId(b.id)}
+                        className="flex items-center justify-center w-15 h-10 bg-emerald-600 rounded-md shadow hover:bg-emerald-700 transition"
+                      >
+                        <FaCheck className="text-white w-5 h-5" />
+                      </motion.button>
+                    </Dialog.Trigger>
+                    <BookingDialog
+                      title="ต้องการยืนยันรายการนี้หรือไม่?"
+                      color="emerald"
+                      booking={b}
+                      onConfirm={() => handleBookingAction("confirm")}
+                    />
+                  </Dialog.Root>
+                )}
 
-  {user?.role !== "user" && (getStatusLabel(b) === "รอดำเนินการ" || getStatusLabel(b) === "อยู่ในคิว") && (
-    <Dialog.Root>
-      <Dialog.Trigger asChild>
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={() => setSelectedId(b.id)}
-          className="flex items-center justify-center w-15 h-10 bg-red-500 rounded-md shadow hover:bg-red-600 transition"
-        >
-          <FaTimes className="text-white w-5 h-5" />
-        </motion.button>
-      </Dialog.Trigger>
-      <BookingDialog
-        title="ต้องการยกเลิกรายการนี้หรือไม่?"
-        color="red"
-        booking={b}
-        onConfirm={() => handleBookingAction("cancel")}
-      />
-    </Dialog.Root>
-  )}
+                {user?.role !== "user" && (getStatusLabel(b) === "รอดำเนินการ" || getStatusLabel(b) === "อยู่ในคิว") && (
+                  <Dialog.Root>
+                    <Dialog.Trigger asChild>
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => setSelectedId(b.id)}
+                        className="flex items-center justify-center w-15 h-10 bg-red-500 rounded-md shadow hover:bg-red-600 transition"
+                      >
+                        <FaTimes className="text-white w-5 h-5" />
+                      </motion.button>
+                    </Dialog.Trigger>
+                    <BookingDialog
+                      title="ต้องการยกเลิกรายการนี้หรือไม่?"
+                      color="red"
+                      booking={b}
+                      onConfirm={() => handleBookingAction("cancel")}
+                    />
+                  </Dialog.Root>
+                )}
 
-  {/* ปุ่มสำเร็จแล้ว ไม่ต้องเช็ก role */}
-  {getStatusLabel(b) === "สำเร็จ" && (
-    <button disabled className="px-4 py-2 rounded-md text-gray-600 flex items-center gap-2 bg-gray-300">
-      <FaCheck className="text-emerald-600"/>
-      สำเร็จแล้ว
-    </button>
-  )}
-</div>
+                {/* ปุ่มสำเร็จแล้ว ไม่ต้องเช็ก role */}
+                {getStatusLabel(b) === "สำเร็จ" && (
+                  <button disabled className="px-4 py-2 rounded-md text-gray-600 flex items-center gap-2 bg-gray-300">
+                    <FaCheck className="text-emerald-600"/>
+                    สำเร็จแล้ว
+                  </button>
+                )}
+              </div>
             </li>
           ))}
         </ul>
       )}
       <AnimatePresence>
-        {showCancelSuccess && <Toast message="ยกเลิกการจองสำเร็จ" />}
-        {showConfirmSuccess && <Toast message="ยืนยันการจองสำเร็จ" />}
+        {showCancelSuccess && <Toast key="cancel" message="ยกเลิกการจองสำเร็จ" />}
+        {showConfirmSuccess && <Toast key="confirm" message="ยืนยันการจองสำเร็จ" />}
+        {showDeleteSuccess && <Toast key="delete" message="ลบรายการสำเร็จ" />}
       </AnimatePresence>
     </div>
   );

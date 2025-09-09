@@ -12,17 +12,9 @@ const pool = mysql.createPool({
   queueLimit: 0,
 });
 
-// GET bookings
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const date = searchParams.get("date");
-
-  if (!date) {
-    return NextResponse.json(
-      { success: false, error: "กรุณาระบุวันที่" },
-      { status: 400 }
-    );
-  }
+  const date = new URL(request.url).searchParams.get("date");
+  if (!date) return NextResponse.json({ success: false, error: "กรุณาระบุวันที่" }, { status: 400 });
 
   try {
     const conn = await pool.getConnection();
@@ -31,46 +23,43 @@ export async function GET(request: Request) {
       [date]
     );
     conn.release();
-
     return NextResponse.json({ success: true, bookings: rows });
   } catch (error) {
     console.error("GET bookings error:", error);
-    return NextResponse.json(
-      { success: false, error: "เกิดข้อผิดพลาด" },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: "เกิดข้อผิดพลาด" }, { status: 500 });
   }
 }
 
-// POST booking
 export async function POST(request: Request) {
   try {
-    const data = await request.json();
-    const { provider, hn, name, phone, therapist, time, date } = data; // ✅ เพิ่ม provider
+    const { provider, hn, name, phone, therapist, time, date } = await request.json();
 
-    if (!provider || !hn || !name || !phone || !therapist || !time || !date) { // ✅ ตรวจสอบ provider ด้วย
+    // ตรวจสอบ field จำเป็น
+    const missingFields = [];
+    if (!provider) missingFields.push("provider");
+    if (!hn) missingFields.push("hn");
+    if (!name) missingFields.push("name");
+    if (!phone) missingFields.push("phone");
+    if (!therapist) missingFields.push("therapist");
+    if (!time) missingFields.push("time");
+    if (!date) missingFields.push("date");
+
+    if (missingFields.length > 0) {
       return NextResponse.json(
-        { success: false, error: "ข้อมูลไม่ครบถ้วน" },
+        { success: false, error: `ข้อมูลไม่ครบถ้วน: ${missingFields.join(", ")}` },
         { status: 400 }
       );
     }
 
     const conn = await pool.getConnection();
     try {
-      // ตรวจสอบว่ามีการจองค้างอยู่หรือไม่
+      // ตรวจสอบ user เก่ามี booking รอดำเนินการอยู่หรือไม่
       const [userRows] = await conn.query(
-        "SELECT * FROM bookings WHERE name = ? AND status = 'รอดำเนินการ' LIMIT 1",
-        [name]
+        "SELECT * FROM bookings WHERE hn = ? AND status = 'รอดำเนินการ' LIMIT 1",
+        [hn]
       );
-      const user = (userRows as any)[0];
-      if (user) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: "คุณมีการจองอยู่แล้ว ไม่สามารถจองเพิ่มได้",
-          },
-          { status: 409 }
-        );
+      if ((userRows as any).length > 0) {
+        return NextResponse.json({ success: false, error: "คุณมีการจองอยู่แล้ว ไม่สามารถจองเพิ่มได้" }, { status: 409 });
       }
 
       // ตรวจสอบช่วงเวลาว่าง
@@ -78,24 +67,15 @@ export async function POST(request: Request) {
         "SELECT COUNT(*) as count FROM bookings WHERE therapist = ? AND time_slot = ? AND date = ? AND status != 'ยกเลิก'",
         [therapist, time, date]
       );
-      const count = (rows as any)[0].count;
-      if (count > 0) {
-        return NextResponse.json(
-          { success: false, error: "ช่วงเวลานี้ถูกจองไปแล้ว" },
-          { status: 409 }
-        );
+      if ((rows as any)[0].count > 0) {
+        return NextResponse.json({ success: false, error: "ช่วงเวลานี้ถูกจองไปแล้ว" }, { status: 409 });
       }
 
-      // บันทึกข้อมูลการจอง พร้อม provider ✅
+      // บันทึก booking สำหรับ user เก่า
       await conn.query(
-        "INSERT INTO bookings (provider, hn, name, phone, therapist, time_slot, date, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'รอดำเนินการ')",
-        [provider, hn, name, phone, therapist, time, date]
+        "INSERT INTO bookings (hn, name, phone, date, therapist, time_slot, provider, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'รอดำเนินการ')",
+        [hn, name, phone, date, therapist, time, provider]
       );
-
-      // อัปเดตสถานะการจองใน users
-      await conn.query("UPDATE users SET Reservation = TRUE WHERE phone = ?", [
-        phone,
-      ]);
     } finally {
       conn.release();
     }
@@ -103,9 +83,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Database error:", error);
-    return NextResponse.json(
-      { success: false, error: "เกิดข้อผิดพลาดจากระบบ" },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: "เกิดข้อผิดพลาดจากระบบ" }, { status: 500 });
   }
 }

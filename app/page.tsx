@@ -69,7 +69,6 @@ function BackgroundDecoration() {
 export default function HomePage() {
   const router = useRouter();
   const { user, logout } = useAuth();
-  const isAdminLike = user?.role === "admin" || user?.role === "user";
   const [showAlert, setShowAlert] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 

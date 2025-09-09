@@ -109,7 +109,6 @@ export default function AllBookingsPage() {
   const router = useRouter();
   const { user } = useContext(AuthContext);
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [therapists, setTherapists] = useState<string[]>([]);
   const [timeSlots, setTimeSlots] = useState<string[]>([]);

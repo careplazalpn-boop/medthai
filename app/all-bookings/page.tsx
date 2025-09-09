@@ -110,6 +110,7 @@ export default function AllBookingsPage() {
   const { user } = useContext(AuthContext);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [providers, setProviders] = useState<string[]>([]);
   const [therapists, setTherapists] = useState<string[]>([]);
   const [timeSlots, setTimeSlots] = useState<string[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -143,10 +144,23 @@ export default function AllBookingsPage() {
   useEffect(() => {
     (async () => {
       try {
-        const [res1, res2] = await Promise.all([fetch("/api/therapists"), fetch("/api/time-slots")]);
-        const data1 = await res1.json(); if (data1.success) setTherapists(data1.therapists);
-        const data2 = await res2.json(); if (data2.success) setTimeSlots(data2.timeSlots);
-      } catch { setTherapists([]); setTimeSlots([]); }
+        const [resTherapist, resTimeSlot, resStaff] = await Promise.all([
+          fetch("/api/therapists"),
+          fetch("/api/time-slots"),
+          fetch("/api/med-staff")
+        ]);
+
+        const dataTherapist = await resTherapist.json();
+        const dataTimeSlot = await resTimeSlot.json();
+        const dataStaff = await resStaff.json();
+
+        if (dataTherapist.success) setTherapists(dataTherapist.therapists);
+        if (dataTimeSlot.success) setTimeSlots(dataTimeSlot.timeSlots);
+        if (dataStaff.success) setProviders(dataStaff.staff.map((s:any) => s.name));
+
+      } catch {
+        setTherapists([]); setTimeSlots([]); setProviders([]);
+      }
     })();
   }, []);
 
@@ -259,14 +273,14 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
         </div>
         <div className="min-w-[256px]">
           <label className="block text-emerald-700 font-semibold mb-2 text-lg">ผู้รับผิดชอบ:</label>
-          <select 
-            value={filterProvider} 
-            onChange={e => setFilterProvider(e.target.value)}
-            className="w-full px-4 h-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900 placeholder-gray-400"
-          >
-            <option value="all">ทั้งหมด</option>
-            {therapists.map((t,i)=><option key={i} value={t}>{t}</option>)}
-          </select>
+        <select 
+          value={filterProvider} 
+          onChange={e => setFilterProvider(e.target.value)}
+          className="w-full px-4 h-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900 placeholder-gray-400"
+        >
+          <option value="all">ทั้งหมด</option>
+          {providers.map((t,i)=><option key={i} value={t}>{t}</option>)}
+        </select>
         </div>
         <div className="min-w-[256px]">
           <label className="block text-emerald-700 font-semibold mb-2 text-lg">ผู้ให้บริการ:</label>

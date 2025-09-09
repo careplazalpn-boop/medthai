@@ -20,6 +20,7 @@ export default function AdminBookingPage() {
 
   const [idCardNumber, setIdCardNumber] = useState("");
   const [therapists, setTherapists] = useState<string[]>([]);
+  const [medStaff, setMedStaff] = useState<string[]>([]);
   const [timeSlots, setTimeSlots] = useState<string[]>([]);
   const [date, setDate] = useState("");
   const [selectedTherapist, setSelectedTherapist] = useState("");
@@ -45,6 +46,13 @@ export default function AdminBookingPage() {
   useEffect(() => {
     if (!user) router.push("/login");
   }, [user, router]);
+
+  useEffect(() => {
+  fetch("/api/med-staff")
+    .then(res => res.json())
+    .then(data => data.success && setMedStaff(data.staff.map((s: any) => s.name)))
+    .catch(() => setMedStaff([]));
+  }, []);
 
   useEffect(() => {
     fetch("/api/therapists")
@@ -138,7 +146,7 @@ export default function AdminBookingPage() {
 
   const handleOpenDialog = () => {
     if (!selectedTherapist || !selectedTime || !date) return setShowAlert(true);
-    setClientHN(""); setClientName(""); setClientPhone(""); setDialogTherapist(""); setSearchResults([]);
+    setClientHN(""); setClientName(""); setClientPhone(""); setDialogTherapist(""); setSearchResults([]); setIdCardNumber("");
     setDialogOpen(true);
   };
 
@@ -291,31 +299,107 @@ export default function AdminBookingPage() {
 
               <label className="block mb-3">
                 <span className="text-sm font-medium text-emerald-800">ผู้รับผิดชอบ</span>
-              <select value={dialogTherapist} onChange={e => setDialogTherapist(e.target.value)}
-                className={`mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 ${dialogTherapist === "" ? "text-gray-400" : "text-gray-900"}`}><option value="" disabled>-- เลือก --</option>{therapists.map(t => (<option key={t} value={t} className="text-gray-900">{t}</option>
-                ))}
-              </select>
+                <select
+                  value={dialogTherapist}
+                  onChange={e => setDialogTherapist(e.target.value)}
+                  className={`mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 ${dialogTherapist === "" ? "text-gray-400" : "text-gray-900"}`}
+                >
+                  <option value="" disabled>-- เลือก --</option>
+                  {medStaff.map(name => (
+                    <option key={name} value={name} className="text-gray-900">{name}</option>
+                  ))}
+                </select>
               </label>
 
-              {["hn", "name", "phone"].map(field => (
-                <label key={field} className="block mb-3 relative">
-                  <span className="text-sm font-medium text-emerald-800">{field === "hn" ? "HN" : field === "name" ? "ชื่อผู้รับบริการ" : "เบอร์โทร"}</span>
-                  <input type="text" value={field === "hn" ? clientHN : field === "name" ? clientName : clientPhone} onChange={e => field === "hn" ? setClientHN(e.target.value) : field === "name" ? setClientName(e.target.value) : handlePhoneChange(e)} maxLength={field === "hn" ? 9 : field === "phone" ? 11 : undefined} placeholder={field === "hn" ? "กรอก HN" : field === "name" ? "กรอกชื่อ" : "กรอกเบอร์โทร"} className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900" />
-                  <div className="absolute top-0 right-0 mt-1 mr-1 flex gap-1">
-                    {field === "hn" && <button type="button" onClick={() => handleAutoFill("hn")} className="px-2 py-1 bg-emerald-500 text-white rounded hover:bg-emerald-600 text-xs">auto-fill</button>}
-                    {field === "name" && <>
-                      <button type="button" onClick={handleSearchName} className="px-2 py-1 bg-emerald-500 text-white rounded hover:bg-emerald-600 text-xs">ค้นหา</button>
-                      <button type="button" onClick={() => handleAutoFill("name")} className="px-2 py-1 bg-emerald-500 text-white rounded hover:bg-emerald-600 text-xs">auto-fill</button>
-                    </>}
-                    {field === "phone" && <button type="button" onClick={() => handleAutoFill("phone")} className="px-2 py-1 bg-emerald-500 text-white rounded hover:bg-emerald-600 text-xs">auto-fill</button>}
-                  </div>
-                </label>
-              ))}
+              {["hn", "name", "phone"].map(field => {
+                // ซ่อน HN ถ้า idCardNumber ครบ 13 หลัก
+                if (field === "hn" && idCardNumber.length === 13) return null;
 
+                return (
+                  <label key={field} className="block mb-3 relative">
+                    <span className="text-sm font-medium text-emerald-800">
+                      {field === "hn" ? "HN" : field === "name" ? "ชื่อผู้รับบริการ" : "เบอร์โทร"}
+                    </span>
+                    <input
+                      type="text"
+                      value={
+                        field === "hn"
+                          ? clientHN
+                          : field === "name"
+                          ? clientName
+                          : clientPhone
+                      }
+                      onChange={e =>
+                        field === "hn"
+                          ? setClientHN(e.target.value)
+                          : field === "name"
+                          ? setClientName(e.target.value)
+                          : handlePhoneChange(e)
+                      }
+                      maxLength={field === "hn" ? 9 : field === "phone" ? 11 : undefined}
+                      placeholder={
+                        field === "hn"
+                          ? "กรอก HN"
+                          : field === "name"
+                          ? "กรอกชื่อ"
+                          : "กรอกเบอร์โทร"
+                      }
+                      className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900"
+                    />
+                    <div className="absolute top-0 right-0 mt-1 mr-1 flex gap-1">
+                      {field === "hn" && (
+                        <button
+                          type="button"
+                          onClick={() => handleAutoFill("hn")}
+                          className="px-2 py-1 bg-emerald-500 text-white rounded hover:bg-emerald-600 text-xs"
+                        >
+                          auto-fill
+                        </button>
+                      )}
+                      {field === "name" && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={handleSearchName}
+                            className="px-2 py-1 bg-emerald-500 text-white rounded hover:bg-emerald-600 text-xs"
+                          >
+                            ค้นหา
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleAutoFill("name")}
+                            className="px-2 py-1 bg-emerald-500 text-white rounded hover:bg-emerald-600 text-xs"
+                          >
+                            auto-fill
+                          </button>
+                        </>
+                      )}
+                      {field === "phone" && (
+                        <button
+                          type="button"
+                          onClick={() => handleAutoFill("phone")}
+                          className="px-2 py-1 bg-emerald-500 text-white rounded hover:bg-emerald-600 text-xs"
+                        >
+                          auto-fill
+                        </button>
+                      )}
+                    </div>
+                  </label>
+                );
+              })}
               {clientHN.length !== 9 && (
                 <label className="block mb-3">
                   <span className="text-sm font-medium text-emerald-800">หมายเลขบัตรประชาชน</span>
-                  <input type="text" value={idCardNumber} onChange={e => setIdCardNumber(e.target.value.replace(/\D/g, "").slice(0, 13))} maxLength={13} placeholder="กรอกหมายเลขบัตรประชาชน" className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900" />
+                  <input
+                    type="text"
+                    value={idCardNumber}
+                    onChange={e =>
+                      setIdCardNumber(e.target.value.replace(/\D/g, "").slice(0, 13))
+                    }
+                    maxLength={13}
+                    placeholder="กรอกหมายเลขบัตรประชาชน"
+                    className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900"
+                  />
                 </label>
               )}
 

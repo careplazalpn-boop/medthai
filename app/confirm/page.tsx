@@ -67,7 +67,7 @@ export default function ConfirmPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-emerald-50 flex items-center justify-center p-6">
       <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.5 }} className="max-w-md w-full bg-white rounded-3xl shadow-xl p-8 text-center border border-emerald-200">
-        <h2 className="text-3xl font-extrabold text-emerald-700 mb-6 tracking-wide">ข้อมูลการจองผู้มารับบริการ</h2>
+        <h2 className="text-3xl font-extrabold text-emerald-700 mb-6 tracking-wide">ข้อมูลการจอง</h2>
         <ul className="text-gray-700 space-y-4 mb-8 text-left">
           <InfoItem icon={UserCheck} label="ผู้ให้บริการ:" value={provider} />
           {hn && <InfoItem icon={User} label="HN:" value={hn} />}

@@ -97,13 +97,14 @@ export default function HomePage() {
 
       {/* แถบเมนูขวาบน */}
       <div className="max-w-[92rem] mx-auto relative w-full">
-        {/* แถบเมนูขวาบน */}
-        <div className="fixed top-4 right-4 flex justify-end gap-3 z-50">
+        {/* แถบเมนูบนสุด */}
+        <div className="fixed top-0 left-0 w-full z-50 bg-emerald-600 shadow-md flex justify-end p-2 gap-3">
           {user ? (
             <>
-              <span className="text-emerald-700 font-semibold text-xl">
+              <span className="text-white font-semibold text-lg self-center">
                 สวัสดี {user.name}!
               </span>
+
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -111,18 +112,18 @@ export default function HomePage() {
                   const isAdminLike = user?.role === "admin" || user?.role === "user";
                   router.push(isAdminLike ? "/all-bookings" : "/booking-history");
                 }}
-                className="flex items-center gap-2 px-5 py-2 bg-emerald-600 text-white rounded-lg shadow-md hover:bg-emerald-700 transition"
-                title={user?.role === "admin" || user?.role === "user" ? "ประวัติการจองทั้งหมด" : "ประวัติการจอง"}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow transition"
+                title={user?.role === "admin" || user?.role === "user" ? "ประวัติการจอง" : "ประวัติการจอง"}
               >
                 <FaHistory className="w-5 h-5" />
-                <span>{user?.role === "admin" || user?.role === "user" ? "ประวัติการจองทั้งหมด" : "ประวัติการจอง"}</span>
+                <span>{user?.role === "admin" || user?.role === "user" ? "ประวัติการจอง" : "ประวัติการจอง"}</span>
               </motion.button>
 
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={handleLogout}
-                className="flex items-center gap-2 px-5 py-2 bg-red-500 text-white rounded-lg shadow-md hover:bg-red-600 transition"
+                className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg shadow font-semibold"
                 title="ออกจากระบบ"
               >
                 <FaSignOutAlt className="w-5 h-5" />
@@ -134,7 +135,7 @@ export default function HomePage() {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => router.push("/login")}
-              className="flex items-center gap-2 px-5 py-2 bg-emerald-700 text-white rounded-lg shadow-md hover:bg-emerald-800 transition"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow transition"
               title="เข้าสู่ระบบ"
             >
               <FaSignInAlt className="w-5 h-5" />
@@ -157,7 +158,7 @@ export default function HomePage() {
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         onClick={handleBookingClick}
-        className="flex items-center space-x-3 px-10 py-4 bg-emerald-600 text-white rounded-full text-2xl font-semibold shadow-lg hover:bg-emerald-700 transition z-10"
+        className="flex items-center space-x-3 px-10 py-4 bg-emerald-600 text-white rounded-full text-2xl font-semibold shadow-lg transition z-10"
         title="จองคิวนวดแผนไทย"
       >
         <FaSpa size={30} />

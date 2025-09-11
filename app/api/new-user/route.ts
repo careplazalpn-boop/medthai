@@ -34,13 +34,21 @@ export async function POST(request: Request) {
 
     const conn = await pool.getConnection();
     try {
-      // บันทึก new_user
-      await conn.query(
-        "INSERT INTO new_user (name, id_card_number, mobile_phone_number) VALUES (?, ?, ?)",
-        [name, idCard, phone || null]
+      // ตรวจสอบว่ามี id_card_number อยู่แล้วหรือยัง
+      const [rows]: any = await conn.query(
+        "SELECT id_card_number FROM new_user WHERE id_card_number = ?",
+        [idCard]
       );
 
-      // บันทึก bookings
+      if (rows.length === 0) {
+        // ถ้ายังไม่มี id_card_number นี้ → insert
+        await conn.query(
+          "INSERT INTO new_user (name, id_card_number, mobile_phone_number) VALUES (?, ?, ?)",
+          [name, idCard, phone || null]
+        );
+      }
+
+      // บันทึก bookings (ทำทุกครั้ง)
       await conn.query(
         "INSERT INTO bookings (name, phone, date, therapist, time_slot, provider, status) VALUES (?, ?, ?, ?, ?, ?, 'รอดำเนินการ')",
         [name, phone, date, therapist, time, provider]

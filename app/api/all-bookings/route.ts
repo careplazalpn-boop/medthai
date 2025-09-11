@@ -13,45 +13,54 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const confirmId = url.searchParams.get("confirmId");
 
-    if (confirmId) {
-      await pool.execute("UPDATE bookings SET status = 'อยู่ในคิว' WHERE id = ?", [confirmId]);
-    }
-
     const [rows]: any = await pool.execute(
       "SELECT id, provider, name, phone, therapist, time_slot, date, status FROM bookings ORDER BY id DESC"
     );
 
     const now = new Date();
+    let updatedStatus: string | null = null;
 
-    for (const booking of rows) {
-      if (booking.status === "ยกเลิก") continue;
+// ตัวอย่างฟังก์ชัน confirm booking
+if (confirmId) {
+  const booking = rows.find((b: any) => b.id.toString() === confirmId);
+  if (booking) {
+    const [, endStr] = booking.time_slot.split("-");
+    const [endHour, endMinute = "00"] = endStr.split(":");
 
-      const [startStr, endStr] = booking.time_slot.split("-");
-      const [startHour, startMinute = "00"] = startStr.split(".");
-      const [endHour, endMinute = "00"] = endStr.split(".");
+    // สร้าง Date ของ booking และ endTime
+    const bookingDate = new Date(booking.date);
+    const endTime = new Date(bookingDate);
+    endTime.setHours(parseInt(endHour), parseInt(endMinute), 0, 0);
 
-      const bookingDate = new Date(booking.date);
-      const startTime = new Date(bookingDate);
-      const endTime = new Date(bookingDate);
-      startTime.setHours(parseInt(startHour), parseInt(startMinute), 0, 0);
-      endTime.setHours(parseInt(endHour), parseInt(endMinute), 0, 0);
+    // กำหนด status หลังกดยืนยัน
+    const newStatus = now >= endTime ? "สำเร็จ" : "อยู่ในคิว";
 
-      let newStatus = booking.status;
+    // อัปเดต database
+    await pool.execute("UPDATE bookings SET status = ? WHERE id = ?", [newStatus, confirmId]);
+    booking.status = newStatus;
 
-      if (booking.status === "รอดำเนินการ" && now >= endTime) {
-        newStatus = "สำเร็จ";
-      }
-      if (booking.status === "อยู่ในคิว" && now >= endTime) {
-        newStatus = "สำเร็จ";
-      }
+    updatedStatus = newStatus; // ส่งกลับ frontend
+  }
+}
 
-      if (booking.status !== newStatus) {
-        await pool.execute("UPDATE bookings SET status = ? WHERE id = ?", [newStatus, booking.id]);
-        booking.status = newStatus;
-      }
+// --- auto-update สำหรับทุก booking ที่อยู่ในคิว
+for (const booking of rows) {
+  if (booking.status === "อยู่ในคิว") {
+    const [, endStr] = booking.time_slot.split("-");
+    const [endHour, endMinute = "00"] = endStr.split(":");
+
+    const bookingDate = new Date(booking.date);
+    const endTime = new Date(bookingDate);
+    endTime.setHours(parseInt(endHour, 10), parseInt(endMinute, 10), 0, 0);
+
+    if (now >= endTime) {
+      booking.status = "สำเร็จ";
+      await pool.execute("UPDATE bookings SET status = ? WHERE id = ?", ["สำเร็จ", booking.id]);
     }
+  }
+}
 
-    return NextResponse.json({ success: true, bookings: rows });
+    return NextResponse.json({ success: true, bookings: rows, updatedStatus });
   } catch (error) {
     console.error("Error fetching all bookings:", error);
     return NextResponse.json({ success: false, error: "ไม่สามารถดึงข้อมูลการจองทั้งหมดได้" }, { status: 500 });

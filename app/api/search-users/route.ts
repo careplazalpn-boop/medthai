@@ -9,57 +9,48 @@ const pool = mysql.createPool({
 });
 
 export async function GET(req: NextRequest) {
-  const name = req.nextUrl.searchParams.get("name") || "";
-  if (!name.trim()) {
-    return NextResponse.json({ success: false, message: "No name" });
-  }
+  const hn = req.nextUrl.searchParams.get("hn")?.trim() || "";
+  const name = req.nextUrl.searchParams.get("name")?.trim() || "";
 
   try {
-    // แยกคำจาก input
-    const terms = name.trim().split(/\s+/);
+    let rows: any[] = [];
 
-    // WHERE clause สำหรับ med_user
-    const whereClauseMed = terms
-      .map(() => `(CONCAT(pname, fname, lname) LIKE ? OR CONCAT(fname, ' ', lname) LIKE ?)` )
-      .join(" AND ");
+    if (hn) {
+      // ค้นเฉพาะ med_user ตาม HN
+      const [r]: any = await pool.query(
+        `SELECT hn, CONCAT(pname, fname, ' ', lname) AS name, NULL AS id_card_number, mobile_phone_number AS phone
+         FROM med_user
+         WHERE hn = ?
+         LIMIT 100`,
+        [hn]
+      );
+      rows = r;
+    } else if (name) {
+      const terms = name.split(/\s+/);
+      const whereClauseMed = terms.map(() => `(CONCAT(pname, fname, ' ', lname) LIKE ? OR CONCAT(fname, ' ', lname) LIKE ?)` ).join(" AND ");
+      const whereClauseNew = terms.map(() => `name LIKE ?`).join(" AND ");
 
-    // WHERE clause สำหรับ new_user
-    const whereClauseNew = terms
-      .map(() => `name LIKE ?`)
-      .join(" AND ");
+      const params: string[] = [];
+      terms.forEach(term => params.push(`%${term}%`, `%${term}%`)); // med_user
+      terms.forEach(term => params.push(`%${term}%`)); // new_user
 
-    const params: string[] = [];
-    terms.forEach(term => {
-      params.push(`%${term}%`, `%${term}%`); // med_user
-    });
-    terms.forEach(term => {
-      params.push(`%${term}%`); // new_user
-    });
-
-    const [rows]: any = await pool.query(
-      `
-      SELECT 
-        hn,
-        CONCAT(pname, fname, ' ', lname) AS name,
-        NULL AS id_card_number,
-        mobile_phone_number AS phone
-      FROM med_user
-      WHERE ${whereClauseMed}
-
-      UNION ALL
-
-      SELECT 
-        NULL AS hn,
-        name,
-        id_card_number,
-        mobile_phone_number AS phone
-      FROM new_user
-      WHERE ${whereClauseNew}
-
-      LIMIT 1000
-      `,
-      params
-    );
+      const [r]: any = await pool.query(
+        `
+        SELECT hn, CONCAT(pname, fname, ' ', lname) AS name, NULL AS id_card_number, mobile_phone_number AS phone
+        FROM med_user
+        WHERE ${whereClauseMed}
+        UNION ALL
+        SELECT NULL AS hn, name, id_card_number, mobile_phone_number AS phone
+        FROM new_user
+        WHERE ${whereClauseNew}
+        LIMIT 100
+        `,
+        params
+      );
+      rows = r;
+    } else {
+      return NextResponse.json({ success: false, message: "No search query" });
+    }
 
     const users = rows.map((r: any) => ({
       hn: r.hn || "",

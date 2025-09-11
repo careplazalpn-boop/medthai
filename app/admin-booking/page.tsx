@@ -4,7 +4,8 @@ import { useState, useEffect, useContext } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { AuthContext } from "@/context/AuthContext";
-import { CalendarIcon, UserIcon, Clock, Home, AlertCircle, UserCheck, UserX } from "lucide-react";
+import { CalendarIcon, UserIcon, Clock, Home, AlertCircle, UserCheck, UserX, Search } from "lucide-react";
+import { ImSpinner2 } from "react-icons/im";
 import { FaHistory, FaCheck, FaTimes } from "react-icons/fa";
 import * as Dialog from "@radix-ui/react-dialog";
 
@@ -30,7 +31,7 @@ export default function AdminBookingPage() {
   const [disabledSlots, setDisabledSlots] = useState<Record<string, string[]>>({});
   const [showAlert, setShowAlert] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
-
+  const [loading, setLoading] = useState(false);
   const [clientHN, setClientHN] = useState("");
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
@@ -151,8 +152,24 @@ export default function AdminBookingPage() {
     setDialogOpen(true);
   };
 
+  const handleSearchHN = async () => {
+    if (!clientHN.trim()) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/search-users?hn=${encodeURIComponent(clientHN.trim())}`);
+      const data = await res.json();
+      setSearchResults(data.success ? data.users : []);
+      if (!data.success) alert("ไม่พบผู้ใช้");
+    } catch {
+      alert("เกิดข้อผิดพลาดในการค้นหา");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSearchName = async () => {
     if (!clientName.trim()) return;
+    setLoading(true);
     try {
       const res = await fetch(`/api/search-users?name=${encodeURIComponent(clientName.trim())}`);
       const data = await res.json();
@@ -160,6 +177,8 @@ export default function AdminBookingPage() {
       if (!data.success) alert("ไม่พบข้อมูลผู้ใช้");
     } catch {
       alert("เกิดข้อผิดพลาดในการค้นหา");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -312,55 +331,53 @@ export default function AdminBookingPage() {
                 </select>
               </label>
 
-              {["hn", "name", "phone"].map(field => {
-                // ซ่อน HN ถ้า idCardNumber ครบ 13 หลัก
+              {["hn", "name", "phone"].map((field) => {
                 if (field === "hn" && idCardNumber.length === 13) return null;
-
                 return (
-                  <label key={field} className="block mb-3 relative">
+                  <label key={field} className="block mb-3">
                     <span className="text-sm font-medium text-emerald-800">
                       {field === "hn" ? "HN" : field === "name" ? "ผู้มารับบริการ" : "เบอร์โทร"}
                     </span>
-                    <input
-                      type="text"
-                      value={
-                        field === "hn"
-                          ? clientHN
-                          : field === "name"
-                          ? clientName
-                          : clientPhone
-                      }
-                      onChange={e =>
-                        field === "hn"
-                          ? setClientHN(e.target.value)
-                          : field === "name"
-                          ? setClientName(e.target.value)
-                          : handlePhoneChange(e)
-                      }
-                      maxLength={field === "hn" ? 9 : field === "phone" ? 11 : undefined}
-                      placeholder={
-                        field === "hn"
-                          ? "กรอก HN"
-                          : field === "name"
-                          ? "กรอกชื่อ"
-                          : "กรอกเบอร์โทร"
-                      }
-                      className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900"
-                    />
-                    <div className="absolute top-0 right-0 mt-1 mr-1 flex gap-1">
-                      {field === "name" && (
+                    <div className="flex border border-gray-300 rounded-md focus-within:ring-2 focus-within:ring-emerald-400 transition">
+                      <input
+                        type="text"
+                        value={
+                          field === "hn" ? clientHN : field === "name" ? clientName : clientPhone
+                        }
+                        onChange={(e) =>
+                          field === "hn"
+                            ? setClientHN(e.target.value)
+                            : field === "name"
+                            ? setClientName(e.target.value)
+                            : handlePhoneChange(e)
+                        }
+                        maxLength={field === "hn" ? 9 : field === "phone" ? 11 : undefined}
+                        placeholder={
+                          field === "hn" ? "กรอก HN" : field === "name" ? "กรอกชื่อ" : "กรอกเบอร์โทร"
+                        }
+                        className="flex-1 px-3 py-2 rounded-l-md focus:outline-none text-gray-900"
+                      />
+                      {(field === "name" || field === "hn") && (
                         <button
                           type="button"
-                          onClick={handleSearchName}
-                          className="px-2 py-1 bg-emerald-500 text-white rounded hover:bg-emerald-600 text-xs"
+                          onClick={() =>
+                            field === "name" ? handleSearchName() : handleSearchHN()
+                          }
+                          disabled={loading}
+                          className="px-4 py-2 bg-emerald-500 text-white rounded-r-md hover:bg-emerald-600 flex items-center justify-center"
                         >
-                          ค้นหา
+                          {loading ? (
+                            <ImSpinner2 className="w-5 h-5 animate-spin text-white" />
+                          ) : (
+                            <Search className="w-5 h-5" />
+                          )}
                         </button>
                       )}
                     </div>
                   </label>
                 );
               })}
+
               {clientHN.length !== 9 && (
                 <label className="block mb-3">
                   <span className="text-sm font-medium text-emerald-800">หมายเลขบัตรประชาชน</span>

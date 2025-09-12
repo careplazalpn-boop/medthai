@@ -57,12 +57,19 @@ export default function AdminBookingPage() {
 
   useEffect(() => {
     const savedDate = localStorage.getItem("selectedDate");
-    if (savedDate) setDate(savedDate);
-  }, []);
+    if (savedDate) {
+      const today = new Date();
+      const selected = new Date(savedDate);
 
-  useEffect(() => {
-    if (date) localStorage.setItem("selectedDate", date);
-  }, [date]);
+      // แปลงทั้งสองเป็น timestamp
+      if (selected.getTime() < today.setHours(0,0,0,0)) {
+        localStorage.removeItem("selectedDate");
+        setDate("");
+      } else {
+        setDate(savedDate);
+      }
+    }
+  }, []);
 
   useEffect(() => {
   fetch("/api/med-staff")
@@ -124,15 +131,6 @@ export default function AdminBookingPage() {
     return digits.length <= 3 ? digits : `${digits.slice(0, 3)}-${digits.slice(3)}`;
   };
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => setClientPhone(formatPhone(e.target.value));
-
-  const isTimeSlotPast = (slot: string) => {
-    if (!date) return false;
-    const [start] = slot.split("-");
-    let [hourStr, minStr = "00"] = start.split(":");
-    if (hourStr.length === 1) hourStr = "0" + hourStr;
-    if (minStr.length === 1) minStr = "0" + minStr;
-    return new Date() > new Date(`${date}T${hourStr}:${minStr}:00`);
-  };
 
   const handleSelect = (therapist: string, time: string) => {
     if (!date) return setShowAlert(true);
@@ -197,60 +195,56 @@ export default function AdminBookingPage() {
     }
   };
 
-  const handleAddPatient = async () => {
-    // แปลงเบอร์โทรให้เป็นตัวเลขล้วน
-    const digitsPhone = patientPhone.replace(/\D/g, "");
+const handleAddPatient = async () => {
+  // แปลงเบอร์โทรให้เป็นตัวเลขล้วน
+  const digitsPhone = patientPhone.replace(/\D/g, "");
 
-    // ตรวจสอบช่องว่าง
-    if (!hn || !patientPrefix || !patientFirstName || !patientLastName || !digitsPhone) {
-      alert("กรุณากรอกข้อมูลให้ครบทุกช่อง");
-      return;
+  // ตรวจสอบช่องว่าง
+  if (!hn || !patientPrefix || !patientFirstName || !patientLastName || !digitsPhone) {
+    alert("กรุณากรอกข้อมูลให้ครบทุกช่อง");
+    return;
+  }
+
+  // ตรวจสอบ HN ต้อง 9 ตัว
+  if (hn.length !== 9) {
+    alert("กรุณากรอก HN ให้ครบ 9 ตัว");
+    return;
+  }
+
+  const fullName = `${patientPrefix}${patientFirstName} ${patientLastName}`;
+
+  try {
+    const res = await fetch("/api/add-patient", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        hn,
+        pname: patientPrefix,
+        fname: patientFirstName,
+        lname: patientLastName,
+        name: fullName,
+        mobile_phone_number: patientPhone, // ส่งไปตามที่กรอก (มี - ด้วย)
+      }),
+    });
+
+    const data = await res.json();
+
+    if (data.success) {
+      alert(data.message || "เพิ่มคนไข้เรียบร้อยแล้ว"); // ✅ ใช้ข้อความจาก backend
+      setAddPatientDialog(false);
+      setHn("");
+      setPatientPrefix("");
+      setPatientFirstName("");
+      setPatientLastName("");
+      setPatientPhone("");
+    } else {
+      alert(data.message || "ไม่สามารถเพิ่มคนไข้ได้"); // ✅ ใช้ข้อความ error จาก backend เช่น "HN นี้มีอยู่แล้ว"
     }
-
-    // ตรวจสอบ HN ต้อง 9 ตัว
-    if (hn.length !== 9) {
-      alert("กรุณากรอก HN ให้ครบ 9 ตัว");
-      return;
-    }
-
-    // ตรวจสอบเบอร์โทร 9–10 ตัวเลข
-    if (digitsPhone.length < 9 || digitsPhone.length > 10) {
-      alert("กรุณากรอกเบอร์โทร 9–10 ตัวเลข");
-      return;
-    }
-
-    const fullName = `${patientPrefix}${patientFirstName} ${patientLastName}`;
-
-    try {
-      const res = await fetch("/api/add-patient", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          hn,
-          pname: patientPrefix,
-          fname: patientFirstName,
-          lname: patientLastName,
-          name: fullName,
-          mobile_phone_number: patientPhone // ส่งเป็นตัวเลขล้วน
-        }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        alert("เพิ่มคนไข้เรียบร้อยแล้ว");
-        setAddPatientDialog(false);
-        setHn("");
-        setPatientPrefix("");
-        setPatientFirstName("");
-        setPatientLastName("");
-        setPatientPhone("");
-      } else {
-        alert("ไม่สามารถเพิ่มคนไข้ได้");
-      }
-    } catch (error) {
-      console.error(error);
-      alert("เกิดข้อผิดพลาดในการเพิ่มคนไข้");
-    }
-  };
+  } catch (error) {
+    console.error(error);
+    alert("เกิดข้อผิดพลาดในการเพิ่มคนไข้");
+  }
+};
 
   const handleSelectUser = (user: UserInfo) => {
     setClientName(user.name);
@@ -315,14 +309,28 @@ export default function AdminBookingPage() {
                 onClick={() => setAddPatientDialog(true)}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow transition"
               >
-                คนไข้มี hn แต่หาไม่เจอ
+                คนไข้มี HN แต่หาไม่เจอ
               </motion.button>
-
-              <Dialog.Root open={addPatientDialog} onOpenChange={setAddPatientDialog}>
+              <Dialog.Root
+                open={addPatientDialog}
+                onOpenChange={(open) => {
+                  setAddPatientDialog(open);
+                  if (!open) {
+                    // รีเซ็ตค่าเมื่อ dialog ปิด
+                    setHn("");
+                    setPatientPrefix("");
+                    setPatientFirstName("");
+                    setPatientLastName("");
+                    setPatientPhone("");
+                  }
+                }}
+              >
                 <Dialog.Portal>
                   <Dialog.Overlay className="fixed inset-0 bg-black/30 z-40" />
                   <Dialog.Content className="fixed z-50 left-1/2 top-1/2 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white p-6 shadow-lg">
                     <Dialog.Title className="text-xl font-bold mb-4 text-emerald-700">เพิ่มข้อมูลคนไข้</Dialog.Title>
+
+                    {/* HN */}
                     <label className="block mb-3">
                       <span className="text-sm font-medium text-emerald-800">HN</span>
                       <input
@@ -334,6 +342,8 @@ export default function AdminBookingPage() {
                         className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900"
                       />
                     </label>
+
+                    {/* ชื่อ */}
                     <div className="flex gap-2 mb-3">
                       <label className="flex flex-col w-20">
                         <span className="text-sm font-medium text-emerald-800">คำนำหน้า</span>
@@ -366,6 +376,8 @@ export default function AdminBookingPage() {
                         />
                       </label>
                     </div>
+
+                    {/* เบอร์โทร */}
                     <label className="block mb-3">
                       <span className="text-sm font-medium text-emerald-800">เบอร์โทร</span>
                       <input
@@ -383,13 +395,20 @@ export default function AdminBookingPage() {
                         className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900"
                       />
                     </label>
+
+                    {/* ปุ่มยืนยัน/ยกเลิก */}
                     <div className="mt-4 flex justify-end gap-2">
-                      <Dialog.Close asChild>
-                        <button className="px-4 py-2 rounded-lg bg-gray-300 hover:bg-gray-400 text-gray-800">ยกเลิก</button>
-                      </Dialog.Close>
-                      <button onClick={handleAddPatient} className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white">
+                      <button
+                        onClick={handleAddPatient}
+                        className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white"
+                      >
                         ยืนยัน
                       </button>
+                      <Dialog.Close asChild>
+                        <button className="px-4 py-2 rounded-lg bg-gray-300 hover:bg-gray-400 text-gray-800">
+                          ยกเลิก
+                        </button>
+                      </Dialog.Close>
                     </div>
                   </Dialog.Content>
                 </Dialog.Portal>
@@ -440,17 +459,15 @@ export default function AdminBookingPage() {
                 <div className="grid grid-cols-2 gap-2">
                   {timeSlots.map(slot => {
                     const isBooked = booked.includes(slot);
-                    const isPast = isTimeSlotPast(slot);
                     const isActive = isSelected && selectedTime === slot;
                     const isSlotDisabled = disabled.includes(slot);
 
                     return (
                       <div key={slot} className="flex gap-1 items-center">
-                        <button disabled={isBooked || isPast || isOff || isSlotDisabled} onClick={() => handleSelect(t, slot)} className={`text-sm px-3 py-2 rounded-lg font-medium border flex-1 flex items-center justify-center gap-1 transition shadow-sm
+                        <button disabled={isBooked || isOff || isSlotDisabled} onClick={() => handleSelect(t, slot)} className={`text-sm px-3 py-2 rounded-lg font-medium border flex-1 flex items-center justify-center gap-1 transition shadow-sm
                           ${isSlotDisabled ? "bg-gray-300 text-gray-500 border-gray-400 cursor-not-allowed"
                           : isOff ? "bg-gray-300 text-gray-500 border-gray-400 cursor-not-allowed"
                           : isBooked ? "bg-red-100 text-red-600 border-red-400 cursor-not-allowed"
-                          : isPast ? "bg-yellow-100 text-yellow-700 border-yellow-400 cursor-not-allowed"
                           : isActive ? "bg-emerald-600 text-white border-emerald-600"
                           : "bg-white hover:bg-emerald-50 text-emerald-800 border-gray-300"}`}>
                           <Clock className="w-4 h-4" /> {slot}
@@ -565,10 +582,10 @@ export default function AdminBookingPage() {
               )}
 
               <div className="mt-4 flex justify-end gap-2">
+                <button onClick={handleSubmit} className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white">ยืนยัน</button>
                 <Dialog.Close asChild>
                   <button className="px-4 py-2 rounded-lg bg-gray-300 hover:bg-gray-400 text-gray-800">ยกเลิก</button>
                 </Dialog.Close>
-                <button onClick={handleSubmit} className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white">ยืนยัน</button>
               </div>
             </Dialog.Content>
           </Dialog.Portal>

@@ -108,7 +108,9 @@ export default function AllBookingsPage() {
   const [showCancelSuccess, setShowCancelSuccess] = useState(false);
   const [showConfirmSuccess, setShowConfirmSuccess] = useState(false);
   const [showDeleteSuccess, setShowDeleteSuccess] = useState(false);
-
+  const [editingNameId, setEditingNameId] = useState<number | null>(null);
+  const [editingNameValue, setEditingNameValue] = useState<string>("");
+  
   const [filterName, setFilterName] = useState("");
   const [filterTherapist, setFilterTherapist] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -381,7 +383,56 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
                 <Label icon={<CheckCircle2 className="w-4 h-4"/>} text="สถานะ"/>
 
                 <span className="font-normal text-base">{b.provider}</span>
-                <span className="font-normal text-base">{b.name}</span>
+                {editingNameId === b.id ? (
+                  <div className="flex flex-col gap-1">
+                    <input
+                      value={editingNameValue}
+                      onChange={(e) => setEditingNameValue(e.target.value)}
+                      className="w-full px-2 py-1 border border-gray-300 rounded-md text-gray-900"
+                      autoFocus
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={async () => {
+                          if (editingNameValue.trim() && editingNameValue !== b.name) {
+                            try {
+                              const res = await fetch(`/api/update-booking-name`, {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ id: b.id, name: editingNameValue })
+                              });
+                              const data = await res.json();
+                              if (data.success) {
+                                setBookings(prev => prev.map(x => x.id === b.id ? { ...x, name: editingNameValue } : x));
+                              } else {
+                                alert("ไม่สามารถอัปเดตชื่อได้");
+                              }
+                            } catch {
+                              alert("เกิดข้อผิดพลาด");
+                            }
+                          }
+                          setEditingNameId(null);
+                        }}
+                        className="px-2 py-1 text-xs bg-emerald-600 text-white rounded hover:bg-emerald-700 transition"
+                      >
+                        ยืนยัน
+                      </button>
+                      <button
+                        onClick={() => setEditingNameId(null)}
+                        className="px-2 py-1 text-xs bg-gray-300 text-gray-700 rounded hover:bg-gray-400 transition"
+                      >
+                        ยกเลิก
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <span
+                    className="font-normal text-base cursor-pointer"
+                    onClick={() => { setEditingNameId(b.id); setEditingNameValue(b.name); }}
+                  >
+                    {b.name}
+                  </span>
+                )}
                 <span className="font-normal text-base">{b.phone}</span>
                 <span className="font-normal text-base">{b.therapist}</span>
                 <span className="font-normal text-base">{new Date(b.date).toLocaleDateString("th-TH",{year:"numeric",month:"2-digit",day:"2-digit",timeZone:"Asia/Bangkok"})}</span>

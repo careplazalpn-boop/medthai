@@ -59,10 +59,10 @@ export default function AdminBookingPage() {
     const savedDate = localStorage.getItem("selectedDate");
     if (savedDate) {
       const today = new Date();
+      const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
       const selected = new Date(savedDate);
 
-      // แปลงทั้งสองเป็น timestamp
-      if (selected.getTime() < today.setHours(0,0,0,0)) {
+      if (selected.getTime() < todayMidnight.getTime()) {
         localStorage.removeItem("selectedDate");
         setDate("");
       } else {

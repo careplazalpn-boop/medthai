@@ -361,10 +361,17 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
       {filteredBookings.length===0?(
         <p className="text-center text-gray-500 italic select-none">ยังไม่มีประวัติ</p>
       ):(
-        <ul className="space-y-4 w-full max-w-[92rem] mx-auto px-6">
-          {filteredBookings.map(b=>(
+        <ul className="space-y-4 w-full max-w-[92rem] mx-auto">
+          {filteredBookings.map((b, idx) => (
             <li key={b.id} className={`bg-white border rounded-xl p-5 flex justify-between items-center border-l-8 ${getStatusColor(b)}`}>
-              <div className="grid grid-cols-[205px_185px_110px_205px_130px_130px_130px] gap-x-6 text-gray-700 flex-grow">
+              {/* เลขลำดับแบบล่างขึ้นบน */}
+              <div className="flex items-center gap-2 pr-4">
+                <span className="w-8 h-8 flex items-center justify-center bg-emerald-200 text-emerald-700 font-bold rounded-full">
+                  {filteredBookings.length - idx}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-[200px_200px_125px_200px_125px_125px_122px] gap-x-6 text-gray-700 flex-grow">
                 <Label icon={<UserCheck className="w-4 h-4"/>} text="ผู้ให้บริการ"/>
                 <Label icon={<User className="w-4 h-4"/>} text="ผู้มารับบริการ"/>
                 <Label icon={<Phone className="w-4 h-4"/>} text="เบอร์โทร"/>

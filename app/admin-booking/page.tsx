@@ -38,6 +38,12 @@ export default function AdminBookingPage() {
   const [searchResults, setSearchResults] = useState<UserInfo[]>([]);
   const [dialogTherapist, setDialogTherapist] = useState("");
   const [offTherapists, setOffTherapists] = useState<string[]>([]);
+  const [addPatientDialog, setAddPatientDialog] = useState(false);
+  const [hn, setHn] = useState("");
+  const [patientPrefix, setPatientPrefix] = useState("");
+  const [patientFirstName, setPatientFirstName] = useState("");
+  const [patientLastName, setPatientLastName] = useState("");
+  const [patientPhone, setPatientPhone] = useState("");
 
   useEffect(() => {
     if (!showAlert) return;
@@ -48,6 +54,15 @@ export default function AdminBookingPage() {
   useEffect(() => {
     if (!user) router.push("/login");
   }, [user, router]);
+
+  useEffect(() => {
+    const savedDate = localStorage.getItem("selectedDate");
+    if (savedDate) setDate(savedDate);
+  }, []);
+
+  useEffect(() => {
+    if (date) localStorage.setItem("selectedDate", date);
+  }, [date]);
 
   useEffect(() => {
   fetch("/api/med-staff")
@@ -182,11 +197,66 @@ export default function AdminBookingPage() {
     }
   };
 
+  const handleAddPatient = async () => {
+    // แปลงเบอร์โทรให้เป็นตัวเลขล้วน
+    const digitsPhone = patientPhone.replace(/\D/g, "");
+
+    // ตรวจสอบช่องว่าง
+    if (!hn || !patientPrefix || !patientFirstName || !patientLastName || !digitsPhone) {
+      alert("กรุณากรอกข้อมูลให้ครบทุกช่อง");
+      return;
+    }
+
+    // ตรวจสอบ HN ต้อง 9 ตัว
+    if (hn.length !== 9) {
+      alert("กรุณากรอก HN ให้ครบ 9 ตัว");
+      return;
+    }
+
+    // ตรวจสอบเบอร์โทร 9–10 ตัวเลข
+    if (digitsPhone.length < 9 || digitsPhone.length > 10) {
+      alert("กรุณากรอกเบอร์โทร 9–10 ตัวเลข");
+      return;
+    }
+
+    const fullName = `${patientPrefix}${patientFirstName} ${patientLastName}`;
+
+    try {
+      const res = await fetch("/api/add-patient", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          hn,
+          pname: patientPrefix,
+          fname: patientFirstName,
+          lname: patientLastName,
+          name: fullName,
+          mobile_phone_number: patientPhone // ส่งเป็นตัวเลขล้วน
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert("เพิ่มคนไข้เรียบร้อยแล้ว");
+        setAddPatientDialog(false);
+        setHn("");
+        setPatientPrefix("");
+        setPatientFirstName("");
+        setPatientLastName("");
+        setPatientPhone("");
+      } else {
+        alert("ไม่สามารถเพิ่มคนไข้ได้");
+      }
+    } catch (error) {
+      console.error(error);
+      alert("เกิดข้อผิดพลาดในการเพิ่มคนไข้");
+    }
+  };
+
   const handleSelectUser = (user: UserInfo) => {
     setClientName(user.name);
     setClientHN(user.hn || ""); // ถ้าไม่มี hn ก็ปล่อยว่าง
     setClientPhone(formatPhone(user.phone || ""));
-    setIdCardNumber(user.id_card_number || ""); // ✅ เพิ่มบรรทัดนี้
+    setIdCardNumber(user.id_card_number || "");
     setSearchResults([]);
   };
 
@@ -226,17 +296,106 @@ export default function AdminBookingPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-white to-emerald-100 relative overflow-hidden">
-      <div className="max-w-[92rem] mx-auto relative">
-        <div className="fixed top-0 left-0 w-full z-50 bg-emerald-600 shadow-md flex justify-between p-2">
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => router.push("/")}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow transition"
-          >
-            <Home className="w-5 h-5" /> หน้าแรก
-          </motion.button>
+      <div className="fixed top-0 left-0 w-full z-50 bg-emerald-600 shadow-md flex justify-between p-2">
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => router.push("/")}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow transition"
+        >
+          <Home className="w-5 h-5" /> หน้าแรก
+        </motion.button>
 
+        <div className="flex gap-2">
+          {user?.role === "admin" && (
+            <>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setAddPatientDialog(true)}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow transition"
+              >
+                คนไข้มี hn แต่หาไม่เจอ
+              </motion.button>
+
+              <Dialog.Root open={addPatientDialog} onOpenChange={setAddPatientDialog}>
+                <Dialog.Portal>
+                  <Dialog.Overlay className="fixed inset-0 bg-black/30 z-40" />
+                  <Dialog.Content className="fixed z-50 left-1/2 top-1/2 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white p-6 shadow-lg">
+                    <Dialog.Title className="text-xl font-bold mb-4 text-emerald-700">เพิ่มข้อมูลคนไข้</Dialog.Title>
+                    <label className="block mb-3">
+                      <span className="text-sm font-medium text-emerald-800">HN</span>
+                      <input
+                        type="text"
+                        value={hn}
+                        onChange={e => setHn(e.target.value.replace(/\D/g, "").slice(0, 9))}
+                        placeholder="กรอก HN"
+                        maxLength={9}
+                        className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900"
+                      />
+                    </label>
+                    <div className="flex gap-2 mb-3">
+                      <label className="flex flex-col w-20">
+                        <span className="text-sm font-medium text-emerald-800">คำนำหน้า</span>
+                        <input
+                          type="text"
+                          value={patientPrefix}
+                          onChange={e => setPatientPrefix(e.target.value)}
+                          placeholder="คำย่อ"
+                          className="mt-1 w-full border border-gray-300 rounded-md px-2 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900"
+                        />
+                      </label>
+                      <label className="flex-1 flex flex-col">
+                        <span className="text-sm font-medium text-emerald-800">ชื่อจริง</span>
+                        <input
+                          type="text"
+                          value={patientFirstName}
+                          onChange={e => setPatientFirstName(e.target.value)}
+                          placeholder="ชื่อ"
+                          className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900"
+                        />
+                      </label>
+                      <label className="flex-1 flex flex-col">
+                        <span className="text-sm font-medium text-emerald-800">นามสกุล</span>
+                        <input
+                          type="text"
+                          value={patientLastName}
+                          onChange={e => setPatientLastName(e.target.value)}
+                          placeholder="นามสกุล"
+                          className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900"
+                        />
+                      </label>
+                    </div>
+                    <label className="block mb-3">
+                      <span className="text-sm font-medium text-emerald-800">เบอร์โทร</span>
+                      <input
+                        type="text"
+                        value={patientPhone}
+                        onChange={e => {
+                          let digits = e.target.value.replace(/\D/g, "");
+                          if (digits.length > 3) {
+                            digits = digits.slice(0, 3) + "-" + digits.slice(3, 10);
+                          }
+                          setPatientPhone(digits.slice(0, 11));
+                        }}
+                        placeholder="กรอกเบอร์โทร"
+                        maxLength={11}
+                        className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900"
+                      />
+                    </label>
+                    <div className="mt-4 flex justify-end gap-2">
+                      <Dialog.Close asChild>
+                        <button className="px-4 py-2 rounded-lg bg-gray-300 hover:bg-gray-400 text-gray-800">ยกเลิก</button>
+                      </Dialog.Close>
+                      <button onClick={handleAddPatient} className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white">
+                        ยืนยัน
+                      </button>
+                    </div>
+                  </Dialog.Content>
+                </Dialog.Portal>
+              </Dialog.Root>
+            </>
+          )}
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
@@ -294,7 +453,7 @@ export default function AdminBookingPage() {
                           : isPast ? "bg-yellow-100 text-yellow-700 border-yellow-400 cursor-not-allowed"
                           : isActive ? "bg-emerald-600 text-white border-emerald-600"
                           : "bg-white hover:bg-emerald-50 text-emerald-800 border-gray-300"}`}>
-                          <Clock className="w-4 h-4" /> {slot} {(isBooked || isPast) && <span className="text-xs font-semibold">({isBooked ? "ถูกจองแล้ว" : "หมดเวลาจอง"})</span>}
+                          <Clock className="w-4 h-4" /> {slot}
                         </button>
                         {date && <button disabled={isOff} onClick={() => toggleSlot(t, slot)} className={`px-2 py-1 rounded text-white ${isOff ? "bg-gray-400 cursor-not-allowed" : isSlotDisabled ? "bg-red-500 hover:bg-red-600" : "bg-emerald-500 hover:bg-emerald-600"}`}>{isSlotDisabled ? <FaTimes /> : <FaCheck />}</button>}
                       </div>
@@ -414,10 +573,9 @@ export default function AdminBookingPage() {
             </Dialog.Content>
           </Dialog.Portal>
         </Dialog.Root>
-
         <AnimatePresence>
           {showAlert && (
-            <motion.div key={Date.now()} initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="fixed top-6 left-1/2 -translate-x-1/2 bg-red-500 text-white px-4 py-2 rounded shadow z-50 flex items-center gap-2">
+            <motion.div key={Date.now()} initial={{ opacity: 0, y: -50 }} animate={{ opacity: 1, y: 65 }} exit={{ opacity: 0, y: -20 }} className="fixed top-6 left-1/2 -translate-x-1/2 bg-red-500 text-white px-4 py-2 rounded shadow z-50 flex items-center gap-2">
               <AlertCircle className="w-5 h-5" />
               <span>กรุณาเลือกวันที่ก่อน</span>
             </motion.div>

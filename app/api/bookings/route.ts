@@ -53,25 +53,7 @@ export async function POST(request: Request) {
 
     const conn = await pool.getConnection();
     try {
-      // ตรวจสอบ user เก่ามี booking รอดำเนินการอยู่หรือไม่
-      const [userRows] = await conn.query(
-        "SELECT * FROM bookings WHERE hn = ? AND status = 'รอดำเนินการ' LIMIT 1",
-        [hn]
-      );
-      if ((userRows as any).length > 0) {
-        return NextResponse.json({ success: false, error: "คุณมีการจองอยู่แล้ว ไม่สามารถจองเพิ่มได้" }, { status: 409 });
-      }
-
-      // ตรวจสอบช่วงเวลาว่าง
-      const [rows] = await conn.query(
-        "SELECT COUNT(*) as count FROM bookings WHERE therapist = ? AND time_slot = ? AND date = ? AND status != 'ยกเลิก'",
-        [therapist, time, date]
-      );
-      if ((rows as any)[0].count > 0) {
-        return NextResponse.json({ success: false, error: "ช่วงเวลานี้ถูกจองไปแล้ว" }, { status: 409 });
-      }
-
-      // บันทึก booking สำหรับ user เก่า
+      // บันทึก booking โดยไม่เช็คการจองซ้ำ
       await conn.query(
         "INSERT INTO bookings (hn, name, phone, date, therapist, time_slot, provider, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'รอดำเนินการ')",
         [hn, name, phone, date, therapist, time, provider]

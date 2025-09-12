@@ -55,21 +55,22 @@ export default function AdminBookingPage() {
     if (!user) router.push("/login");
   }, [user, router]);
 
-  useEffect(() => {
-    const savedDate = localStorage.getItem("selectedDate");
-    if (savedDate) {
-      const today = new Date();
-      const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      const selected = new Date(savedDate);
+useEffect(() => {
+  const savedDate = localStorage.getItem("selectedDate");
+  if (savedDate) {
+    const today = new Date();
+    const todayLocal = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const [year, month, day] = savedDate.split("-").map(Number);
+    const selected = new Date(year, month - 1, day);
 
-      if (selected.getTime() < todayMidnight.getTime()) {
-        localStorage.removeItem("selectedDate");
-        setDate("");
-      } else {
-        setDate(savedDate);
-      }
+    if (selected.getTime() < todayLocal.getTime()) {
+      localStorage.removeItem("selectedDate"); // ลบถ้าเก่า
+      setDate(""); // ให้ input ว่าง
+    } else {
+      setDate(savedDate); // เอาค่าที่ถูกต้อง
     }
-  }, []);
+  }
+}, []);
 
   useEffect(() => {
   fetch("/api/med-staff")
@@ -435,7 +436,21 @@ const handleAddPatient = async () => {
           <label className="flex items-center gap-2 text-emerald-700 font-semibold mb-2 text-lg">
             <CalendarIcon className="w-4 h-4" /> วันที่ต้องการนวด
           </label>
-          <input type="date" value={date} min={new Date().toISOString().split("T")[0]} onChange={e => setDate(e.target.value)} className={`border border-gray-300 rounded-lg p-3 w-full focus:outline-none focus:ring-2 focus:ring-emerald-400 transition ${!date ? "text-gray-400" : "text-gray-900"}`} />
+          <input
+            type="date"
+            value={date || ""}
+            min={new Date().toISOString().split("T")[0]}
+            onChange={e => {
+              const val = e.target.value;
+              setDate(val);
+              if (val) {
+                localStorage.setItem("selectedDate", val);
+              } else {
+                localStorage.removeItem("selectedDate"); // ลบเมื่อกด clear
+              }
+            }}
+            className={`border border-gray-300 rounded-lg p-3 w-full focus:outline-none focus:ring-2 focus:ring-emerald-400 transition ${!date ? "text-gray-400" : "text-gray-900"}`}
+          />
         </div>
 
         {/* Therapist & slots rendering */}

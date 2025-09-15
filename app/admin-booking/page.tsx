@@ -44,6 +44,7 @@ export default function AdminBookingPage() {
   const [dialogTherapist, setDialogTherapist] = useState("");
   const [offTherapists, setOffTherapists] = useState<string[]>([]);
   const [addPatientDialog, setAddPatientDialog] = useState(false);
+  const [noHN, setNoHN] = useState(false); // true = ซ่อน HN
   const [hn, setHn] = useState("");
   const [patientPrefix, setPatientPrefix] = useState("");
   const [patientFirstName, setPatientFirstName] = useState("");
@@ -147,30 +148,41 @@ fetch(`/api/bookings?date=${encodeURIComponent(date)}`)
     setSelectedTime(time);
   };
 
-  const handleSubmit = () => {
-    if (!clientName || !clientPhone || !date || !selectedTherapist || !selectedTime || !dialogTherapist) {
-      alert("กรุณากรอกข้อมูลให้ครบถ้วน");
+const handleSubmit = () => {
+  if (!clientName || !clientPhone || !date || !selectedTherapist || !selectedTime || !dialogTherapist) {
+    alert("กรุณากรอกข้อมูลให้ครบถ้วน");
+    return;
+  }
+
+  if (noHN) {
+    // กรณีไม่มี HN ใช้บัตรประชาชนแทน
+    if (!idCardNumber || idCardNumber.length !== 13) {
+      alert("กรุณากรอกหมายเลขบัตรประชาชนให้ครบ 13 ตัว");
       return;
     }
-    if (clientHN.length !== 9 && !idCardNumber) {
-      alert("กรุณากรอก HN หรือ หมายเลขบัตรประชาชน");
+  } else {
+    // กรณีมี HN
+    if (!clientHN || clientHN.length !== 9) {
+      alert("กรุณากรอก HN ให้ครบ 9 ตัว");
       return;
     }
-    router.push(`/confirm?${new URLSearchParams({
-      hn: clientHN,
-      name: clientName,
-      phone: clientPhone,
-      idCard: idCardNumber,
-      date,
-      therapist: selectedTherapist,
-      time: selectedTime,
-      provider: dialogTherapist,
-    }).toString()}`);
-  };
+  }
+
+  router.push(`/confirm?${new URLSearchParams({
+    hn: clientHN,
+    name: clientName,
+    phone: clientPhone,
+    idCard: idCardNumber,
+    date,
+    therapist: selectedTherapist,
+    time: selectedTime,
+    provider: dialogTherapist,
+  }).toString()}`);
+};
 
   const handleOpenDialog = () => {
     if (!selectedTherapist || !selectedTime || !date) return setShowAlert(true);
-    setClientHN(""); setClientName(""); setClientPhone(""); setDialogTherapist(""); setSearchResults([]); setIdCardNumber("");
+    setClientHN(""); setClientName(""); setClientPhone(""); setDialogTherapist(""); setSearchResults([]); setIdCardNumber(""); setNoHN(false);
     setDialogOpen(true);
   };
 
@@ -533,8 +545,23 @@ const handleAddPatient = async () => {
           <Dialog.Portal>
             <Dialog.Overlay className="fixed inset-0 bg-black/30 z-40" />
             <Dialog.Content className="fixed z-50 left-1/2 top-1/2 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white p-6 shadow-lg">
-              <Dialog.Title className="text-xl font-bold mb-4 text-emerald-700">กรอกข้อมูลผู้มารับบริการ</Dialog.Title>
-
+              <Dialog.Title className="text-xl font-bold mb-4 text-emerald-700 flex justify-between items-center">
+                <span>กรอกข้อมูลผู้มารับบริการ</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNoHN(prev => !prev);       // สลับโหมด HN / บัตรประชาชน
+                    setClientHN("");               // รีเซ็ต HN
+                    setClientName("");             // รีเซ็ตชื่อ
+                    setClientPhone("");            // รีเซ็ตเบอร์
+                    setIdCardNumber("");           // รีเซ็ตหมายเลขบัตร
+                    setSearchResults([]);          // ล้างผลการค้นหา
+                  }}
+                  className="px-3 py-1 bg-emerald-500 hover:bg-emerald-600 rounded text-white text-sm"
+                >
+                  {noHN ? "กลับ" : "คนไข้ใหม่"}
+                </button>
+              </Dialog.Title>
               <label className="block mb-3">
                 <span className="text-sm font-medium text-emerald-800">ผู้ให้บริการ</span>
                 <select
@@ -549,69 +576,70 @@ const handleAddPatient = async () => {
                 </select>
               </label>
 
-              {["hn", "name", "phone"].map((field) => {
-                if (field === "hn" && idCardNumber.length === 13) return null;
-                return (
-                  <label key={field} className="block mb-3">
-                    <span className="text-sm font-medium text-emerald-800">
-                      {field === "hn" ? "HN" : field === "name" ? "ผู้มารับบริการ" : "เบอร์โทร"}
-                    </span>
-                    <div className="flex border border-gray-300 rounded-md focus-within:ring-2 focus-within:ring-emerald-400 transition">
-                      <input
-                        type="text"
-                        value={
-                          field === "hn" ? clientHN : field === "name" ? clientName : clientPhone
-                        }
-                        onChange={(e) =>
-                          field === "hn"
-                            ? setClientHN(e.target.value)
-                            : field === "name"
-                            ? setClientName(e.target.value)
-                            : handlePhoneChange(e)
-                        }
-                        maxLength={field === "hn" ? 9 : field === "phone" ? 11 : undefined}
-                        placeholder={
-                          field === "hn" ? "กรอก HN" : field === "name" ? "กรอกชื่อ" : "กรอกเบอร์โทร"
-                        }
-                        className="flex-1 px-3 py-2 rounded-l-md focus:outline-none text-gray-900"
-                      />
-                      {(field === "name" || field === "hn") && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            field === "name" ? handleSearchName() : handleSearchHN()
-                          }
-                          disabled={loading}
-                          className="px-4 py-2 bg-emerald-500 text-white rounded-r-md hover:bg-emerald-600 flex items-center justify-center"
-                        >
-                          {loading ? (
-                            <ImSpinner2 className="w-5 h-5 animate-spin text-white" />
-                          ) : (
-                            <Search className="w-5 h-5" />
-                          )}
-                        </button>
-                      )}
-                    </div>
-                  </label>
-                );
-              })}
+{["hn", "name", "phone"].map((field) => {
+  if (field === "hn" && noHN) return null; // ซ่อน HN ถ้าเลือก "ไม่มี HN"
 
-              {clientHN.length !== 9 && (
-                <label className="block mb-3">
-                  <span className="text-sm font-medium text-emerald-800">หมายเลขบัตรประชาชน</span>
-                  <input
-                    type="text"
-                    value={idCardNumber}
-                    onChange={e =>
-                      setIdCardNumber(e.target.value.replace(/\D/g, "").slice(0, 13))
-                    }
-                    maxLength={13}
-                    placeholder="กรอกหมายเลขบัตรประชาชน"
-                    className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900"
-                  />
-                </label>
-              )}
+  return (
+    <label key={field} className="block mb-3">
+      <span className="text-sm font-medium text-emerald-800">
+        {field === "hn" ? "HN" : field === "name" ? "ผู้มารับบริการ" : "เบอร์โทร"}
+      </span>
+      <div className="flex border border-gray-300 rounded-md focus-within:ring-2 focus-within:ring-emerald-400 transition">
+        <input
+          type="text"
+          value={
+            field === "hn" ? clientHN : field === "name" ? clientName : clientPhone
+          }
+          onChange={(e) =>
+            field === "hn"
+              ? setClientHN(e.target.value)
+              : field === "name"
+              ? setClientName(e.target.value)
+              : handlePhoneChange(e)
+          }
+          maxLength={field === "hn" ? 9 : field === "phone" ? 11 : undefined}
+          placeholder={
+            field === "hn" ? "กรอก HN" : field === "name" ? "กรอกชื่อ" : "กรอกเบอร์โทร"
+          }
+          className="flex-1 px-3 py-2 rounded-l-md focus:outline-none text-gray-900"
+        />
+        {(field === "name" || field === "hn") && !noHN && (
+          <button
+            type="button"
+            onClick={() =>
+              field === "name" ? handleSearchName() : handleSearchHN()
+            }
+            disabled={loading}
+            className="px-4 py-2 bg-emerald-500 text-white rounded-r-md hover:bg-emerald-600 flex items-center justify-center"
+          >
+            {loading ? (
+              <ImSpinner2 className="w-5 h-5 animate-spin text-white" />
+            ) : (
+              <Search className="w-5 h-5" />
+            )}
+          </button>
+        )}
+      </div>
+    </label>
+  );
+})}
 
+{/* ฟิลด์หมายเลขบัตรประชาชน */}
+{noHN && (
+  <label className="block mb-3">
+    <span className="text-sm font-medium text-emerald-800">หมายเลขบัตรประชาชน</span>
+    <input
+      type="text"
+      value={idCardNumber}
+      onChange={e =>
+        setIdCardNumber(e.target.value.replace(/\D/g, "").slice(0, 13))
+      }
+      maxLength={13}
+      placeholder="กรอกหมายเลขบัตรประชาชน"
+      className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900"
+    />
+  </label>
+)}
               {searchResults.length > 0 && (
                 <div className="border p-2 rounded max-h-40 overflow-y-auto mb-3">
                   {searchResults.map(u => (

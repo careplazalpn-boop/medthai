@@ -464,7 +464,6 @@ const handleAddPatient = async () => {
         {/* Therapist & slots rendering */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {therapists.map(t => {
-            const booked = bookedSlots[t] || [];
             const isSelected = selectedTherapist === t;
             const isOff = offTherapists.includes(t);
             const disabled = disabledSlots[t] || [];

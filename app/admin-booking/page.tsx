@@ -16,6 +16,11 @@ interface UserInfo {
   id_card_number?: string; // เพิ่ม id_card_number
 }
 
+interface BookingInfo {
+  time_slot: string;
+  name: string;
+}
+
 export default function AdminBookingPage() {
   const router = useRouter();
   const { user } = useContext(AuthContext);
@@ -27,7 +32,7 @@ export default function AdminBookingPage() {
   const [date, setDate] = useState("");
   const [selectedTherapist, setSelectedTherapist] = useState("");
   const [selectedTime, setSelectedTime] = useState("");
-  const [bookedSlots, setBookedSlots] = useState<Record<string, string[]>>({});
+  const [bookedSlots, setBookedSlots] = useState<Record<string, BookingInfo[]>>({});
   const [disabledSlots, setDisabledSlots] = useState<Record<string, string[]>>({});
   const [showAlert, setShowAlert] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -100,19 +105,22 @@ useEffect(() => {
       return;
     }
 
-    fetch(`/api/bookings?date=${encodeURIComponent(date)}`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          const grouped: Record<string, string[]> = {};
-          data.bookings.forEach((b: any) => {
-            if (!grouped[b.therapist]) grouped[b.therapist] = [];
-            grouped[b.therapist].push(b.time_slot);
-          });
-          setBookedSlots(grouped);
-        } else setBookedSlots({});
-      })
-      .catch(() => setBookedSlots({}));
+fetch(`/api/bookings?date=${encodeURIComponent(date)}`)
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
+      const grouped: Record<string, BookingInfo[]> = {};
+      data.bookings.forEach((b: any) => {
+        if (!grouped[b.therapist]) grouped[b.therapist] = [];
+        grouped[b.therapist].push({
+          time_slot: b.time_slot,
+          name: b.name // <-- ต้องมีชื่อผู้จองตรงนี้
+        });
+      });
+      setBookedSlots(grouped);
+    } else setBookedSlots({});
+  })
+  .catch(() => setBookedSlots({}));
 
     fetch(`/api/off-therapists?date=${encodeURIComponent(date)}`)
       .then(res => res.json())
@@ -472,25 +480,45 @@ const handleAddPatient = async () => {
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
-                  {timeSlots.map(slot => {
-                    const isBooked = booked.includes(slot);
-                    const isActive = isSelected && selectedTime === slot;
-                    const isSlotDisabled = disabled.includes(slot);
+                {timeSlots.map(slot => {
+                  const slotInfo = bookedSlots[t]?.find(b => b.time_slot === slot);
+                  const isBooked = !!slotInfo;
+                  const isActive = isSelected && selectedTime === slot;
+                  const isSlotDisabled = disabled.includes(slot);
 
-                    return (
-                      <div key={slot} className="flex gap-1 items-center">
-                        <button disabled={isBooked || isOff || isSlotDisabled} onClick={() => handleSelect(t, slot)} className={`text-sm px-3 py-2 rounded-lg font-medium border flex-1 flex items-center justify-center gap-1 transition shadow-sm
+                  return (
+                    <div key={slot} className="flex gap-1 items-center">
+                      <button
+                        disabled={isBooked || isOff || isSlotDisabled}
+                        onClick={() => handleSelect(t, slot)}
+                        className={`text-sm px-3 py-2 rounded-lg font-medium border flex-1 flex flex-col items-center justify-center gap-1 transition shadow-sm
                           ${isSlotDisabled ? "bg-gray-300 text-gray-500 border-gray-400 cursor-not-allowed"
                           : isOff ? "bg-gray-300 text-gray-500 border-gray-400 cursor-not-allowed"
                           : isBooked ? "bg-red-100 text-red-600 border-red-400 cursor-not-allowed"
                           : isActive ? "bg-emerald-600 text-white border-emerald-600"
-                          : "bg-white hover:bg-emerald-50 text-emerald-800 border-gray-300"}`}>
+                          : "bg-white hover:bg-emerald-50 text-emerald-800 border-gray-400"}`}
+                      >
+                        <div className="flex items-center gap-1">
                           <Clock className="w-4 h-4" /> {slot}
+                        </div>
+                        {isBooked && (
+                          <div className="text-xs text-red-600">
+                            ({slotInfo?.name || "ไม่ระบุ"})
+                          </div>
+                        )}
+                      </button>
+                      {date && (
+                        <button
+                          disabled={isOff}
+                          onClick={() => toggleSlot(t, slot)}
+                          className={`px-2 py-1 rounded text-white ${isOff ? "bg-gray-400 cursor-not-allowed" : isSlotDisabled ? "bg-red-500 hover:bg-red-600" : "bg-emerald-500 hover:bg-emerald-600"}`}
+                        >
+                          {isSlotDisabled ? <FaTimes /> : <FaCheck />}
                         </button>
-                        {date && <button disabled={isOff} onClick={() => toggleSlot(t, slot)} className={`px-2 py-1 rounded text-white ${isOff ? "bg-gray-400 cursor-not-allowed" : isSlotDisabled ? "bg-red-500 hover:bg-red-600" : "bg-emerald-500 hover:bg-emerald-600"}`}>{isSlotDisabled ? <FaTimes /> : <FaCheck />}</button>}
-                      </div>
-                    );
-                  })}
+                      )}
+                    </div>
+                  );
+                })}
                 </div>
 
                 <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} onClick={handleOpenDialog} disabled={!(isSelected && selectedTime && date) || isOff} className={`mt-5 w-full py-2 rounded-xl font-bold shadow transition text-center ${isSelected && selectedTime && date && !isOff ? "bg-emerald-600 text-white hover:bg-emerald-700" : "bg-gray-300 text-gray-500 cursor-not-allowed"}`}>

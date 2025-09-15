@@ -7,6 +7,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { FaCheck, FaTimes } from "react-icons/fa";
 import { AuthContext } from "@/context/AuthContext";
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
 
 interface Booking {
   id: number;
@@ -17,6 +19,7 @@ interface Booking {
   time_slot: string;
   date: string;
   status: string;
+  created_at: string; // หรือ Date ถ้า parse เป็น Date แล้ว
 }
 
 const getStatusLabel = (b: Booking) => {
@@ -157,6 +160,68 @@ export default function AllBookingsPage() {
     })();
   }, []);
 
+const exportToExcel = () => {
+  // กรองเฉพาะวันที่ที่เลือก
+  const filteredData = bookings
+    .filter(b => formatDate(b.date) === filterDate)
+    // sort: time_slot จากน้อยไปมาก + create_at ใหม่สุดล่าง
+    .sort((a, b) => {
+      // แปลงเวลาเริ่มต้นเป็นนาที
+      const [aStart] = a.time_slot.split("-");
+      const [bStart] = b.time_slot.split("-");
+      const timeDiff = parseTime(aStart) - parseTime(bStart);
+
+      if (timeDiff !== 0) return timeDiff;
+
+      // ถ้าเวลาเท่ากัน ให้เอา create_at ใหม่สุดล่าง
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    });
+
+  if (filteredData.length === 0) return alert("ไม่มีข้อมูลให้ export สำหรับวันที่นี้");
+
+  // แปลงข้อมูล
+  const data = filteredData.map(b => ({
+    "ผู้ให้บริการ": b.provider,
+    "ผู้มารับบริการ": b.name,
+    "เบอร์โทร": b.phone,
+    "หมอนวด": b.therapist,
+    "วันที่": new Date(b.date).toLocaleDateString("th-TH",{year:"numeric",month:"2-digit",day:"2-digit",timeZone:"Asia/Bangkok"}),
+    "ช่วงเวลา": b.time_slot,
+    "สถานะ": getStatusLabel(b),
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(data);
+
+  const columnWidths = Object.keys(data[0]).map(key => {
+    const maxLength = Math.max(
+      key.length,
+      ...data.map((d: Record<string, any>) => (d[key] ? d[key].toString().length : 0))
+    );
+
+    const maxWidths: Record<string, number> = {
+      "ผู้ให้บริการ": 25,
+      "ผู้มารับบริการ": 25,
+      "หมอนวด": 25,
+      "ช่วงเวลา": 12
+    };
+
+    return { wch: Math.min(maxLength + 2, maxWidths[key] || maxLength + 2) };
+  });
+
+  ws['!cols'] = columnWidths;
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Bookings");
+
+  const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+  const file = new Blob([buf], { type: "application/octet-stream" });
+  saveAs(file, `BookingHistory-${filterDate}.xlsx`);
+};
+// ฟังก์ชันช่วยแปลง "HH:MM" เป็นนาที
+const parseTime = (timeStr: string) => {
+  const [h, m] = timeStr.split(":").map(Number);
+  return h * 60 + m;
+};
+
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr);
     return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,"0")}-${d.getDate().toString().padStart(2,"0")}`;
@@ -253,15 +318,35 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
             ย้อนกลับ
           </motion.button>
 
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => router.push("/")}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow transition"
-          >
-            <Home className="w-5 h-5" />
-            หน้าแรก
-          </motion.button>
+          <div className="flex gap-2">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={exportToExcel}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow transition"
+            >
+              {/* ไอคอน Excel */}
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="w-5 h-5 text-green-600"
+                fill="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path d="M19 2H8a2 2 0 0 0-2 2v4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-1h1a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2h-1V2zM8 4h11v16H5V8h1v-2zM7 10h10v2H7v-2zm0 4h10v2H7v-2z"/>
+              </svg>
+              Export Excel
+            </motion.button>
+
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => router.push("/")}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow transition"
+            >
+              <Home className="w-5 h-5" />
+              หน้าแรก
+            </motion.button>
+          </div>
         </div>
       </div>
       <h1 className="text-4xl font-extrabold text-emerald-700 mb-12 pt-10 text-center drop-shadow-sm">ประวัติการจอง</h1>

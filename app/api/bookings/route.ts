@@ -14,27 +14,35 @@ const pool = mysql.createPool({
 
 export async function GET(request: Request) {
   const date = new URL(request.url).searchParams.get("date");
-  if (!date) return NextResponse.json({ success: false, error: "กรุณาระบุวันที่" }, { status: 400 });
+  if (!date)
+    return NextResponse.json(
+      { success: false, error: "กรุณาระบุวันที่" },
+      { status: 400 }
+    );
 
   try {
     const conn = await pool.getConnection();
+    // ดึง name ของผู้จองมาด้วย
     const [rows] = await conn.query(
-      "SELECT therapist, time_slot, status FROM bookings WHERE date = ? AND status != 'ยกเลิก'",
+      "SELECT therapist, time_slot, name, status FROM bookings WHERE date = ? AND status != 'ยกเลิก'",
       [date]
     );
     conn.release();
     return NextResponse.json({ success: true, bookings: rows });
   } catch (error) {
     console.error("GET bookings error:", error);
-    return NextResponse.json({ success: false, error: "เกิดข้อผิดพลาด" }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: "เกิดข้อผิดพลาด" },
+      { status: 500 }
+    );
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const { provider, hn, name, phone, therapist, time, date } = await request.json();
+    const { provider, hn, name, phone, therapist, time, date } =
+      await request.json();
 
-    // ตรวจสอบ field จำเป็น
     const missingFields = [];
     if (!provider) missingFields.push("provider");
     if (!hn) missingFields.push("hn");
@@ -53,7 +61,6 @@ export async function POST(request: Request) {
 
     const conn = await pool.getConnection();
     try {
-      // บันทึก booking โดยไม่เช็คการจองซ้ำ
       await conn.query(
         "INSERT INTO bookings (hn, name, phone, date, therapist, time_slot, provider, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'รอดำเนินการ')",
         [hn, name, phone, date, therapist, time, provider]
@@ -65,6 +72,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Database error:", error);
-    return NextResponse.json({ success: false, error: "เกิดข้อผิดพลาดจากระบบ" }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: "เกิดข้อผิดพลาดจากระบบ" },
+      { status: 500 }
+    );
   }
 }

@@ -29,32 +29,43 @@ export default function ConfirmPage() {
     }
   }, [hn, idCard, name, phone, date, therapist, time, router]);
 
-  const handleConfirm = async () => {
-    setLoading(true);
-    setErrorMsg("");
-    try {
-      const isNewUser = !hn;
-      const endpoint = isNewUser ? "/api/new-user" : "/api/bookings";
-      const payload: any = isNewUser
-        ? { name, phone, idCard, therapist, time, date, provider }
-        : { hn, name, phone, therapist, time, date, provider };
+const handleConfirm = async () => {
+  setLoading(true);
+  setErrorMsg("");
+  try {
+    const isNewUser = !hn;
+    const endpoint = isNewUser ? "/api/new-user" : "/api/bookings";
 
-      const res = await fetch(endpoint, {
+    // payload สำหรับ booking
+    const payload: any = isNewUser
+      ? { name, phone, idCard, therapist, time, date, provider }
+      : { hn, name, phone, therapist, time, date, provider };
+
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || "บันทึกไม่สำเร็จ");
+
+    // ถ้าเป็นผู้ใช้ที่มี HN ให้ไปอัปเดตเบอร์ใน med_user
+    if (!isNewUser && hn) {
+      await fetch("/api/update-user-phone", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ hn, phone }),
       });
-
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error || "บันทึกไม่สำเร็จ");
-
-      setSuccess(true);
-    } catch (err: any) {
-      setErrorMsg(err.message || "เกิดข้อผิดพลาดจากระบบ");
-    } finally {
-      setLoading(false);
     }
-  };
+
+    setSuccess(true);
+  } catch (err: any) {
+    setErrorMsg(err.message || "เกิดข้อผิดพลาดจากระบบ");
+  } finally {
+    setLoading(false);
+  }
+};
 
   const InfoItem = ({ icon: Icon, label, value }: { icon: any; label: string; value: string | null }) => (
     <li className="flex items-center gap-3">

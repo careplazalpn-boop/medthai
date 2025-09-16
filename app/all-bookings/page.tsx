@@ -101,7 +101,7 @@ function BookingSummary({ attended, cancelled }: SummaryProps) {
 
 export default function AllBookingsPage() {
   const router = useRouter();
-  const { user } = useContext(AuthContext);
+
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [providers, setProviders] = useState<string[]>([]);
@@ -529,7 +529,8 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
                 }`}>{getStatusLabel(b)}</span>
               </div>
               <div className="flex gap-2">
-                {user?.role !== "user" && getStatusLabel(b) === "ยกเลิก" && (
+                {/* สามารถปรับให้เช็ค role ได้ */}
+                {getStatusLabel(b) === "ยกเลิก" && (
                   <Dialog.Root open={cancelDialogOpen && selectedId===b.id} onOpenChange={setCancelDialogOpen}>
                     <Dialog.Trigger asChild>
                       <motion.button
@@ -562,8 +563,8 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
                     />
                   </Dialog.Root>
                 )}
-
-                {user?.role !== "user" && getStatusLabel(b) === "รอดำเนินการ" && (
+                {/* สามารถปรับให้เช็ค role ได้ */}
+                {getStatusLabel(b) === "รอดำเนินการ" && (
                   <Dialog.Root>
                     <Dialog.Trigger asChild>
                       <motion.button
@@ -583,8 +584,8 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
                     />
                   </Dialog.Root>
                 )}
-
-                {user?.role !== "user" && (getStatusLabel(b) === "รอดำเนินการ" || getStatusLabel(b) === "อยู่ในคิว") && (
+                {/* สามารถปรับให้เช็ค role ได้ */}
+                {(getStatusLabel(b) === "รอดำเนินการ" || getStatusLabel(b) === "อยู่ในคิว") && (
                   <Dialog.Root>
                     <Dialog.Trigger asChild>
                       <motion.button

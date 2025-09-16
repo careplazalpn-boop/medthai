@@ -23,7 +23,9 @@ export default function ConfirmPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const hasValidId = (hn && hn.length === 9) || idCard;
+    // เช็คแค่กรณีมี HN เท่านั้น
+    const hasValidId = !hn || (hn && hn.length === 9);
+
     if (!hasValidId || !name || !phone || !date || !therapist || !time) {
       router.push("/admin-booking");
     }

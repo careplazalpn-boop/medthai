@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useState, useContext } from "react";
+import { useEffect, useState } from "react";
 import { User, Phone, UserCheck, Clock, CalendarDays, CheckCircle2, ChevronLeft, Home, Smile, Frown } from "lucide-react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { FaCheck, FaTimes } from "react-icons/fa";
-import { AuthContext } from "@/context/AuthContext";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 

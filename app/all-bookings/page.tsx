@@ -457,7 +457,7 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
                 </span>
               </div>
 
-              <div className="grid grid-cols-[200px_200px_125px_200px_125px_125px_122px] gap-x-6 text-gray-700 flex-grow">
+              <div className="grid grid-cols-[200px_211px_125px_200px_115px_115px_115px] gap-x-6 text-gray-700 flex-grow">
                 <Label icon={<UserCheck className="w-4 h-4"/>} text="ผู้ให้บริการ"/>
                 <Label icon={<User className="w-4 h-4"/>} text="ผู้มารับบริการ"/>
                 <Label icon={<Phone className="w-4 h-4"/>} text="เบอร์โทร"/>

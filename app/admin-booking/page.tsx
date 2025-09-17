@@ -326,7 +326,7 @@ const handleAddPatient = async () => {
                 onClick={() => setAddPatientDialog(true)}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow transition"
               >
-                คนไข้มี HN แต่หาไม่เจอ
+                มี HN แต่หาไม่เจอ
               </motion.button>
               <Dialog.Root
                 open={addPatientDialog}
@@ -345,7 +345,7 @@ const handleAddPatient = async () => {
                 <Dialog.Portal>
                   <Dialog.Overlay className="fixed inset-0 bg-black/30 z-40" />
                   <Dialog.Content className="fixed z-50 left-1/2 top-1/2 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white p-6 shadow-lg">
-                    <Dialog.Title className="text-xl font-bold mb-4 text-emerald-700">เพิ่มข้อมูลคนไข้</Dialog.Title>
+                    <Dialog.Title className="text-xl font-bold mb-4 text-emerald-700">เพิ่มข้อมูลคนไข้ (เพิ่มเสร็จแล้วให้จองใหม่)</Dialog.Title>
 
                     {/* HN */}
                     <label className="block mb-3">

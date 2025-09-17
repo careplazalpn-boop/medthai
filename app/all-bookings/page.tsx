@@ -43,12 +43,12 @@ function BookingSummary({ attended, cancelled }: SummaryProps) {
   const cancelledPercent = total ? 100 - attendedPercent : 0;
 
   return (
-    <div className="flex flex-col sm:flex-row gap-4 sm:gap-3">
+    <div className="flex gap-3">
       <motion.div
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ duration: 0.5 }}
-        className="flex items-center gap-4 bg-emerald-50 text-emerald-900 rounded-xl p-4 shadow-sm border-2 border-emerald-200 w-full sm:min-w-[396px]"
+        className="flex items-center gap-4 bg-emerald-50 text-emerald-900 rounded-xl p-4 shadow-sm border-2 border-emerald-200 min-w-[396px]"
       >
         <Smile className="w-12 h-10 text-emerald-500 flex-shrink-0" />
         <div className="flex flex-col flex-grow justify-center">
@@ -69,12 +69,11 @@ function BookingSummary({ attended, cancelled }: SummaryProps) {
           </div>
         </div>
       </motion.div>
-
       <motion.div
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ duration: 0.5, delay: 0.1 }}
-        className="flex items-center gap-4 bg-red-50 text-red-900 rounded-xl p-4 shadow-sm border-2 border-red-200 w-full sm:min-w-[397px]"
+        className="flex items-center gap-4 bg-red-50 text-red-900 rounded-xl p-4 shadow-sm border-2 border-red-200 min-w-[397px]"
       >
         <Frown className="w-12 h-10 text-red-500 flex-shrink-0" />
         <div className="flex flex-col flex-grow justify-center">
@@ -98,7 +97,6 @@ function BookingSummary({ attended, cancelled }: SummaryProps) {
     </div>
   );
 }
-
 
 export default function AllBookingsPage() {
   const router = useRouter();
@@ -306,8 +304,8 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
   if (error) return <p className="p-4 text-center text-red-600 font-semibold">Error: {error}</p>;
 
   return (
-    <div className="min-h-screen px-4 sm:px-6 py-12 bg-gradient-to-br from-white to-emerald-50 relative">
-      <div className="max-w-[92rem] mx-auto relative flex flex-col gap-6">
+    <div className="min-h-screen px-6 py-12 bg-gradient-to-br from-white to-emerald-50 relative">
+      <div className="max-w-[92rem] mx-auto relative">
         <div className="fixed top-0 left-0 w-full z-50 bg-emerald-600 shadow-md flex justify-between p-2">
           <motion.button
             whileHover={{ scale: 1.05 }}
@@ -350,309 +348,275 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
           </div>
         </div>
       </div>
-<h1 className="text-3xl sm:text-4xl font-extrabold text-emerald-700 mb-8 sm:mb-12 pt-10 text-center drop-shadow-sm">
-  ประวัติการจอง
-</h1>
-
-{/* ฟิลเตอร์ */}
-<div className="max-w-6xl mx-auto mb-5 flex flex-wrap gap-4 items-end">
-  <div className="w-full sm:w-[356px]">
-    <label className="block text-emerald-700 font-semibold mb-2 text-lg">ผู้มารับบริการ:</label>
-    <input 
-      type="text" 
-      placeholder="พิมพ์ชื่อเพื่อกรอง..." 
-      value={filterName} 
-      onChange={e => setFilterName(e.target.value)}
-      className="w-full px-4 h-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900 placeholder-gray-400"
-    />
-  </div>
-
-  <div className="w-full sm:w-[256px]">
-    <label className="block text-emerald-700 font-semibold mb-2 text-lg">ผู้ให้บริการ:</label>
-    <select 
-      value={filterProvider} 
-      onChange={e => setFilterProvider(e.target.value)}
-      className="w-full px-4 h-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900 placeholder-gray-400"
-    >
-      <option value="all">ทั้งหมด</option>
-      {providers.map((t,i)=><option key={i} value={t}>{t}</option>)}
-    </select>
-  </div>
-
-  <div className="w-full sm:w-[256px]">
-    <label className="block text-emerald-700 font-semibold mb-2 text-lg">หมอนวด:</label>
-    <select 
-      value={filterTherapist} 
-      onChange={e => setFilterTherapist(e.target.value)}
-      className="w-full px-4 h-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900 placeholder-gray-400"
-    >
-      <option value="all">ทั้งหมด</option>
-      {therapists.map((t,i)=><option key={i} value={t}>{t}</option>)}
-    </select>
-  </div>
-
-  <div className="w-full sm:w-[150px]">
-    <label className="block text-emerald-700 font-semibold mb-2 text-lg">สถานะ:</label>
-    <select 
-      value={filterStatus} 
-      onChange={e => setFilterStatus(e.target.value)}
-      className="w-full px-4 h-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900 placeholder-gray-400"
-    >
-      <option value="all">ทั้งหมด</option>
-      <option value="upcoming">รอดำเนินการ</option>
-      <option value="in_queue">อยู่ในคิว</option>
-      <option value="past">สำเร็จ</option>
-      <option value="cancelled">ยกเลิก</option>
-    </select>
-  </div>
-
-  <div className="flex w-full sm:w-auto items-end">
-    <motion.button 
-      whileHover={{scale:1.05}} 
-      whileTap={{scale:0.95}}
-      onClick={() => {
-        setFilterName(""); 
-        setFilterTherapist("all"); 
-        setFilterStatus("all"); 
-        setFilterDate(""); 
-        setFilterTimeSlot("all"); 
-        setFilterProvider("all");
-      }}
-      className="h-10 px-4 bg-emerald-600 text-white rounded-md font-semibold hover:bg-emerald-700 transition"
-    >
-      รีเซ็ต
-    </motion.button>
-  </div>
-</div>
-
-{/* วันที่ + ช่วงเวลา + BookingSummary */}
-<div className="max-w-6xl mx-auto mb-5 flex flex-wrap gap-4 items-end">
-  <div className="w-full sm:w-[150px]">
-    <label className="block text-emerald-700 font-semibold mb-2 text-lg">วันที่:</label>
-    <input 
-      type="date" 
-      value={filterDate} 
-      onChange={e => setFilterDate(e.target.value)}
-      className={`w-full px-4 h-10 border rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500
-        ${filterDate 
-          ? "border-gray-300 text-gray-900" 
-          : "border-gray-300 text-gray-400"
-        }`}
-    />
-  </div>
-
-  <div className="w-full sm:w-[150px]">
-    <label className="block text-emerald-700 font-semibold mb-2 text-lg">ช่วงเวลา:</label>
-    <select 
-      value={filterTimeSlot} 
-      onChange={e => setFilterTimeSlot(e.target.value)}
-      className="w-full px-4 h-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900 placeholder-gray-400"
-    >
-      <option value="all">ทั้งหมด</option>
-      {timeSlots.map((slot,i)=><option key={i} value={slot}>{slot}</option>)}
-    </select>
-  </div>
-
-  <div className="w-full sm:flex-1">
-    <BookingSummary attended={attendedBookings} cancelled={cancelledBookings} />
-  </div>
-</div>
-
-      
-{filteredBookings.length === 0 ? (
-  <p className="text-center text-gray-500 italic select-none">ยังไม่มีประวัติ</p>
-) : (
-  <div className="overflow-x-auto w-full">
-    <ul className="space-y-4 min-w-[700px] sm:min-w-full mx-auto">
-      {filteredBookings.map((b, idx) => (
-        <li
-          key={b.id}
-          className={`bg-white border rounded-xl p-5 flex flex-col sm:flex-row sm:justify-between items-start sm:items-center border-l-8 ${getStatusColor(b)}`}
+      <h1 className="text-4xl font-extrabold text-emerald-700 mb-12 pt-10 text-center drop-shadow-sm">ประวัติการจอง</h1>
+      <div className="max-w-6xl mx-auto mb-5 flex flex-wrap gap-4 items-end">
+        <div className="min-w-[356px]">
+          <label className="block text-emerald-700 font-semibold mb-2 text-lg">ผู้มารับบริการ:</label>
+          <input 
+            type="text" 
+            placeholder="พิมพ์ชื่อเพื่อกรอง..." 
+            value={filterName} 
+            onChange={e => setFilterName(e.target.value)}
+            className="w-full px-4 h-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900 placeholder-gray-400"
+          />
+        </div>
+        <div className="min-w-[256px]">
+          <label className="block text-emerald-700 font-semibold mb-2 text-lg">ผู้ให้บริการ:</label>
+        <select 
+          value={filterProvider} 
+          onChange={e => setFilterProvider(e.target.value)}
+          className="w-full px-4 h-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900 placeholder-gray-400"
         >
-          {/* เลขลำดับแบบล่างขึ้นบน */}
-          <div className="flex items-center gap-2 pr-0 sm:pr-4 mb-2 sm:mb-0">
-            <span className="w-8 h-8 flex items-center justify-center bg-emerald-200 text-emerald-700 font-bold rounded-full">
-              {filteredBookings.length - idx}
-            </span>
-          </div>
+          <option value="all">ทั้งหมด</option>
+          {providers.map((t,i)=><option key={i} value={t}>{t}</option>)}
+        </select>
+        </div>
+        <div className="min-w-[256px]">
+          <label className="block text-emerald-700 font-semibold mb-2 text-lg">หมอนวด:</label>
+          <select 
+            value={filterTherapist} 
+            onChange={e => setFilterTherapist(e.target.value)}
+            className="w-full px-4 h-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900 placeholder-gray-400"
+          >
+            <option value="all">ทั้งหมด</option>
+            {therapists.map((t,i)=><option key={i} value={t}>{t}</option>)}
+          </select>
+        </div>
+        <div className="min-w-[150px]">
+          <label className="block text-emerald-700 font-semibold mb-2 text-lg">สถานะ:</label>
+          <select 
+            value={filterStatus} 
+            onChange={e => setFilterStatus(e.target.value)}
+            className="w-full px-4 h-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900 placeholder-gray-400"
+          >
+            <option value="all">ทั้งหมด</option>
+            <option value="upcoming">รอดำเนินการ</option>
+            <option value="in_queue">อยู่ในคิว</option>
+            <option value="past">สำเร็จ</option>
+            <option value="cancelled">ยกเลิก</option>
+          </select>
+        </div>
+        <div className="flex items-end">
+          <motion.button 
+            whileHover={{scale:1.05}} 
+            whileTap={{scale:0.95}}
+            onClick={() => {
+              setFilterName(""); 
+              setFilterTherapist("all"); 
+              setFilterStatus("all"); 
+              setFilterDate(""); 
+              setFilterTimeSlot("all"); 
+              setFilterProvider("all");
+            }}
+            className="h-10 px-4 bg-emerald-600 text-white rounded-md font-semibold hover:bg-emerald-700 transition"
+          >
+            รีเซ็ต
+          </motion.button>
+        </div>
+      </div>
+      <div className="max-w-6xl mx-auto mb-5 flex flex-wrap gap-4 items-end">
+        <div className="min-w-[150px]">
+          <label className="block text-emerald-700 font-semibold mb-2 text-lg">วันที่:</label>
+          <input 
+            type="date" 
+            value={filterDate} 
+            onChange={e => setFilterDate(e.target.value)}
+            className={`w-full px-4 h-10 border rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500
+              ${filterDate 
+                ? "border-gray-300 text-gray-900" 
+                : "border-gray-300 text-gray-400"
+              }`}
+          />
+        </div>
+        <div className="min-w-[150px]">
+          <label className="block text-emerald-700 font-semibold mb-2 text-lg">ช่วงเวลา:</label>
+          <select 
+            value={filterTimeSlot} 
+            onChange={e => setFilterTimeSlot(e.target.value)}
+            className="w-full px-4 h-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900 placeholder-gray-400"
+          >
+            <option value="all">ทั้งหมด</option>
+            {timeSlots.map((slot,i)=><option key={i} value={slot}>{slot}</option>)}
+          </select>
+        </div>
+        <div className="flex-1 min-w-[337px] -mt-1">
+          <BookingSummary attended={attendedBookings} cancelled={cancelledBookings} />
+        </div>
+      </div>
+      
+      {filteredBookings.length===0?(
+        <p className="text-center text-gray-500 italic select-none">ยังไม่มีประวัติ</p>
+      ):(
+        <ul className="space-y-4 w-full max-w-[92rem] mx-auto">
+          {filteredBookings.map((b, idx) => (
+            <li key={b.id} className={`bg-white border rounded-xl p-5 flex justify-between items-center border-l-8 ${getStatusColor(b)}`}>
+              {/* เลขลำดับแบบล่างขึ้นบน */}
+              <div className="flex items-center gap-2 pr-4">
+                <span className="w-8 h-8 flex items-center justify-center bg-emerald-200 text-emerald-700 font-bold rounded-full">
+                  {filteredBookings.length - idx}
+                </span>
+              </div>
 
-          {/* รายละเอียด booking */}
-          <div className="flex flex-col sm:grid sm:grid-cols-[200px_211px_125px_200px_115px_115px_115px] gap-2 sm:gap-x-6 text-gray-700 flex-grow">
-            <Label icon={<UserCheck className="w-4 h-4" />} text="ผู้ให้บริการ" />
-            <Label icon={<User className="w-4 h-4" />} text="ผู้มารับบริการ" />
-            <Label icon={<Phone className="w-4 h-4" />} text="เบอร์โทร" />
-            <Label icon={<UserCheck className="w-4 h-4" />} text="หมอนวด" />
-            <Label icon={<CalendarDays className="w-4 h-4" />} text="วันที่" />
-            <Label icon={<Clock className="w-4 h-4" />} text="ช่วงเวลา" />
-            <Label icon={<CheckCircle2 className="w-4 h-4" />} text="สถานะ" />
+              <div className="grid grid-cols-[200px_211px_125px_200px_120px_120px_120px] gap-x-6 text-gray-700 flex-grow">
+                <Label icon={<UserCheck className="w-4 h-4"/>} text="ผู้ให้บริการ"/>
+                <Label icon={<User className="w-4 h-4"/>} text="ผู้มารับบริการ"/>
+                <Label icon={<Phone className="w-4 h-4"/>} text="เบอร์โทร"/>
+                <Label icon={<UserCheck className="w-4 h-4"/>} text="หมอนวด"/>
+                <Label icon={<CalendarDays className="w-4 h-4"/>} text="วันที่"/>
+                <Label icon={<Clock className="w-4 h-4"/>} text="ช่วงเวลา"/>
+                <Label icon={<CheckCircle2 className="w-4 h-4"/>} text="สถานะ"/>
 
-            <span className="font-normal text-base">{b.provider}</span>
-            {editingNameId === b.id ? (
-              <div className="flex flex-col gap-1">
-                <input
-                  value={editingNameValue}
-                  onChange={(e) => setEditingNameValue(e.target.value)}
-                  className="w-full px-2 py-1 border border-gray-300 rounded-md text-gray-900"
-                  autoFocus
-                />
-                <div className="flex gap-2">
-                  <button
-                    onClick={async () => {
-                      if (editingNameValue.trim() && editingNameValue !== b.name) {
+                <span className="font-normal text-base">{b.provider}</span>
+                {editingNameId === b.id ? (
+                  <div className="flex flex-col gap-1">
+                    <input
+                      value={editingNameValue}
+                      onChange={(e) => setEditingNameValue(e.target.value)}
+                      className="w-full px-2 py-1 border border-gray-300 rounded-md text-gray-900"
+                      autoFocus
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={async () => {
+                          if (editingNameValue.trim() && editingNameValue !== b.name) {
+                            try {
+                              const res = await fetch(`/api/update-booking-name`, {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ id: b.id, name: editingNameValue })
+                              });
+                              const data = await res.json();
+                              if (data.success) {
+                                setBookings(prev => prev.map(x => x.id === b.id ? { ...x, name: editingNameValue } : x));
+                              } else {
+                                alert("ไม่สามารถอัปเดตชื่อได้");
+                              }
+                            } catch {
+                              alert("เกิดข้อผิดพลาด");
+                            }
+                          }
+                          setEditingNameId(null);
+                        }}
+                        className="px-2 py-1 text-xs bg-emerald-600 text-white rounded hover:bg-emerald-700 transition"
+                      >
+                        ยืนยัน
+                      </button>
+                      <button
+                        onClick={() => setEditingNameId(null)}
+                        className="px-2 py-1 text-xs bg-gray-300 text-gray-700 rounded hover:bg-gray-400 transition"
+                      >
+                        ยกเลิก
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <span
+                    className="font-normal text-base cursor-pointer"
+                    onClick={() => { setEditingNameId(b.id); setEditingNameValue(b.name); }}
+                  >
+                    {b.name}
+                  </span>
+                )}
+                <span className="font-normal text-base">{b.phone}</span>
+                <span className="font-normal text-base">{b.therapist}</span>
+                <span className="font-normal text-base">{new Date(b.date).toLocaleDateString("th-TH",{year:"numeric",month:"2-digit",day:"2-digit",timeZone:"Asia/Bangkok"})}</span>
+                <span className="font-normal text-base">{b.time_slot}</span>
+                <span className={`font-bold text-base ${
+                  b.status==="ยกเลิก"?"text-red-600":
+                  getStatusLabel(b)==="สำเร็จ"?"text-emerald-600":
+                  getStatusLabel(b)==="อยู่ในคิว"?"text-orange-600":"text-gray-600"
+                }`}>{getStatusLabel(b)}</span>
+              </div>
+              <div className="flex gap-2">
+                {/* สามารถปรับให้เช็ค role ได้ */}
+                {getStatusLabel(b) === "ยกเลิก" && (
+                  <Dialog.Root open={cancelDialogOpen && selectedId===b.id} onOpenChange={setCancelDialogOpen}>
+                    <Dialog.Trigger asChild>
+                      <motion.button
+                        whileHover={{scale:1.05}} whileTap={{scale:0.95}}
+                        onClick={()=>{setSelectedId(b.id); setCancelDialogOpen(true);}}
+                        className="px-4 py-2 rounded-md flex items-center gap-2 bg-gray-300 text-gray-600"
+                      >
+                        <FaTimes className="text-red-500"/>
+                        ยกเลิกแล้ว
+                      </motion.button>
+                    </Dialog.Trigger>
+                    <BookingDialog
+                      title="ต้องการลบรายการนี้หรือไม่?"
+                      color="red"
+                      booking={selectedBooking}
+                      onConfirm={async () => {
                         try {
-                          const res = await fetch(`/api/update-booking-name`, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ id: b.id, name: editingNameValue }),
-                          });
+                          const res = await fetch(`/api/all-bookings?id=${b.id}`, { method: "DELETE" });
                           const data = await res.json();
                           if (data.success) {
-                            setBookings((prev) =>
-                              prev.map((x) => (x.id === b.id ? { ...x, name: editingNameValue } : x))
-                            );
-                          } else {
-                            alert("ไม่สามารถอัปเดตชื่อได้");
-                          }
+                            setBookings(prev => prev.filter(x => x.id !== b.id));
+                            setSelectedId(null);
+                            setShowDeleteSuccess(true); // เพิ่มตรงนี้
+                            setTimeout(() => setShowDeleteSuccess(false), 3000); // ปิดหลัง 3 วินาที
+                          } else alert("เกิดข้อผิดพลาดในการลบรายการ");
                         } catch {
-                          alert("เกิดข้อผิดพลาด");
+                          alert("ไม่สามารถลบรายการได้");
                         }
-                      }
-                      setEditingNameId(null);
-                    }}
-                    className="px-2 py-1 text-xs bg-emerald-600 text-white rounded hover:bg-emerald-700 transition"
-                  >
-                    ยืนยัน
+                      }}
+                    />
+                  </Dialog.Root>
+                )}
+                {/* สามารถปรับให้เช็ค role ได้ */}
+                {getStatusLabel(b) === "รอดำเนินการ" && (
+                  <Dialog.Root>
+                    <Dialog.Trigger asChild>
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => setSelectedId(b.id)}
+                        className="flex items-center justify-center w-15 h-10 bg-emerald-600 rounded-md shadow hover:bg-emerald-700 transition"
+                      >
+                        <FaCheck className="text-white w-5 h-5" />
+                      </motion.button>
+                    </Dialog.Trigger>
+                    <BookingDialog
+                      title="ต้องการยืนยันรายการนี้หรือไม่?"
+                      color="emerald"
+                      booking={b}
+                      onConfirm={() => handleBookingAction("confirm")}
+                    />
+                  </Dialog.Root>
+                )}
+                {/* สามารถปรับให้เช็ค role ได้ */}
+                {(getStatusLabel(b) === "รอดำเนินการ" || getStatusLabel(b) === "อยู่ในคิว") && (
+                  <Dialog.Root>
+                    <Dialog.Trigger asChild>
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => setSelectedId(b.id)}
+                        className="flex items-center justify-center w-15 h-10 bg-red-500 rounded-md shadow hover:bg-red-600 transition"
+                      >
+                        <FaTimes className="text-white w-5 h-5" />
+                      </motion.button>
+                    </Dialog.Trigger>
+                    <BookingDialog
+                      title="ต้องการยกเลิกรายการนี้หรือไม่?"
+                      color="red"
+                      booking={b}
+                      onConfirm={() => handleBookingAction("cancel")}
+                    />
+                  </Dialog.Root>
+                )}
+
+                {/* ปุ่มสำเร็จแล้ว ไม่ต้องเช็ก role */}
+                {getStatusLabel(b) === "สำเร็จ" && (
+                  <button disabled className="px-4 py-2 rounded-md text-gray-600 flex items-center gap-2 bg-gray-300">
+                    <FaCheck className="text-emerald-600"/>
+                    สำเร็จแล้ว
                   </button>
-                  <button
-                    onClick={() => setEditingNameId(null)}
-                    className="px-2 py-1 text-xs bg-gray-300 text-gray-700 rounded hover:bg-gray-400 transition"
-                  >
-                    ยกเลิก
-                  </button>
-                </div>
+                )}
               </div>
-            ) : (
-              <span
-                className="font-normal text-base cursor-pointer"
-                onClick={() => {
-                  setEditingNameId(b.id);
-                  setEditingNameValue(b.name);
-                }}
-              >
-                {b.name}
-              </span>
-            )}
-            <span className="font-normal text-base">{b.phone}</span>
-            <span className="font-normal text-base">{b.therapist}</span>
-            <span className="font-normal text-base">
-              {new Date(b.date).toLocaleDateString("th-TH", {
-                year: "numeric",
-                month: "2-digit",
-                day: "2-digit",
-                timeZone: "Asia/Bangkok",
-              })}
-            </span>
-            <span className="font-normal text-base">{b.time_slot}</span>
-            <span
-              className={`font-bold text-base ${
-                b.status === "ยกเลิก"
-                  ? "text-red-600"
-                  : getStatusLabel(b) === "สำเร็จ"
-                  ? "text-emerald-600"
-                  : getStatusLabel(b) === "อยู่ในคิว"
-                  ? "text-orange-600"
-                  : "text-gray-600"
-              }`}
-            >
-              {getStatusLabel(b)}
-            </span>
-          </div>
-
-          {/* ปุ่ม action */}
-          <div className="flex gap-2 mt-2 sm:mt-0">
-            {getStatusLabel(b) === "ยกเลิก" && (
-              <Dialog.Root open={cancelDialogOpen && selectedId === b.id} onOpenChange={setCancelDialogOpen}>
-                <Dialog.Trigger asChild>
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => {
-                      setSelectedId(b.id);
-                      setCancelDialogOpen(true);
-                    }}
-                    className="px-4 py-2 rounded-md flex items-center gap-2 bg-gray-300 text-gray-600"
-                  >
-                    <FaTimes className="text-red-500" />
-                    ยกเลิกแล้ว
-                  </motion.button>
-                </Dialog.Trigger>
-                <BookingDialog
-                  title="ต้องการลบรายการนี้หรือไม่?"
-                  color="red"
-                  booking={selectedBooking}
-                  onConfirm={async () => {
-                    try {
-                      const res = await fetch(`/api/all-bookings?id=${b.id}`, { method: "DELETE" });
-                      const data = await res.json();
-                      if (data.success) {
-                        setBookings((prev) => prev.filter((x) => x.id !== b.id));
-                        setSelectedId(null);
-                        setShowDeleteSuccess(true);
-                        setTimeout(() => setShowDeleteSuccess(false), 3000);
-                      } else alert("เกิดข้อผิดพลาดในการลบรายการ");
-                    } catch {
-                      alert("ไม่สามารถลบรายการได้");
-                    }
-                  }}
-                />
-              </Dialog.Root>
-            )}
-
-            {getStatusLabel(b) === "รอดำเนินการ" && (
-              <Dialog.Root>
-                <Dialog.Trigger asChild>
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => setSelectedId(b.id)}
-                    className="flex items-center justify-center w-15 h-10 bg-emerald-600 rounded-md shadow hover:bg-emerald-700 transition"
-                  >
-                    <FaCheck className="text-white w-5 h-5" />
-                  </motion.button>
-                </Dialog.Trigger>
-                <BookingDialog title="ต้องการยืนยันรายการนี้หรือไม่?" color="emerald" booking={b} onConfirm={() => handleBookingAction("confirm")} />
-              </Dialog.Root>
-            )}
-
-            {(getStatusLabel(b) === "รอดำเนินการ" || getStatusLabel(b) === "อยู่ในคิว") && (
-              <Dialog.Root>
-                <Dialog.Trigger asChild>
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => setSelectedId(b.id)}
-                    className="flex items-center justify-center w-15 h-10 bg-red-500 rounded-md shadow hover:bg-red-600 transition"
-                  >
-                    <FaTimes className="text-white w-5 h-5" />
-                  </motion.button>
-                </Dialog.Trigger>
-                <BookingDialog title="ต้องการยกเลิกรายการนี้หรือไม่?" color="red" booking={b} onConfirm={() => handleBookingAction("cancel")} />
-              </Dialog.Root>
-            )}
-
-            {getStatusLabel(b) === "สำเร็จ" && (
-              <button disabled className="px-4 py-2 rounded-md text-gray-600 flex items-center gap-2 bg-gray-300">
-                <FaCheck className="text-emerald-600" />
-                สำเร็จแล้ว
-              </button>
-            )}
-          </div>
-        </li>
-      ))}
-    </ul>
-  </div>
-)}
-
+            </li>
+          ))}
+        </ul>
+      )}
       <AnimatePresence>
         {showCancelSuccess && <Toast key="cancel" message="ยกเลิกการจองสำเร็จ" />}
         {showConfirmSuccess && <Toast key="confirm" message="ยืนยันการจองสำเร็จ" />}

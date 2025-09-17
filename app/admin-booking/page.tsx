@@ -443,7 +443,7 @@ const handleAddPatient = async () => {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto p-6 pt-22 relative z-10">
+      <div className="max-w-6xl mx-auto p-6 pt-27 relative z-10">
         <motion.h1 initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="text-4xl font-extrabold text-emerald-700 mb-12 text-center drop-shadow-sm">
           เลือกหมอนวดและช่วงเวลา
         </motion.h1>

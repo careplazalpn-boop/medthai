@@ -349,12 +349,12 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
           </div>
         </div>
       </div>
-<h1 className="text-3xl sm:text-4xl font-extrabold text-emerald-700 mb-8 sm:mb-12 pt-10 text-center drop-shadow-sm">
+<h1 className="text-3xl sm:text-4xl font-extrabold text-emerald-700 mb-8 sm:mb-12 pt-15 text-center drop-shadow-sm">
   ประวัติการจอง
 </h1>
 
 {/* ฟิลเตอร์ */}
-<div className="max-w-6xl mx-auto mb-5 flex flex-wrap gap-4 items-end">
+<div className="max-w-6xl mx-auto mb-4 flex flex-wrap gap-4 items-end">
   <div className="w-full sm:w-[356px]">
     <label className="block text-emerald-700 font-semibold mb-2 text-lg">ผู้มารับบริการ:</label>
     <input 
@@ -464,7 +464,7 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
     {filteredBookings.map((b, idx) => (
       <li
         key={b.id}
-        className={`bg-white border rounded-xl p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center border-l-8 ${getStatusColor(
+        className={`bg-white border rounded-xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center border-l-8 ${getStatusColor(
           b
         )}`}
       >
@@ -476,7 +476,7 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
         </div>
 
         {/* ข้อมูล */}
-        <div className="grid grid-cols-1 sm:grid-cols-[200px_211px_125px_200px_120px_120px_120px] gap-y-2 sm:gap-x-6 text-gray-700 flex-grow w-full">
+        <div className="grid grid-cols-[200px_211px_130px_200px_120px_120px_120px] gap-x-6 text-gray-700 flex-grow">
           {/* ผู้ให้บริการ */}
           <div className="flex flex-col sm:flex-col gap-1">
             <Label icon={<UserCheck className="w-4 h-4" />} text="ผู้ให้บริการ" />

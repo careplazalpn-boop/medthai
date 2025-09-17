@@ -43,12 +43,12 @@ function BookingSummary({ attended, cancelled }: SummaryProps) {
   const cancelledPercent = total ? 100 - attendedPercent : 0;
 
   return (
-    <div className="flex gap-3">
+    <div className="flex flex-col sm:flex-row gap-4 sm:gap-3">
       <motion.div
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ duration: 0.5 }}
-        className="flex items-center gap-4 bg-emerald-50 text-emerald-900 rounded-xl p-4 shadow-sm border-2 border-emerald-200 min-w-[396px]"
+        className="flex items-center gap-4 bg-emerald-50 text-emerald-900 rounded-xl p-4 shadow-sm border-2 border-emerald-200 w-full sm:min-w-[396px]"
       >
         <Smile className="w-12 h-10 text-emerald-500 flex-shrink-0" />
         <div className="flex flex-col flex-grow justify-center">
@@ -69,11 +69,12 @@ function BookingSummary({ attended, cancelled }: SummaryProps) {
           </div>
         </div>
       </motion.div>
+
       <motion.div
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ duration: 0.5, delay: 0.1 }}
-        className="flex items-center gap-4 bg-red-50 text-red-900 rounded-xl p-4 shadow-sm border-2 border-red-200 min-w-[397px]"
+        className="flex items-center gap-4 bg-red-50 text-red-900 rounded-xl p-4 shadow-sm border-2 border-red-200 w-full sm:min-w-[397px]"
       >
         <Frown className="w-12 h-10 text-red-500 flex-shrink-0" />
         <div className="flex flex-col flex-grow justify-center">
@@ -304,8 +305,8 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
   if (error) return <p className="p-4 text-center text-red-600 font-semibold">Error: {error}</p>;
 
   return (
-    <div className="min-h-screen px-6 py-12 bg-gradient-to-br from-white to-emerald-50 relative">
-      <div className="max-w-[92rem] mx-auto relative">
+    <div className="min-h-screen px-4 sm:px-6 py-12 bg-gradient-to-br from-white to-emerald-50 relative">
+      <div className="max-w-[92rem] mx-auto relative flex flex-col gap-6">
         <div className="fixed top-0 left-0 w-full z-50 bg-emerald-600 shadow-md flex justify-between p-2">
           <motion.button
             whileHover={{ scale: 1.05 }}
@@ -456,7 +457,6 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
   </div>
 </div>
 
-      
 {filteredBookings.length === 0 ? (
   <p className="text-center text-gray-500 italic select-none">ยังไม่มีประวัติ</p>
 ) : (
@@ -464,25 +464,27 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
     {filteredBookings.map((b, idx) => (
       <li
         key={b.id}
-        className={`bg-white border rounded-xl p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center border-l-8 ${getStatusColor(b)}`}
+        className={`bg-white border rounded-xl p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center border-l-8 ${getStatusColor(
+          b
+        )}`}
       >
         {/* เลขลำดับ */}
-        <div className="flex items-center gap-2 mb-3 sm:mb-0 sm:pr-4">
+        <div className="flex items-center gap-2 pr-0 sm:pr-4 mb-3 sm:mb-0">
           <span className="w-8 h-8 flex items-center justify-center bg-emerald-200 text-emerald-700 font-bold rounded-full">
             {filteredBookings.length - idx}
           </span>
         </div>
 
-        {/* ข้อมูล booking */}
-        <div className="grid grid-cols-1 sm:grid-cols-[200px_211px_125px_200px_120px_120px_120px] gap-x-6 gap-y-2 w-full text-gray-700 flex-grow">
+        {/* ข้อมูล */}
+        <div className="grid grid-cols-1 sm:grid-cols-[200px_211px_125px_200px_120px_120px_120px] gap-y-2 sm:gap-x-6 text-gray-700 flex-grow w-full">
           {/* ผู้ให้บริการ */}
-          <div className="flex flex-col sm:flex-none gap-1">
+          <div className="flex flex-col sm:flex-col gap-1">
             <Label icon={<UserCheck className="w-4 h-4" />} text="ผู้ให้บริการ" />
             <span className="font-normal text-base">{b.provider}</span>
           </div>
 
           {/* ผู้มารับบริการ */}
-          <div className="flex flex-col sm:flex-none gap-1">
+          <div className="flex flex-col sm:flex-col gap-1">
             <Label icon={<User className="w-4 h-4" />} text="ผู้มารับบริการ" />
             {editingNameId === b.id ? (
               <div className="flex flex-col gap-1">
@@ -542,19 +544,19 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
           </div>
 
           {/* เบอร์โทร */}
-          <div className="flex flex-col sm:flex-none gap-1">
+          <div className="flex flex-col sm:flex-col gap-1">
             <Label icon={<Phone className="w-4 h-4" />} text="เบอร์โทร" />
             <span className="font-normal text-base">{b.phone}</span>
           </div>
 
           {/* หมอนวด */}
-          <div className="flex flex-col sm:flex-none gap-1">
+          <div className="flex flex-col sm:flex-col gap-1">
             <Label icon={<UserCheck className="w-4 h-4" />} text="หมอนวด" />
             <span className="font-normal text-base">{b.therapist}</span>
           </div>
 
           {/* วันที่ */}
-          <div className="flex flex-col sm:flex-none gap-1">
+          <div className="flex flex-col sm:flex-col gap-1">
             <Label icon={<CalendarDays className="w-4 h-4" />} text="วันที่" />
             <span className="font-normal text-base">
               {new Date(b.date).toLocaleDateString("th-TH", {
@@ -567,13 +569,13 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
           </div>
 
           {/* ช่วงเวลา */}
-          <div className="flex flex-col sm:flex-none gap-1">
+          <div className="flex flex-col sm:flex-col gap-1">
             <Label icon={<Clock className="w-4 h-4" />} text="ช่วงเวลา" />
             <span className="font-normal text-base">{b.time_slot}</span>
           </div>
 
           {/* สถานะ */}
-          <div className="flex flex-col sm:flex-none gap-1">
+          <div className="flex flex-col sm:flex-col gap-1">
             <Label icon={<CheckCircle2 className="w-4 h-4" />} text="สถานะ" />
             <span
               className={`font-bold text-base ${
@@ -593,51 +595,90 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
 
         {/* ปุ่ม action */}
         <div className="flex gap-2 mt-3 sm:mt-0">
-          {/* ปุ่มยกเลิก */}
-          {(getStatusLabel(b) === "รอดำเนินการ" || getStatusLabel(b) === "อยู่ในคิว") && (
-            <Dialog.Root>
+          {getStatusLabel(b) === "ยกเลิก" && (
+            <Dialog.Root open={cancelDialogOpen && selectedId === b.id} onOpenChange={setCancelDialogOpen}>
               <Dialog.Trigger asChild>
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  onClick={() => setSelectedId(b.id)}
-                  className="flex items-center justify-center w-15 h-10 bg-red-500 rounded-md shadow hover:bg-red-600 transition"
+                  onClick={() => {
+                    setSelectedId(b.id);
+                    setCancelDialogOpen(true);
+                  }}
+                  className="px-4 py-2 rounded-md flex items-center gap-2 bg-gray-300 text-gray-600"
                 >
-                  <FaTimes className="text-white w-5 h-5" />
+                  <FaTimes className="text-red-500" />
+                  ยกเลิกแล้ว
                 </motion.button>
               </Dialog.Trigger>
               <BookingDialog
-                title="ต้องการยกเลิกรายการนี้หรือไม่?"
+                title="ต้องการลบรายการนี้หรือไม่?"
                 color="red"
-                booking={b}
-                onConfirm={() => handleBookingAction("cancel")}
+                booking={selectedBooking}
+                onConfirm={async () => {
+                  try {
+                    const res = await fetch(`/api/all-bookings?id=${b.id}`, { method: "DELETE" });
+                    const data = await res.json();
+                    if (data.success) {
+                      setBookings((prev) => prev.filter((x) => x.id !== b.id));
+                      setSelectedId(null);
+                      setShowDeleteSuccess(true);
+                      setTimeout(() => setShowDeleteSuccess(false), 3000);
+                    } else alert("เกิดข้อผิดพลาดในการลบรายการ");
+                  } catch {
+                    alert("ไม่สามารถลบรายการได้");
+                  }
+                }}
               />
             </Dialog.Root>
           )}
 
-          {/* ปุ่มยืนยัน */}
-          {getStatusLabel(b) === "รอดำเนินการ" && (
-            <Dialog.Root>
-              <Dialog.Trigger asChild>
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setSelectedId(b.id)}
-                  className="flex items-center justify-center w-15 h-10 bg-emerald-600 rounded-md shadow hover:bg-emerald-700 transition"
-                >
-                  <FaCheck className="text-white w-5 h-5" />
-                </motion.button>
-              </Dialog.Trigger>
-              <BookingDialog
-                title="ต้องการยืนยันรายการนี้หรือไม่?"
-                color="emerald"
-                booking={b}
-                onConfirm={() => handleBookingAction("confirm")}
-              />
-            </Dialog.Root>
+          {(getStatusLabel(b) === "รอดำเนินการ" || getStatusLabel(b) === "อยู่ในคิว") && (
+            <>
+              {/* ยืนยัน */}
+              {getStatusLabel(b) === "รอดำเนินการ" && (
+                <Dialog.Root>
+                  <Dialog.Trigger asChild>
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => setSelectedId(b.id)}
+                      className="flex items-center justify-center w-15 h-10 bg-emerald-600 rounded-md shadow hover:bg-emerald-700 transition"
+                    >
+                      <FaCheck className="text-white w-5 h-5" />
+                    </motion.button>
+                  </Dialog.Trigger>
+                  <BookingDialog
+                    title="ต้องการยืนยันรายการนี้หรือไม่?"
+                    color="emerald"
+                    booking={b}
+                    onConfirm={() => handleBookingAction("confirm")}
+                  />
+                </Dialog.Root>
+              )}
+
+              {/* ยกเลิก */}
+              <Dialog.Root>
+                <Dialog.Trigger asChild>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setSelectedId(b.id)}
+                    className="flex items-center justify-center w-15 h-10 bg-red-500 rounded-md shadow hover:bg-red-600 transition"
+                  >
+                    <FaTimes className="text-white w-5 h-5" />
+                  </motion.button>
+                </Dialog.Trigger>
+                <BookingDialog
+                  title="ต้องการยกเลิกรายการนี้หรือไม่?"
+                  color="red"
+                  booking={b}
+                  onConfirm={() => handleBookingAction("cancel")}
+                />
+              </Dialog.Root>
+            </>
           )}
 
-          {/* ปุ่มสำเร็จ */}
           {getStatusLabel(b) === "สำเร็จ" && (
             <button
               disabled

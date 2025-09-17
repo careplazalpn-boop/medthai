@@ -353,7 +353,7 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
 </h1>
 
 {/* ฟิลเตอร์ */}
-<div className="max-w-6xl mx-auto mb-4 flex flex-wrap gap-4 items-end">
+<div className="max-w-6xl mx-auto mb-5 flex flex-wrap gap-4 items-end">
   <div className="w-full sm:w-[356px]">
     <label className="block text-emerald-700 font-semibold mb-2 text-lg">ผู้มารับบริการ:</label>
     <input 
@@ -425,7 +425,7 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
 
 {/* วันที่ + ช่วงเวลา + BookingSummary */}
 <div className="max-w-6xl mx-auto mb-5 flex flex-wrap gap-4 items-end">
-  <div className="w-full sm:w-[165px]">
+  <div className="w-full sm:w-[150px]">
     <label className="block text-emerald-700 font-semibold mb-2 text-lg">วันที่:</label>
     <input 
       type="date" 
@@ -455,7 +455,6 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
     <BookingSummary attended={attendedBookings} cancelled={cancelledBookings} />
   </div>
 </div>
-
       
 {filteredBookings.length === 0 ? (
   <p className="text-center text-gray-500 italic select-none">ยังไม่มีประวัติ</p>

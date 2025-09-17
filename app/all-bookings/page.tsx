@@ -353,8 +353,8 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
 </h1>
 
 {/* ฟิลเตอร์ */}
-<div className="max-w-6xl mx-auto mb-5 flex flex-col sm:flex-row sm:flex-wrap gap-4 items-start sm:items-end">
-  <div className="w-full sm:min-w-[356px]">
+<div className="max-w-6xl mx-auto mb-5 flex flex-wrap gap-4 items-end">
+  <div className="w-full sm:w-[356px]">
     <label className="block text-emerald-700 font-semibold mb-2 text-lg">ผู้มารับบริการ:</label>
     <input 
       type="text" 
@@ -365,7 +365,7 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
     />
   </div>
 
-  <div className="w-full sm:min-w-[256px]">
+  <div className="w-full sm:w-[256px]">
     <label className="block text-emerald-700 font-semibold mb-2 text-lg">ผู้ให้บริการ:</label>
     <select 
       value={filterProvider} 
@@ -377,7 +377,7 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
     </select>
   </div>
 
-  <div className="w-full sm:min-w-[256px]">
+  <div className="w-full sm:w-[256px]">
     <label className="block text-emerald-700 font-semibold mb-2 text-lg">หมอนวด:</label>
     <select 
       value={filterTherapist} 
@@ -389,7 +389,7 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
     </select>
   </div>
 
-  <div className="w-full sm:min-w-[150px]">
+  <div className="w-full sm:w-[150px]">
     <label className="block text-emerald-700 font-semibold mb-2 text-lg">สถานะ:</label>
     <select 
       value={filterStatus} 
@@ -404,7 +404,7 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
     </select>
   </div>
 
-  <div className="flex w-full sm:w-auto items-start sm:items-end mt-2 sm:mt-0">
+  <div className="flex w-full sm:w-auto items-end">
     <motion.button 
       whileHover={{scale:1.05}} 
       whileTap={{scale:0.95}}
@@ -424,8 +424,8 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
 </div>
 
 {/* วันที่ + ช่วงเวลา + BookingSummary */}
-<div className="max-w-6xl mx-auto mb-5 flex flex-col sm:flex-row sm:flex-wrap gap-4 items-start sm:items-end">
-  <div className="w-full sm:min-w-[150px]">
+<div className="max-w-6xl mx-auto mb-5 flex flex-wrap gap-4 items-end">
+  <div className="w-full sm:w-[150px]">
     <label className="block text-emerald-700 font-semibold mb-2 text-lg">วันที่:</label>
     <input 
       type="date" 
@@ -439,7 +439,7 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
     />
   </div>
 
-  <div className="w-full sm:min-w-[150px]">
+  <div className="w-full sm:w-[150px]">
     <label className="block text-emerald-700 font-semibold mb-2 text-lg">ช่วงเวลา:</label>
     <select 
       value={filterTimeSlot} 
@@ -451,7 +451,7 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
     </select>
   </div>
 
-  <div className="w-full sm:flex-1 mt-4 sm:mt-0">
+  <div className="w-full sm:flex-1">
     <BookingSummary attended={attendedBookings} cancelled={cancelledBookings} />
   </div>
 </div>

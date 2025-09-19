@@ -13,6 +13,9 @@ interface Booking {
   id: number;
   provider: string;
   name: string;
+  pname?: string;
+  fname?: string;
+  lname?: string;
   phone: string;
   therapist: string;
   time_slot: string;
@@ -113,6 +116,10 @@ export default function AllBookingsPage() {
   const [showDeleteSuccess, setShowDeleteSuccess] = useState(false);
   const [editingNameId, setEditingNameId] = useState<number | null>(null);
   const [editingNameValue, setEditingNameValue] = useState<string>("");
+  const [editingPnameValue, setEditingPnameValue] = useState("");
+  const [editingFnameValue, setEditingFnameValue] = useState("");
+  const [editingLnameValue, setEditingLnameValue] = useState("");
+
   
   const [filterName, setFilterName] = useState("");
   const [filterTherapist, setFilterTherapist] = useState("all");
@@ -306,49 +313,51 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
 
   return (
     <div className="min-h-screen px-4 sm:px-6 py-12 bg-gradient-to-br from-white to-emerald-50 relative">
-      <div className="max-w-[92rem] mx-auto relative flex flex-col gap-6">
-        <div className="fixed top-0 left-0 w-full z-50 bg-emerald-600 shadow-md flex justify-between p-2">
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => router.back()}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow transition"
-          >
-            <ChevronLeft className="w-5 h-5" />
-            ย้อนกลับ
-          </motion.button>
+<div className="fixed top-0 left-0 w-full z-50 bg-emerald-600 shadow-md flex justify-between p-2">
+  {/* กลุ่มปุ่มซ้าย */}
+  <div className="flex gap-2">
+    <motion.button
+      whileHover={{ scale: 1.05 }}
+      whileTap={{ scale: 0.95 }}
+      onClick={() => router.back()}
+      className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow transition"
+    >
+      <ChevronLeft className="w-5 h-5" />
+      ย้อนกลับ
+    </motion.button>
 
-          <div className="flex gap-2">
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={exportToExcel}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow transition"
-            >
-              {/* ไอคอน Excel */}
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="w-5 h-5 text-green-600"
-                fill="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path d="M19 2H8a2 2 0 0 0-2 2v4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-1h1a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2h-1V2zM8 4h11v16H5V8h1v-2zM7 10h10v2H7v-2zm0 4h10v2H7v-2z"/>
-              </svg>
-              Export Excel
-            </motion.button>
+    <motion.button
+      whileHover={{ scale: 1.05 }}
+      whileTap={{ scale: 0.95 }}
+      onClick={() => router.push("/")}
+      className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow transition"
+    >
+      <Home className="w-5 h-5" />
+      หน้าแรก
+    </motion.button>
+  </div>
 
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => router.push("/")}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow transition"
-            >
-              <Home className="w-5 h-5" />
-              หน้าแรก
-            </motion.button>
-          </div>
-        </div>
-      </div>
+  {/* กลุ่มปุ่มขวา */}
+  <div className="flex gap-2">
+    <motion.button
+      whileHover={{ scale: 1.05 }}
+      whileTap={{ scale: 0.95 }}
+      onClick={exportToExcel}
+      className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow transition"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        className="w-5 h-5 text-green-600"
+        fill="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path d="M19 2H8a2 2 0 0 0-2 2v4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-1h1a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2h-1V2zM8 4h11v16H5V8h1v-2zM7 10h10v2H7v-2zm0 4h10v2H7v-2z"/>
+      </svg>
+      Export Excel
+    </motion.button>
+  </div>
+</div>
+
 <h1 className="text-3xl sm:text-4xl font-extrabold text-emerald-700 mb-8 sm:mb-12 pt-15 text-center drop-shadow-sm">
   ประวัติการจอง
 </h1>
@@ -482,38 +491,80 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
             <Label icon={<UserCheck className="w-4 h-4" />} text="ผู้ให้บริการ" />
             <span className="font-normal text-base">{b.provider}</span>
           </div>
-
           {/* ผู้มารับบริการ */}
           <div className="flex flex-col sm:flex-col gap-1">
             <Label icon={<User className="w-4 h-4" />} text="ผู้มารับบริการ" />
             {editingNameId === b.id ? (
               <div className="flex flex-col gap-1">
-                <input
-                  value={editingNameValue}
-                  onChange={(e) => setEditingNameValue(e.target.value)}
-                  className="w-full px-2 py-1 border border-gray-300 rounded-md text-gray-900"
-                  autoFocus
-                />
-                <div className="flex gap-2">
+                {/* Input 3 ช่อง */}
+                <div className="flex flex-col sm:flex-row gap-1">
+                  <input
+                    placeholder="คำนำหน้า"
+                    value={editingPnameValue}
+                    onChange={(e) => setEditingPnameValue(e.target.value)}
+                    className="px-2 py-1 border border-gray-300 rounded-md text-gray-900 w-19"
+                    autoFocus
+                  />
+                  <input
+                    placeholder="ชื่อจริง"
+                    value={editingFnameValue}
+                    onChange={(e) => setEditingFnameValue(e.target.value)}
+                    className="px-2 py-1 border border-gray-300 rounded-md text-gray-900 w-19"
+                  />
+                  <input
+                    placeholder="นามสกุล"
+                    value={editingLnameValue}
+                    onChange={(e) => setEditingLnameValue(e.target.value)}
+                    className="px-2 py-1 border border-gray-300 rounded-md text-gray-900 w-19"
+                  />
+                </div>
+                {/* ปุ่มยืนยัน/ยกเลิก */}
+                <div className="flex gap-2 mt-1">
                   <button
                     onClick={async () => {
-                      if (editingNameValue.trim() && editingNameValue !== b.name) {
+                      // รวม pname+fname ติดกัน ตามด้วย lname
+                      const fullName = [editingPnameValue + editingFnameValue, editingLnameValue]
+                        .filter(Boolean)
+                        .join(" ");
+
+                      if (
+                        fullName &&
+                        (editingPnameValue !== b.pname ||
+                        editingFnameValue !== b.fname ||
+                        editingLnameValue !== b.lname)
+                      ) {
                         try {
                           const res = await fetch(`/api/update-booking-name`, {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ id: b.id, name: editingNameValue }),
+                            body: JSON.stringify({
+                              id: b.id,
+                              pname: editingPnameValue,
+                              fname: editingFnameValue,
+                              lname: editingLnameValue,
+                            }),
                           });
                           const data = await res.json();
                           if (data.success) {
+                            // แสดง fullname หลังอัปเดต
                             setBookings((prev) =>
-                              prev.map((x) => (x.id === b.id ? { ...x, name: editingNameValue } : x))
+                              prev.map((x) =>
+                                x.id === b.id
+                                  ? {
+                                      ...x,
+                                      name: fullName,
+                                      pname: editingPnameValue,
+                                      fname: editingFnameValue,
+                                      lname: editingLnameValue,
+                                    }
+                                  : x
+                              )
                             );
                           } else {
-                            alert("ไม่สามารถอัปเดตชื่อได้");
+                            alert("ไม่สามารถอัปเดตชื่อได้: " + data.error);
                           }
-                        } catch {
-                          alert("เกิดข้อผิดพลาด");
+                        } catch (err) {
+                          alert("เกิดข้อผิดพลาด: " + err);
                         }
                       }
                       setEditingNameId(null);
@@ -522,6 +573,7 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
                   >
                     ยืนยัน
                   </button>
+
                   <button
                     onClick={() => setEditingNameId(null)}
                     className="px-2 py-1 text-xs bg-gray-300 text-gray-700 rounded hover:bg-gray-400 transition"
@@ -535,14 +587,16 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
                 className="font-normal text-base cursor-pointer"
                 onClick={() => {
                   setEditingNameId(b.id);
-                  setEditingNameValue(b.name);
+                  // แสดงข้อมูลเดิมก่อนแก้ไข
+                  setEditingPnameValue(b.pname ?? "");
+                  setEditingFnameValue(b.fname ?? "");
+                  setEditingLnameValue(b.lname ?? "");
                 }}
               >
                 {b.name}
               </span>
             )}
           </div>
-
           {/* เบอร์โทร */}
           <div className="flex flex-col sm:flex-col gap-1">
             <Label icon={<Phone className="w-4 h-4" />} text="เบอร์โทร" />

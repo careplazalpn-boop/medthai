@@ -94,56 +94,69 @@ export default function HomePage() {
   return (
     <div className="min-h-screen relative flex flex-col justify-center items-center p-8 overflow-hidden">
       <BackgroundDecoration />
+{/* แถบเมนูบนสุด */}
+<div className="fixed top-0 left-0 w-full z-50 bg-emerald-600 shadow-md flex items-center justify-between p-2">
+  {/* ปุ่มซ้าย (เฉพาะ admin) */}
+  {user?.role === "admin" && (
+    <motion.button
+      whileHover={{ scale: 1.05 }}
+      whileTap={{ scale: 0.95 }}
+      onClick={() => router.push("/manage-therapists")}
+      className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow transition"
+      title="จัดการหมอ"
+    >
+      🧑‍⚕️
+      <span>จัดการหมอ</span>
+    </motion.button>
+  )}
 
-      {/* แถบเมนูขวาบน */}
-      <div className="max-w-[92rem] mx-auto relative w-full">
-        {/* แถบเมนูบนสุด */}
-        <div className="fixed top-0 left-0 w-full z-50 bg-emerald-600 shadow-md flex justify-end p-2 gap-3">
-          {user ? (
-            <>
-              <span className="text-white font-semibold text-lg self-center">
-                สวัสดี {user.name}!
-              </span>
+  {/* ปุ่มขวา */}
+  <div className="flex gap-3 items-center ml-auto">
+    {user ? (
+      <>
+        <span className="text-white font-semibold text-lg self-center">
+          สวัสดี {user.name}!
+        </span>
 
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => {
-                  const isAdminLike = user?.role === "admin" || user?.role === "user";
-                  router.push(isAdminLike ? "/all-bookings" : "/booking-history");
-                }}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow transition"
-                title={user?.role === "admin" || user?.role === "user" ? "ประวัติการจอง" : "ประวัติการจอง"}
-              >
-                <FaHistory className="w-5 h-5" />
-                <span>{user?.role === "admin" || user?.role === "user" ? "ประวัติการจอง" : "ประวัติการจอง"}</span>
-              </motion.button>
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => {
+            const isAdminLike = user?.role === "admin" || user?.role === "user";
+            router.push(isAdminLike ? "/all-bookings" : "/booking-history");
+          }}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow transition"
+          title="ประวัติการจอง"
+        >
+          <FaHistory className="w-5 h-5" />
+          <span>ประวัติการจอง</span>
+        </motion.button>
 
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={handleLogout}
-                className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg shadow font-semibold"
-                title="ออกจากระบบ"
-              >
-                <FaSignOutAlt className="w-5 h-5" />
-                <span>ออกจากระบบ</span>
-              </motion.button>
-            </>
-          ) : (
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => router.push("/login")}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow transition"
-              title="เข้าสู่ระบบ"
-            >
-              <FaSignInAlt className="w-5 h-5" />
-              <span>เข้าสู่ระบบ</span>
-            </motion.button>
-          )}
-        </div>
-      </div>
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={handleLogout}
+          className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg shadow font-semibold"
+          title="ออกจากระบบ"
+        >
+          <FaSignOutAlt className="w-5 h-5" />
+          <span>ออกจากระบบ</span>
+        </motion.button>
+      </>
+    ) : (
+      <motion.button
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+        onClick={() => router.push("/login")}
+        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow transition"
+        title="เข้าสู่ระบบ"
+      >
+        <FaSignInAlt className="w-5 h-5" />
+        <span>เข้าสู่ระบบ</span>
+      </motion.button>
+    )}
+  </div>
+</div>
 
       <motion.h1
         initial={{ opacity: 0, y: -20 }}

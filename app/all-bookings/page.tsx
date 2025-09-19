@@ -115,7 +115,6 @@ export default function AllBookingsPage() {
   const [showConfirmSuccess, setShowConfirmSuccess] = useState(false);
   const [showDeleteSuccess, setShowDeleteSuccess] = useState(false);
   const [editingNameId, setEditingNameId] = useState<number | null>(null);
-  const [editingNameValue, setEditingNameValue] = useState<string>("");
   const [editingPnameValue, setEditingPnameValue] = useState("");
   const [editingFnameValue, setEditingFnameValue] = useState("");
   const [editingLnameValue, setEditingLnameValue] = useState("");

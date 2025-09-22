@@ -21,12 +21,15 @@ export const metadata: Metadata = {
 // Props interface สำหรับ RootLayout
 interface LayoutProps {
   children: React.ReactNode;
-  eaDir?: string; // optional เพื่อไม่ให้เกิด error
+  eaDir: string; // ไม่ optional เพื่อให้ตรงกับ type ของ Next.js
 }
 
-export default function RootLayout({ children, eaDir }: LayoutProps) {
+export default function RootLayout({
+  children,
+  eaDir = "ltr", // กำหนด default value
+}: LayoutProps) {
   return (
-    <html lang="en" dir={eaDir ?? "ltr"}>
+    <html lang="en" dir={eaDir}>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >

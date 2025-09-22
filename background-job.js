@@ -1,22 +1,9 @@
 import fetch from "node-fetch";
 import dotenv from "dotenv";
-import mysql from "mysql2/promise";
+import pool from '../dbconnection/db';
 import cron from "node-cron";
 
 dotenv.config();
-
-const API_URL = process.env.API_URL || "https://medthai.lmwcc.synology.me/api/all-bookings"; 
-
-// สร้าง connection pool ของ MySQL
-const pool = mysql.createPool({
-  host: process.env.DB_HOST || "lmwcc.synology.me",
-  user: process.env.DB_USER || "medthai",
-  password: process.env.DB_PASS || "I4FEtUu*-uB-hAK0",
-  database: process.env.DB_NAME || "medthai",
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-});
 
 // ----------------- Helper -----------------
 function getTodayTH() {
@@ -100,8 +87,12 @@ let todayDate = getTodayTH();
 async function callApi(slotLabel) {
   try {
     await new Promise(res => setTimeout(res, 2000));
-    const res = await fetch(API_URL);
-    const data = await res.json();
+    if (!process.env.API_URL) {
+      throw new Error("Missing API_URL in environment variables");
+    }
+    const res = await fetch(process.env.API_URL);
+
+    await res.json();
     console.log(`[${new Date().toLocaleString("en-CA", { timeZone: "Asia/Bangkok" })}] called /api/all-bookings for slot ${slotLabel}`);
   } catch (err) {
     console.error(`[${new Date().toLocaleString("en-CA", { timeZone: "Asia/Bangkok" })}] Error calling /api/all-bookings`, err);

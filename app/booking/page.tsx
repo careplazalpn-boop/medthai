@@ -21,7 +21,7 @@ interface BookingInfo {
   name: string;
 }
 
-export default function AdminBookingPage() {
+export default function BookingPage() {
   const router = useRouter();
   const { user } = useContext(AuthContext);
 
@@ -327,26 +327,26 @@ export default function AdminBookingPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-white to-emerald-100 relative overflow-hidden">
-      <div className="fixed top-0 left-0 w-full z-50 bg-emerald-600 shadow-md flex justify-between p-2">
+      <div className="fixed top-0 left-0 w-full z-50 bg-emerald-600 shadow-md flex flex-wrap sm:flex-nowrap justify-between p-2 gap-2">
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={() => router.push("/")}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow transition"
+          className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-1 sm:py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow text-sm sm:text-base transition"
         >
-          <Home className="w-5 h-5" /> หน้าแรก
+          <Home className="w-4 h-4 sm:w-5 sm:h-5" /> หน้าแรก
         </motion.button>
 
-        <div className="flex gap-2">
+        <div className="flex gap-1 sm:gap-2 flex-wrap sm:flex-nowrap">
           {user?.role === "admin" && (
             <>
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setAddPatientDialog(true)}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow transition"
+                className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-1 sm:py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow text-sm sm:text-base transition"
               >
-                มี HN แต่หาไม่เจอ
+                HN ?
               </motion.button>
               <Dialog.Root
                 open={addPatientDialog}
@@ -457,9 +457,9 @@ export default function AdminBookingPage() {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => router.push("/all-bookings")}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow transition"
+              className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-1 sm:py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow text-sm sm:text-base transition"
             >
-              <FaHistory className="w-5 h-5" /> ประวัติการจอง
+              <FaHistory className="w-4 h-4 sm:w-5 sm:h-5" /> ประวัติการจอง
             </motion.button>
           )}
         </div>

@@ -1,12 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import mysql from "mysql2/promise";
-
-const pool = mysql.createPool({
-  host: "lmwcc.synology.me",
-  user: "medthai",
-  password: "I4FEtUu*-uB-hAK0",
-  database: "medthai",
-});
+import pool from '../dbconnection/db';
 
 export async function POST(req: NextRequest) {
   try {

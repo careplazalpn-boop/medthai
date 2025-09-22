@@ -83,7 +83,7 @@ export default function HomePage() {
       return;
     }
     const isAdminLike = user.role === "admin" || user.role === "user";
-    router.push(isAdminLike ? "/admin-booking" : "/booking");
+    router.push(isAdminLike ? "/booking" : "/booking");
   };
 
   const handleLogout = () => {
@@ -98,16 +98,16 @@ export default function HomePage() {
 <div className="fixed top-0 left-0 w-full z-50 bg-emerald-600 shadow-md flex items-center justify-between p-2">
   {/* ปุ่มซ้าย (เฉพาะ admin) */}
   {user?.role === "admin" && (
-    <motion.button
-      whileHover={{ scale: 1.05 }}
-      whileTap={{ scale: 0.95 }}
-      onClick={() => router.push("/manage-therapists")}
-      className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow transition"
-      title="จัดการหมอ"
-    >
-      🧑‍⚕️
-      <span>จัดการหมอ</span>
-    </motion.button>
+  <motion.button
+    whileHover={{ scale: 1.05 }}
+    whileTap={{ scale: 0.95 }}
+    onClick={() => router.push("/manage-therapists")}
+    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow transition"
+    title="จัดการหมอ"
+  >
+    🧑‍⚕️
+    <span>จัดการหมอ</span>
+  </motion.button>
   )}
 
   {/* ปุ่มขวา */}
@@ -166,17 +166,30 @@ export default function HomePage() {
       >
         ศูนย์บริการสาธารณสุข <br /> เทศบาลเมืองลำพูน
       </motion.h1>
-
-      <motion.button
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        onClick={handleBookingClick}
-        className="flex items-center space-x-3 px-10 py-4 bg-emerald-600 text-white rounded-full text-2xl font-semibold shadow-lg transition z-10"
-        title="จองคิวนวดแผนไทย"
-      >
-        <FaSpa size={30} />
-        <span>จองคิวนวดแผนไทย</span>
-      </motion.button>
+      
+      {user ? (
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={handleBookingClick}
+          className="flex items-center space-x-3 px-10 py-4 bg-emerald-600 text-white rounded-full text-2xl font-semibold shadow-lg transition z-10"
+          title="จองคิวนวดแผนไทย"
+        >
+          <FaSpa size={30} />
+          <span>จองคิวนวดแผนไทย</span>
+        </motion.button>
+      ) : (
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => router.push("/booking")}
+          className="flex items-center space-x-3 px-10 py-4 bg-gray-500 text-white rounded-full text-2xl font-semibold shadow-lg transition z-10"
+          title="ดูคิวจองนวดแผนไทย"
+        >
+          <FaSpa size={30} />
+          <span>ดูคิวจองนวดแผนไทย</span>
+        </motion.button>
+      )}
 
       <AnimatePresence>
         {showAlert && (

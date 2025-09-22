@@ -71,7 +71,7 @@ export default function LoginPage() {
           <FaUser className="absolute left-4 text-emerald-500" />
           <input
             type="text"
-            placeholder="ชื่อผู้ใช้"manage-therapists
+            placeholder="ชื่อผู้ใช้"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             className="w-full p-4 pl-12 rounded-xl focus:outline-none text-gray-800"

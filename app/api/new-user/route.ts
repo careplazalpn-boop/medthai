@@ -1,16 +1,6 @@
 // app/api/new-user/route.ts
 import { NextResponse } from "next/server";
-import mysql from "mysql2/promise";
-
-const pool = mysql.createPool({
-  host: "lmwcc.synology.me",
-  user: "medthai",
-  password: "I4FEtUu*-uB-hAK0",
-  database: "medthai",
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-});
+import pool from '../dbconnection/db';
 
 export async function POST(request: Request) {
   try {

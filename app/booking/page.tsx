@@ -13,7 +13,7 @@ interface UserInfo {
   hn?: string;
   name: string;
   phone: string;
-  id_card_number?: string; // เพิ่ม id_card_number
+  id_card_number?: string;
 }
 
 interface BookingInfo {
@@ -24,6 +24,8 @@ interface BookingInfo {
 export default function AdminBookingPage() {
   const router = useRouter();
   const { user } = useContext(AuthContext);
+
+  const isGuest = !user;
 
   const [idCardNumber, setIdCardNumber] = useState("");
   const [therapists, setTherapists] = useState<string[]>([]);
@@ -44,7 +46,7 @@ export default function AdminBookingPage() {
   const [dialogTherapist, setDialogTherapist] = useState("");
   const [offTherapists, setOffTherapists] = useState<string[]>([]);
   const [addPatientDialog, setAddPatientDialog] = useState(false);
-  const [noHN, setNoHN] = useState(false); // true = ซ่อน HN
+  const [noHN, setNoHN] = useState(false);
   const [hn, setHn] = useState("");
   const [patientPrefix, setPatientPrefix] = useState("");
   const [patientFirstName, setPatientFirstName] = useState("");
@@ -57,32 +59,33 @@ export default function AdminBookingPage() {
     return () => clearTimeout(timer);
   }, [showAlert]);
 
+  // ❌ ตัด redirect ออก
+  // useEffect(() => {
+  //   if (!user) router.push("/login");
+  // }, [user, router]);
+
   useEffect(() => {
-    if (!user) router.push("/login");
-  }, [user, router]);
+    const savedDate = localStorage.getItem("selectedDate");
+    if (savedDate) {
+      const today = new Date();
+      const todayLocal = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const [year, month, day] = savedDate.split("-").map(Number);
+      const selected = new Date(year, month - 1, day);
 
-useEffect(() => {
-  const savedDate = localStorage.getItem("selectedDate");
-  if (savedDate) {
-    const today = new Date();
-    const todayLocal = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const [year, month, day] = savedDate.split("-").map(Number);
-    const selected = new Date(year, month - 1, day);
-
-    if (selected.getTime() < todayLocal.getTime()) {
-      localStorage.removeItem("selectedDate"); // ลบถ้าเก่า
-      setDate(""); // ให้ input ว่าง
-    } else {
-      setDate(savedDate); // เอาค่าที่ถูกต้อง
+      if (selected.getTime() < todayLocal.getTime()) {
+        localStorage.removeItem("selectedDate");
+        setDate("");
+      } else {
+        setDate(savedDate);
+      }
     }
-  }
-}, []);
+  }, []);
 
   useEffect(() => {
-  fetch("/api/med-staff")
-    .then(res => res.json())
-    .then(data => data.success && setMedStaff(data.staff.map((s: any) => s.name)))
-    .catch(() => setMedStaff([]));
+    fetch("/api/med-staff")
+      .then(res => res.json())
+      .then(data => data.success && setMedStaff(data.staff.map((s: any) => s.name)))
+      .catch(() => setMedStaff([]));
   }, []);
 
   useEffect(() => {
@@ -106,22 +109,22 @@ useEffect(() => {
       return;
     }
 
-fetch(`/api/bookings?date=${encodeURIComponent(date)}`)
-  .then(res => res.json())
-  .then(data => {
-    if (data.success) {
-      const grouped: Record<string, BookingInfo[]> = {};
-      data.bookings.forEach((b: any) => {
-        if (!grouped[b.therapist]) grouped[b.therapist] = [];
-        grouped[b.therapist].push({
-          time_slot: b.time_slot,
-          name: b.name // <-- ต้องมีชื่อผู้จองตรงนี้
-        });
-      });
-      setBookedSlots(grouped);
-    } else setBookedSlots({});
-  })
-  .catch(() => setBookedSlots({}));
+    fetch(`/api/bookings?date=${encodeURIComponent(date)}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          const grouped: Record<string, BookingInfo[]> = {};
+          data.bookings.forEach((b: any) => {
+            if (!grouped[b.therapist]) grouped[b.therapist] = [];
+            grouped[b.therapist].push({
+              time_slot: b.time_slot,
+              name: b.name,
+            });
+          });
+          setBookedSlots(grouped);
+        } else setBookedSlots({});
+      })
+      .catch(() => setBookedSlots({}));
 
     fetch(`/api/off-therapists?date=${encodeURIComponent(date)}`)
       .then(res => res.json())
@@ -129,7 +132,10 @@ fetch(`/api/bookings?date=${encodeURIComponent(date)}`)
         setOffTherapists(data.success ? data.offTherapists || [] : []);
         setDisabledSlots(data.success ? data.disabledSlotsByTherapist || {} : {});
       })
-      .catch(() => { setOffTherapists([]); setDisabledSlots({}); });
+      .catch(() => {
+        setOffTherapists([]);
+        setDisabledSlots({});
+      });
 
     setSelectedTherapist("");
     setSelectedTime("");
@@ -148,35 +154,41 @@ fetch(`/api/bookings?date=${encodeURIComponent(date)}`)
     setSelectedTime(time);
   };
 
-const handleSubmit = () => {
-  if (!clientName || !clientPhone || !date || !selectedTherapist || !selectedTime || !dialogTherapist) {
-    alert("กรุณากรอกข้อมูลให้ครบถ้วน");
-    return;
-  }
-  if (noHN) {
-    // กรณีไม่มี HN ใช้บัตรประชาชนแทน (สามารถเว้นว่างได้)
-    // ❌ ไม่ต้องเช็คอะไร
-  } else {
-    // กรณีมี HN
-    if (!clientHN || clientHN.length !== 9) {
-      alert("กรุณากรอก HN ให้ครบ 9 ตัว");
+  const handleSubmit = () => {
+    if (isGuest) {
+      alert("โหมดดูอย่างเดียว ไม่สามารถบันทึกการจองได้");
       return;
     }
-  }
+    if (!clientName || !clientPhone || !date || !selectedTherapist || !selectedTime || !dialogTherapist) {
+      alert("กรุณากรอกข้อมูลให้ครบถ้วน");
+      return;
+    }
+    if (noHN) {
+      // ไม่มี HN → ใช้บัตรประชาชนแทน
+    } else {
+      if (!clientHN || clientHN.length !== 9) {
+        alert("กรุณากรอก HN ให้ครบ 9 ตัว");
+        return;
+      }
+    }
 
-  router.push(`/confirm?${new URLSearchParams({
-    hn: clientHN,
-    name: clientName,
-    phone: clientPhone,
-    idCard: idCardNumber,
-    date,
-    therapist: selectedTherapist,
-    time: selectedTime,
-    provider: dialogTherapist,
-  }).toString()}`);
-};
+    router.push(`/confirm?${new URLSearchParams({
+      hn: clientHN,
+      name: clientName,
+      phone: clientPhone,
+      idCard: idCardNumber,
+      date,
+      therapist: selectedTherapist,
+      time: selectedTime,
+      provider: dialogTherapist,
+    }).toString()}`);
+  };
 
   const handleOpenDialog = () => {
+    if (isGuest) {
+      alert("โหมดดูอย่างเดียว ไม่สามารถเปิดการจองได้");
+      return;
+    }
     if (!selectedTherapist || !selectedTime || !date) return setShowAlert(true);
     setClientHN(""); setClientName(""); setClientPhone(""); setDialogTherapist(""); setSearchResults([]); setIdCardNumber(""); setNoHN(false);
     setDialogOpen(true);
@@ -212,66 +224,70 @@ const handleSubmit = () => {
     }
   };
 
-const handleAddPatient = async () => {
-  // แปลงเบอร์โทรให้เป็นตัวเลขล้วน
-  const digitsPhone = patientPhone.replace(/\D/g, "");
-
-  // ตรวจสอบช่องว่าง
-  if (!hn || !patientPrefix || !patientFirstName || !patientLastName || !digitsPhone) {
-    alert("กรุณากรอกข้อมูลให้ครบทุกช่อง");
-    return;
-  }
-
-  // ตรวจสอบ HN ต้อง 9 ตัว
-  if (hn.length !== 9) {
-    alert("กรุณากรอก HN ให้ครบ 9 ตัว");
-    return;
-  }
-
-  const fullName = `${patientPrefix}${patientFirstName} ${patientLastName}`;
-
-  try {
-    const res = await fetch("/api/add-patient", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        hn,
-        pname: patientPrefix,
-        fname: patientFirstName,
-        lname: patientLastName,
-        name: fullName,
-        mobile_phone_number: patientPhone, // ส่งไปตามที่กรอก (มี - ด้วย)
-      }),
-    });
-
-    const data = await res.json();
-
-    if (data.success) {
-      alert(data.message || "เพิ่มคนไข้เรียบร้อยแล้ว"); // ✅ ใช้ข้อความจาก backend
-      setAddPatientDialog(false);
-      setHn("");
-      setPatientPrefix("");
-      setPatientFirstName("");
-      setPatientLastName("");
-      setPatientPhone("");
-    } else {
-      alert(data.message || "ไม่สามารถเพิ่มคนไข้ได้"); // ✅ ใช้ข้อความ error จาก backend เช่น "HN นี้มีอยู่แล้ว"
+  const handleAddPatient = async () => {
+    if (isGuest) {
+      alert("โหมดดูอย่างเดียว ไม่สามารถเพิ่มคนไข้ได้");
+      return;
     }
-  } catch (error) {
-    console.error(error);
-    alert("เกิดข้อผิดพลาดในการเพิ่มคนไข้");
-  }
-};
+
+    const digitsPhone = patientPhone.replace(/\D/g, "");
+    if (!hn || !patientPrefix || !patientFirstName || !patientLastName || !digitsPhone) {
+      alert("กรุณากรอกข้อมูลให้ครบทุกช่อง");
+      return;
+    }
+    if (hn.length !== 9) {
+      alert("กรุณากรอก HN ให้ครบ 9 ตัว");
+      return;
+    }
+
+    const fullName = `${patientPrefix}${patientFirstName} ${patientLastName}`;
+
+    try {
+      const res = await fetch("/api/add-patient", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          hn,
+          pname: patientPrefix,
+          fname: patientFirstName,
+          lname: patientLastName,
+          name: fullName,
+          mobile_phone_number: patientPhone,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        alert(data.message || "เพิ่มคนไข้เรียบร้อยแล้ว");
+        setAddPatientDialog(false);
+        setHn("");
+        setPatientPrefix("");
+        setPatientFirstName("");
+        setPatientLastName("");
+        setPatientPhone("");
+      } else {
+        alert(data.message || "ไม่สามารถเพิ่มคนไข้ได้");
+      }
+    } catch (error) {
+      console.error(error);
+      alert("เกิดข้อผิดพลาดในการเพิ่มคนไข้");
+    }
+  };
 
   const handleSelectUser = (user: UserInfo) => {
     setClientName(user.name);
-    setClientHN(user.hn || ""); // ถ้าไม่มี hn ก็ปล่อยว่าง
+    setClientHN(user.hn || "");
     setClientPhone(formatPhone(user.phone || ""));
     setIdCardNumber(user.id_card_number || "");
     setSearchResults([]);
   };
 
   const toggleOffTherapist = async (therapist: string) => {
+    if (isGuest) {
+      alert("โหมดดูอย่างเดียว ไม่สามารถอัปเดตหมอไม่มาได้");
+      return;
+    }
     if (!date) return alert("กรุณาเลือกวันที่ก่อน");
     try {
       const res = await fetch("/api/toggle-off-therapist", {
@@ -287,6 +303,10 @@ const handleAddPatient = async () => {
   };
 
   const toggleSlot = async (therapist: string, slot: string) => {
+    if (isGuest) {
+      alert("โหมดดูอย่างเดียว ไม่สามารถอัปเดต slot ได้");
+      return;
+    }
     if (!date) return alert("กรุณาเลือกวันที่ก่อน");
     try {
       const res = await fetch("/api/toggle-off-therapist", {
@@ -432,25 +452,32 @@ const handleAddPatient = async () => {
               </Dialog.Root>
             </>
           )}
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => router.push("/all-bookings")}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow transition"
-          >
-            <FaHistory className="w-5 h-5" /> ประวัติการจอง
-          </motion.button>
+          {!isGuest && (
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => router.push("/all-bookings")}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow transition"
+            >
+              <FaHistory className="w-5 h-5" /> ประวัติการจอง
+            </motion.button>
+          )}
         </div>
       </div>
 
       <div className="max-w-6xl mx-auto p-6 pt-27 relative z-10">
-        <motion.h1 initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="text-4xl font-extrabold text-emerald-700 mb-12 text-center drop-shadow-sm">
-          เลือกหมอนวดและช่วงเวลา
+        <motion.h1
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="text-4xl font-extrabold text-emerald-700 mb-12 text-center drop-shadow-sm"
+        >
+          {isGuest ? "ดูคิวจองนวดแผนไทย" : "เลือกหมอนวดและช่วงเวลา"}
         </motion.h1>
 
         <div className="mb-8 max-w-sm mx-auto">
           <label className="flex items-center gap-2 text-emerald-700 font-semibold mb-2 text-lg">
-            <CalendarIcon className="w-4 h-4" /> วันที่ต้องการนวด
+            <CalendarIcon className="w-4 h-4" /> {isGuest ? "เลือกวันที่ต้องการดู" : "เลือกวันที่ต้องการนวด"}
           </label>
           <input
             type="date"
@@ -482,55 +509,82 @@ const handleAddPatient = async () => {
                   <UserIcon className={`w-5 h-5 ${isOff ? "text-gray-500" : "text-emerald-600"}`} />
                   <h2 className={`text-lg font-semibold ${isOff ? "text-gray-500" : "text-emerald-700"}`}>{t}</h2>
                   <div className="ml-auto flex items-center gap-2">
-                    {date && <button onClick={() => toggleOffTherapist(t)} className={`px-3 py-1.5 text-sm rounded flex items-center gap-2 font-semibold text-white hover:brightness-90 ${isOff ? "bg-red-500 hover:bg-red-600" : "bg-emerald-500 hover:bg-emerald-600"}`}>{isOff ? "ไม่มา" : "มา"}{isOff ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}</button>}
+                    {date && !isGuest && (
+                    <button
+                      onClick={() => toggleOffTherapist(t)}
+                      className={`px-3 py-1.5 text-sm rounded flex items-center gap-2 font-semibold text-white hover:brightness-90 ${
+                        isOff
+                          ? "bg-red-500 hover:bg-red-600"
+                          : "bg-emerald-500 hover:bg-emerald-600"
+                      }`}
+                    >
+                      {isOff ? "ไม่มา" : "มา"}{isOff ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
+                    </button>
+                  )}
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
-                {timeSlots.map(slot => {
-                  const slotInfo = bookedSlots[t]?.find(b => b.time_slot === slot);
-                  const isBooked = !!slotInfo;
-                  const isActive = isSelected && selectedTime === slot;
-                  const isSlotDisabled = disabled.includes(slot);
+                  {timeSlots.map(slot => {
+                    const slotInfo = bookedSlots[t]?.find(b => b.time_slot === slot);
+                    const isBooked = !!slotInfo;
+                    const isActive = isSelected && selectedTime === slot;
+                    const isSlotDisabled = disabled.includes(slot);
 
-                  return (
-                    <div key={slot} className="flex gap-1 items-center">
-                      <button
-                        disabled={isBooked || isOff || isSlotDisabled}
-                        onClick={() => handleSelect(t, slot)}
-                        className={`text-sm px-3 py-2 rounded-lg font-medium border flex-1 flex flex-col items-center justify-center gap-1 transition shadow-sm
-                          ${isSlotDisabled ? "bg-gray-300 text-gray-500 border-gray-400 cursor-not-allowed"
-                          : isOff ? "bg-gray-300 text-gray-500 border-gray-400 cursor-not-allowed"
-                          : isBooked ? "bg-red-100 text-red-600 border-red-400 cursor-not-allowed"
-                          : isActive ? "bg-emerald-600 text-white border-emerald-600"
-                          : "bg-white hover:bg-emerald-50 text-emerald-800 border-gray-400"}`}
-                      >
-                        <div className="flex items-center gap-1">
-                          <Clock className="w-4 h-4" /> {slot}
-                        </div>
-                        {isBooked && (
-                          <div className="text-xs text-red-600">
-                            ({slotInfo?.name || "ไม่ระบุ"})
-                          </div>
-                        )}
-                      </button>
-                      {date && (
+                    return (
+                      <div key={slot} className="flex gap-1 items-center">
                         <button
-                          disabled={isOff}
-                          onClick={() => toggleSlot(t, slot)}
-                          className={`px-2 py-1 rounded text-white ${isOff ? "bg-gray-400 cursor-not-allowed" : isSlotDisabled ? "bg-red-500 hover:bg-red-600" : "bg-emerald-500 hover:bg-emerald-600"}`}
+                          disabled={isBooked || isOff || isSlotDisabled || isGuest}
+                          onClick={() => handleSelect(t, slot)}
+                          className={`text-sm px-3 py-2 rounded-lg font-medium border flex-1 flex flex-col items-center justify-center gap-1 transition shadow-sm
+                            ${isSlotDisabled ? "bg-gray-300 text-gray-500 border-gray-400 cursor-not-allowed"
+                            : isOff ? "bg-gray-300 text-gray-500 border-gray-400 cursor-not-allowed"
+                            : isBooked ? "bg-red-100 text-red-600 border-red-400 cursor-not-allowed"
+                            : isActive ? "bg-emerald-600 text-white border-emerald-600"
+                            : "bg-white hover:bg-emerald-50 text-emerald-800 border-gray-400"}`}
                         >
-                          {isSlotDisabled ? <FaTimes /> : <FaCheck />}
+                          <div className="flex items-center gap-1">
+                            <Clock className="w-4 h-4" /> {slot}
+                          </div>
+                          {isBooked && (
+                            <div className="text-xs text-red-600">
+                              ({slotInfo?.name || "ไม่ระบุ"})
+                            </div>
+                          )}
                         </button>
-                      )}
-                    </div>
-                  );
-                })}
+                        {date && !isGuest && ( // เพิ่ม !isGuest
+                          <button
+                            onClick={() => toggleSlot(t, slot)}
+                            className={`px-2 py-1 rounded text-white ${
+                              isOff
+                                ? "bg-gray-400 cursor-not-allowed"
+                                : isSlotDisabled
+                                ? "bg-red-500 hover:bg-red-600"
+                                : "bg-emerald-500 hover:bg-emerald-600"
+                            }`}
+                          >
+                            {isSlotDisabled ? <FaTimes /> : <FaCheck />}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-
-                <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} onClick={handleOpenDialog} disabled={!(isSelected && selectedTime && date) || isOff} className={`mt-5 w-full py-2 rounded-xl font-bold shadow transition text-center ${isSelected && selectedTime && date && !isOff ? "bg-emerald-600 text-white hover:bg-emerald-700" : "bg-gray-300 text-gray-500 cursor-not-allowed"}`}>
-                  เลือก
-                </motion.button>
+                {!isGuest && (
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.97 }}
+                    onClick={handleOpenDialog}
+                    disabled={!(isSelected && selectedTime && date) || isOff}
+                    className={`mt-5 w-full py-2 rounded-xl font-bold shadow transition text-center ${
+                      isSelected && selectedTime && date && !isOff
+                        ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                        : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    }`}
+                  >
+                    เลือก
+                  </motion.button>
+                )}
               </motion.div>
             );
           })}
@@ -558,6 +612,7 @@ const handleAddPatient = async () => {
                   {noHN ? "กลับ" : "คนไข้ใหม่"}
                 </button>
               </Dialog.Title>
+
               <label className="block mb-3">
                 <span className="text-sm font-medium text-emerald-800">ผู้ให้บริการ</span>
                 <select
@@ -636,6 +691,7 @@ const handleAddPatient = async () => {
                   />
                 </label>
               )}
+
               {searchResults.length > 0 && (
                 <div className="border p-2 rounded max-h-40 overflow-y-auto mb-3">
                   {searchResults.map(u => (
@@ -656,6 +712,8 @@ const handleAddPatient = async () => {
             </Dialog.Content>
           </Dialog.Portal>
         </Dialog.Root>
+
+        {/* Alert popup */}
         <AnimatePresence>
           {showAlert && (
             <motion.div key={Date.now()} initial={{ opacity: 0, y: -50 }} animate={{ opacity: 1, y: 65 }} exit={{ opacity: 0, y: -20 }} className="fixed top-6 left-1/2 -translate-x-1/2 bg-red-500 text-white px-4 py-2 rounded shadow z-50 flex items-center gap-2">

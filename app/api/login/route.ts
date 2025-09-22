@@ -1,17 +1,7 @@
 import { NextResponse } from "next/server";
-import mysql from "mysql2/promise";
+import pool from '../dbconnection/db';
 import bcrypt from "bcryptjs"; // เปลี่ยนมาใช้ bcrypt
 import crypto from "crypto";
-
-const pool = mysql.createPool({
-  host: "lmwcc.synology.me",
-  user: "medthai",
-  password: "I4FEtUu*-uB-hAK0",
-  database: "medthai",
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-});
 
 // ฟังก์ชันสร้าง token ง่าย ๆ
 function generateToken() {

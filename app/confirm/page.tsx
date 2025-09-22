@@ -27,7 +27,7 @@ export default function ConfirmPage() {
     const hasValidId = !hn || (hn && hn.length === 9);
 
     if (!hasValidId || !name || !phone || !date || !therapist || !time) {
-      router.push("/admin-booking");
+      router.push("/booking");
     }
   }, [hn, idCard, name, phone, date, therapist, time, router]);
 
@@ -97,7 +97,7 @@ const handleConfirm = async () => {
             <CheckCircle2 className="w-12 h-12" />
             <p className="text-2xl font-semibold">จองสำเร็จแล้ว</p>
             <div className="flex gap-4 mt-6">
-              <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => router.push("/admin-booking")} className="flex items-center gap-2 px-4 py-2 bg-emerald-100 text-emerald-700 rounded-lg font-semibold shadow-sm hover:bg-emerald-200">
+              <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => router.push("/booking")} className="flex items-center gap-2 px-4 py-2 bg-emerald-100 text-emerald-700 rounded-lg font-semibold shadow-sm hover:bg-emerald-200">
                 <ArrowLeft className="w-5 h-5" /> กลับหน้าจองคิว
               </motion.button>
               <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => router.push("/")} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg font-semibold shadow-sm hover:bg-emerald-700">
@@ -114,7 +114,7 @@ const handleConfirm = async () => {
               </motion.div>
             )}
             <div className="flex gap-4 justify-center">
-              <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => router.push("/admin-booking")} className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-emerald-800 bg-emerald-100 shadow-sm hover:bg-emerald-200">
+              <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => router.push("/booking")} className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-emerald-800 bg-emerald-100 shadow-sm hover:bg-emerald-200">
                 <ArrowLeft className="w-5 h-5" /> กลับหน้าจองคิว
               </motion.button>
               <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={handleConfirm} disabled={loading} className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-white shadow-sm transition ${loading ? "bg-emerald-300 cursor-not-allowed" : "bg-emerald-600 hover:bg-emerald-700"}`}>

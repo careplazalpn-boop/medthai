@@ -1,13 +1,6 @@
 // app/api/update-user-phone/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import mysql from "mysql2/promise";
-
-const pool = mysql.createPool({
-  host: "lmwcc.synology.me",
-  user: "medthai",
-  password: "I4FEtUu*-uB-hAK0",
-  database: "medthai",
-});
+import pool from '../dbconnection/db';
 
 // POST method
 export async function POST(req: NextRequest) {

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Trash2, UserPlus, Home, X } from "lucide-react";
+import { Pencil, Trash2, UserPlus, Home } from "lucide-react";
 import { motion } from "framer-motion";
 import { FaHistory } from "react-icons/fa";
 
@@ -161,7 +161,7 @@ export default function ManageTherapistsPage() {
               onClick={handleAddSave}
               className="px-6 h-10 bg-emerald-600 text-white rounded-md font-semibold hover:bg-emerald-700 transition"
             >
-              เพิ่มข้อมูลใหม
+              เพิ่มข้อมูลใหม่
             </button>
           </div>
         </div>

@@ -1,6 +1,6 @@
 import fetch from "node-fetch";
 import dotenv from "dotenv";
-import pool from '../dbconnection/db';
+import pool from './api/dbconnection/db.js';
 import cron from "node-cron";
 
 dotenv.config();

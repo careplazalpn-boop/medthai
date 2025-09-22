@@ -27,10 +27,6 @@ function BackgroundDecoration() {
         d="M0 600 Q360 550 720 600 T1440 600 V900 H0 Z"
         opacity="0.4"
       />
-      <circle cx="300" cy="300" r="180" fill="#A7F3D0" opacity="0.35" />
-      <circle cx="1100" cy="200" r="120" fill="#22C55E" opacity="0.25" />
-      <circle cx="1000" cy="700" r="220" fill="#4ADE80" opacity="0.15" />
-      <circle cx="600" cy="750" r="150" fill="#86EFAC" opacity="0.2" />
       <defs>
         <linearGradient
           id="greenGradient1"
@@ -147,14 +143,11 @@ export default function HomePage() {
       </div>
 
       {/* หัวข้อ */}
-      <motion.h1
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
+      <h1
         className="text-3xl sm:text-4xl md:text-6xl font-extrabold text-emerald-800 mb-8 sm:mb-12 max-w-xs sm:max-w-3xl text-center drop-shadow-xl z-10 leading-snug"
       >
         ศูนย์บริการสาธารณสุข <br /> เทศบาลเมืองลำพูน
-      </motion.h1>
+      </h1>
 
       {/* ปุ่มจอง / ดูคิว */}
       {user ? (

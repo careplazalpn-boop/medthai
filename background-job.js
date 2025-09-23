@@ -1,7 +1,7 @@
 import dotenv from "dotenv";
 import mysql from "mysql2/promise";
 import cron from "node-cron";
-
+import fetch from "node-fetch";
 dotenv.config({ path: ".env.local" });
 
 const API_URL = process.env.API_URL
@@ -11,6 +11,9 @@ const pool = mysql.createPool({
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
 });
 
 // ----------------- Helper -----------------
@@ -91,31 +94,39 @@ cron.schedule("0 0 * * *", () => {
 // ----------------- API Slot Checker -----------------
 let calledSlots = new Set();
 let todayDate = getTodayTH();
+let cachedSlots = [];
 
+// ฟังก์ชัน refresh slot ทุก 5 นาที
+async function refreshTimeSlots() {
+  try {
+    const [rows] = await pool.query("SELECT slot FROM time_slot ORDER BY id ASC");
+    cachedSlots = rows.map(r => r.slot.split("-"));
+    // console.log("[refresh] cached slots:", cachedSlots);
+  } catch (err) {
+    console.error("[refresh] Error fetching time slots:", err);
+  }
+}
+
+// เรียกตอน start script และ refresh ทุก 5 นาที
+refreshTimeSlots();
+setInterval(refreshTimeSlots, 5 * 60 * 1000);
+
+// ----------------- Call API -----------------
 async function callApi(slotLabel) {
   try {
-    await fetch(API_URL);
+    const res = await fetch(API_URL);
+    console.log("Status:", res.status);
     console.log(`[${new Date().toLocaleString("en-CA", { timeZone: "Asia/Bangkok" })}] called /api/all-bookings for slot ${slotLabel}`);
   } catch (err) {
     console.error(`[${new Date().toLocaleString("en-CA", { timeZone: "Asia/Bangkok" })}] Error calling /api/all-bookings`, err);
   }
 }
 
-async function getTimeSlotsFromDB() {
-  try {
-    const [rows] = await pool.query("SELECT slot FROM time_slot ORDER BY id ASC");
-    return rows.map(r => r.slot.split("-"));
-  } catch (err) {
-    console.error("Error fetching time slots from DB:", err);
-    return [];
-  }
-}
-
+// ----------------- Check Time -----------------
 async function checkTime() {
-  const slotTimes = await getTimeSlotsFromDB();
-  if (slotTimes.length === 0) return;
+  if (cachedSlots.length === 0) return;
 
-  const slotMinutes = slotTimes.map(([start, end]) => [
+  const slotMinutes = cachedSlots.map(([start, end]) => [
     parseInt(start.split(":")[0]) * 60 + parseInt(start.split(":")[1]),
     parseInt(end.split(":")[0]) * 60 + parseInt(end.split(":")[1])
   ]);
@@ -129,7 +140,7 @@ async function checkTime() {
   }
 
   slotMinutes.forEach(([startM, endM], idx) => {
-    const slotLabel = `${slotTimes[idx][0]}-${slotTimes[idx][1]}`;
+    const slotLabel = `${cachedSlots[idx][0]}-${cachedSlots[idx][1]}`;
     if (calledSlots.has(slotLabel)) return;
 
     if (nowM >= startM && nowM <= endM) {
@@ -140,7 +151,10 @@ async function checkTime() {
 }
 
 // ----------------- Run -----------------
+(async () => {
+  await checkTime();
+  await cleanOldDates();
+  await cleanOldDisabledSlots();
+})();
+
 setInterval(checkTime, 1000);
-checkTime();
-cleanOldDates();
-cleanOldDisabledSlots();

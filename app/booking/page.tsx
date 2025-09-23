@@ -109,37 +109,22 @@ export default function BookingPage() {
       return;
     }
 
-    fetch(`/api/bookings?date=${encodeURIComponent(date)}`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          const grouped: Record<string, BookingInfo[]> = {};
-          data.bookings.forEach((b: any) => {
-            if (!grouped[b.therapist]) grouped[b.therapist] = [];
-            grouped[b.therapist].push({
-              time_slot: b.time_slot,
-              name: b.name,
-            });
-          });
-          setBookedSlots(grouped);
-        } else setBookedSlots({});
-      })
-      .catch(() => setBookedSlots({}));
-
-    fetch(`/api/off-therapists?date=${encodeURIComponent(date)}`)
-      .then(res => res.json())
-      .then(data => {
-        setOffTherapists(data.success ? data.offTherapists || [] : []);
-        setDisabledSlots(data.success ? data.disabledSlotsByTherapist || {} : {});
-      })
-      .catch(() => {
-        setOffTherapists([]);
-        setDisabledSlots({});
+  fetchWithLoading(`/api/bookings?date=${encodeURIComponent(date)}`, data => {
+    if (data?.success) {
+      const grouped: Record<string, BookingInfo[]> = {};
+      data.bookings.forEach((b: any) => {
+        if (!grouped[b.therapist]) grouped[b.therapist] = [];
+        grouped[b.therapist].push({ time_slot: b.time_slot, name: b.name });
       });
+      setBookedSlots(grouped);
+    } else setBookedSlots({});
+  });
 
-    setSelectedTherapist("");
-    setSelectedTime("");
-  }, [date]);
+  fetchWithLoading(`/api/off-therapists?date=${encodeURIComponent(date)}`, data => {
+    setOffTherapists(data?.success ? data.offTherapists || [] : []);
+    setDisabledSlots(data?.success ? data.disabledSlotsByTherapist || {} : {});
+  });
+}, [date]);
 
   const formatPhone = (value: string) => {
     const digits = value.replace(/\D/g, "");
@@ -325,8 +310,27 @@ export default function BookingPage() {
     } catch { alert("เกิดข้อผิดพลาดในการอัปเดต slot"); }
   };
 
+  const fetchWithLoading = async (url: string, setter: (data: any) => void) => {
+    setLoading(true);
+    try {
+      const res = await fetch(url);
+      const data = await res.json();
+      setter(data);
+    } catch (err) {
+      console.error(err);
+      setter(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
   return (
     <div className="min-h-screen bg-gradient-to-br from-white to-emerald-100 relative overflow-hidden">
+      {loading && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-[1000]">
+          <ImSpinner2 className="w-12 h-12 text-white animate-spin" />
+        </div>
+      )}
       <div className="fixed top-0 left-0 w-full z-50 bg-emerald-600 shadow-md flex flex-wrap sm:flex-nowrap justify-between p-2 gap-2">
         <motion.button
           whileHover={{ scale: 1.05 }}
@@ -652,20 +656,16 @@ export default function BookingPage() {
                         className="flex-1 px-3 py-2 rounded-l-md focus:outline-none text-gray-900"
                       />
                       {(field === "name" || field === "hn") && !noHN && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            field === "name" ? handleSearchName() : handleSearchHN()
-                          }
-                          disabled={loading}
-                          className="px-4 py-2 bg-emerald-500 text-white rounded-r-md hover:bg-emerald-600 flex items-center justify-center"
-                        >
-                          {loading ? (
-                            <ImSpinner2 className="w-5 h-5 animate-spin text-white" />
-                          ) : (
-                            <Search className="w-5 h-5" />
-                          )}
-                        </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          field === "name" ? handleSearchName() : handleSearchHN()
+                        }
+                        disabled={loading}
+                        className="px-4 py-2 bg-emerald-500 text-white rounded-r-md hover:bg-emerald-600 flex items-center justify-center"
+                      >
+                        <Search className="w-5 h-5" />
+                      </button>
                       )}
                     </div>
                   </label>

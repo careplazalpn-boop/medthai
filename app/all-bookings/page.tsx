@@ -6,6 +6,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { FaCheck, FaTimes } from "react-icons/fa";
+import { ImSpinner2 } from "react-icons/im";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 
@@ -126,11 +127,13 @@ export default function AllBookingsPage() {
   const [filterDate, setFilterDate] = useState("");
   const [filterTimeSlot, setFilterTimeSlot] = useState("all");
   const [filterProvider, setFilterProvider] = useState("all");
-
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!filterDate) {setBookings([]); return;}
+    if (!filterDate) { setBookings([]); return; }
+    
+    setLoading(true); // เริ่มโหลด
     (async () => {
       try {
         const res = await fetch(`/api/all-bookings?date=${filterDate}`);
@@ -139,11 +142,14 @@ export default function AllBookingsPage() {
         setBookings(data.bookings);
       } catch (e: any) {
         setError(e.message || "เกิดข้อผิดพลาดไม่ทราบสาเหตุ");
+      } finally {
+        setLoading(false); // โหลดเสร็จ
       }
     })();
   }, [filterDate]);
 
   useEffect(() => {
+    setLoading(true);
     (async () => {
       try {
         const [resTherapist, resTimeSlot, resStaff] = await Promise.all([
@@ -162,6 +168,8 @@ export default function AllBookingsPage() {
 
       } catch {
         setTherapists([]); setTimeSlots([]); setProviders([]);
+      } finally {
+        setLoading(false);
       }
     })();
   }, []);
@@ -312,6 +320,11 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
 
   return (
     <div className="min-h-screen px-4 sm:px-6 py-12 bg-gradient-to-br from-white to-emerald-50 relative">
+      {loading && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-[1000]">
+          <ImSpinner2 className="w-12 h-12 text-white animate-spin" />
+        </div>
+      )}
       <div className="fixed top-0 left-0 w-full z-50 bg-emerald-600 shadow-md flex flex-wrap sm:flex-nowrap justify-between p-2 gap-2">
         {/* กลุ่มปุ่มซ้าย */}
         <div className="flex gap-1 sm:gap-2 flex-wrap">

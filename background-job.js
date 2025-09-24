@@ -4,7 +4,7 @@ import cron from "node-cron";
 import fetch from "node-fetch";
 dotenv.config({ path: ".env.local" });
 
-const API_URL = process.env.API_URL
+const API_URL = process.env.API_URL;
 
 const pool = mysql.createPool({
   host: process.env.DB_HOST,
@@ -31,53 +31,72 @@ function getMinutesNowTH() {
   return nowTH.getHours() * 60 + nowTH.getMinutes();
 }
 
-// ----------------- Clean old off_date -----------------
+// ----------------- Clean old off_date (batch) -----------------
 async function cleanOldDates() {
   try {
     const today = getTodayTH();
     console.log(`Starting cleanOldDates job... Today: ${today}`);
 
-    const [rows] = await pool.query("SELECT id, off_date FROM therapist");
+    // ดึงข้อมูลที่ต้อง update
+    const [rows] = await pool.query(
+      "SELECT id, off_date FROM therapist WHERE off_date IS NOT NULL AND off_date != 'null'"
+    );
 
-    for (const row of rows) {
-      if (!row.off_date || row.off_date.toLowerCase() === "null") continue;
+    if (rows.length === 0) return console.log("No off_date to update.");
 
-      const dates = row.off_date.split(",").map(d => d.trim());
-      const newDates = dates.filter(d => d >= today);
+    // สร้าง CASE WHEN สำหรับ batch update
+    const cases = [];
+    const ids = [];
+    const values = [];
+    rows.forEach(row => {
+      const newDates = row.off_date
+        .split(",")
+        .map(d => d.trim())
+        .filter(d => d >= today)
+        .join(",");
+      cases.push(`WHEN id = ? THEN ?`);
+      ids.push(row.id);
+      values.push(newDates);
+    });
 
-      if (newDates.join(",") !== row.off_date) {
-        await pool.query("UPDATE therapist SET off_date = ? WHERE id = ?", [newDates.join(", "), row.id]);
-        console.log(`[therapist:${row.id}] off_date updated: ${newDates.join(", ")}`);
-      }
-    }
+    const sql = `UPDATE therapist SET off_date = CASE ${cases.join(" ")} ELSE off_date END WHERE id IN (${ids.map(() => "?").join(",")})`;
+    await pool.query(sql, [...ids.flatMap((id, i) => [id, values[i]]), ...ids]);
+
     console.log("cleanOldDates finished!\n");
   } catch (err) {
     console.error("Error cleaning old dates:", err);
   }
 }
 
-// ----------------- Clean old disabled_slots -----------------
+// ----------------- Clean old disabled_slots (batch) -----------------
 async function cleanOldDisabledSlots() {
   try {
     const today = getTodayTH();
     console.log(`Starting cleanOldDisabledSlots job... Today: ${today}`);
 
-    const [rows] = await pool.query("SELECT id, disabled_slots FROM therapist");
+    const [rows] = await pool.query(
+      "SELECT id, disabled_slots FROM therapist WHERE disabled_slots IS NOT NULL AND disabled_slots != 'null'"
+    );
+    if (rows.length === 0) return console.log("No disabled_slots to update.");
 
-    for (const row of rows) {
-      if (!row.disabled_slots || row.disabled_slots.toLowerCase() === "null") continue;
+    const cases = [];
+    const ids = [];
+    const values = [];
 
-      const slots = row.disabled_slots.split(",").map(d => d.trim());
-      const newSlots = slots.filter(s => {
-        const datePart = s.split("|")[0]; // YYYY-MM-DD|HH.MM-HH.MM หรือ YYYY-MM-DD
-        return datePart >= today;
-      });
+    rows.forEach(row => {
+      const newSlots = row.disabled_slots
+        .split(",")
+        .map(s => s.trim())
+        .filter(s => s.split("|")[0] >= today)
+        .join(",");
+      cases.push(`WHEN id = ? THEN ?`);
+      ids.push(row.id);
+      values.push(newSlots);
+    });
 
-      if (newSlots.join(",") !== row.disabled_slots) {
-        await pool.query("UPDATE therapist SET disabled_slots = ? WHERE id = ?", [newSlots.join(","), row.id]);
-        console.log(`[therapist:${row.id}] disabled_slots updated: ${newSlots.join(", ")}`);
-      }
-    }
+    const sql = `UPDATE therapist SET disabled_slots = CASE ${cases.join(" ")} ELSE disabled_slots END WHERE id IN (${ids.map(() => "?").join(",")})`;
+    await pool.query(sql, [...ids.flatMap((id, i) => [id, values[i]]), ...ids]);
+
     console.log("cleanOldDisabledSlots finished!\n");
   } catch (err) {
     console.error("Error cleaning old disabled_slots:", err);
@@ -96,22 +115,17 @@ let calledSlots = new Set();
 let todayDate = getTodayTH();
 let cachedSlots = [];
 
-// ฟังก์ชัน refresh slot ทุก 5 นาที
 async function refreshTimeSlots() {
   try {
     const [rows] = await pool.query("SELECT slot FROM time_slot ORDER BY id ASC");
     cachedSlots = rows.map(r => r.slot.split("-"));
-    // console.log("[refresh] cached slots:", cachedSlots);
   } catch (err) {
     console.error("[refresh] Error fetching time slots:", err);
   }
 }
-
-// เรียกตอน start script และ refresh ทุก 5 นาที
 refreshTimeSlots();
 setInterval(refreshTimeSlots, 5 * 60 * 1000);
 
-// ----------------- Call API -----------------
 async function callApi(slotLabel) {
   try {
     const res = await fetch(API_URL);
@@ -122,7 +136,6 @@ async function callApi(slotLabel) {
   }
 }
 
-// ----------------- Check Time -----------------
 async function checkTime() {
   if (cachedSlots.length === 0) return;
 
@@ -157,4 +170,4 @@ async function checkTime() {
   await cleanOldDisabledSlots();
 })();
 
-setInterval(checkTime, 1000);
+setInterval(checkTime, 5000);

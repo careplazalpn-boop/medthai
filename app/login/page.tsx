@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { motion } from "framer-motion";
 import { FaUser, FaLock, FaArrowLeft } from "react-icons/fa";
 
 export default function LoginPage() {
@@ -41,11 +40,8 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-tr from-white to-emerald-100 px-4 sm:px-6 relative">
       {/* กล่องฟอร์ม */}
-      <motion.form
+      <form
         onSubmit={handleSubmit}
-        initial={{ opacity: 0, y: -50 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: "easeOut" }}
         className="bg-white rounded-3xl shadow-2xl w-full max-w-sm sm:max-w-md p-6 sm:p-10 relative z-10"
       >
         <h2 className="text-2xl sm:text-3xl font-extrabold mb-6 sm:mb-8 text-center text-emerald-700 drop-shadow-sm">
@@ -53,17 +49,14 @@ export default function LoginPage() {
         </h2>
 
         {error && (
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
+          <p
             className="text-red-600 mb-4 sm:mb-6 text-center font-medium text-sm sm:text-base select-none"
           >
             {error}
-          </motion.p>
+          </p>
         )}
 
-        <motion.div
-          whileFocus={{ scale: 1.02 }}
+        <div
           className="mb-4 sm:mb-6 relative flex items-center border border-emerald-300 rounded-xl focus-within:ring-2 focus-within:ring-emerald-400 transition"
         >
           <FaUser className="absolute left-3 sm:left-4 text-emerald-500" />
@@ -76,10 +69,9 @@ export default function LoginPage() {
             required
             autoComplete="username"
           />
-        </motion.div>
+        </div>
 
-        <motion.div
-          whileFocus={{ scale: 1.02 }}
+        <div
           className="mb-6 sm:mb-8 relative flex items-center border border-emerald-300 rounded-xl focus-within:ring-2 focus-within:ring-emerald-400 transition"
         >
           <FaLock className="absolute left-3 sm:left-4 text-emerald-500" />
@@ -92,36 +84,29 @@ export default function LoginPage() {
             required
             autoComplete="current-password"
           />
-        </motion.div>
+        </div>
 
-        <motion.button
-          whileHover={{ scale: 1.03 }}
-          whileTap={{ scale: 0.97 }}
+        <button
           type="submit"
           className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 sm:py-4 rounded-xl shadow-lg text-sm sm:text-base transition"
         >
           เข้าสู่ระบบ
-        </motion.button>
+        </button>
 
         {/* ปุ่มกลับหน้าแรก */}
-        <motion.button
+        <button
           type="button"
           onClick={() => router.push("/")}
-          whileHover={{ scale: 1.03 }}
-          whileTap={{ scale: 0.97 }}
           className="mt-4 sm:mt-6 w-full flex justify-center items-center space-x-2 border border-emerald-600 text-emerald-600 font-semibold py-2.5 sm:py-3 rounded-xl hover:bg-emerald-100 text-sm sm:text-base transition"
         >
           <FaArrowLeft />
           <span>กลับสู่หน้าหลัก</span>
-        </motion.button>
-      </motion.form>
+        </button>
+      </form>
 
       {/* แสงเงาพื้นหลัง */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 0.15 }}
-        transition={{ duration: 2 }}
-        className="absolute inset-0 bg-[radial-gradient(circle_at_center,_#34d399,_transparent_70%)] pointer-events-none"
+      <div
+        className="absolute inset-0 pointer-events-none"
       />
     </div>
   );

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useContext } from "react";
 import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence } from "framer-motion";
 import { AuthContext } from "@/context/AuthContext";
 import { CalendarIcon, UserIcon, Clock, Home, AlertCircle, UserCheck, UserX, Search } from "lucide-react";
 import { ImSpinner2 } from "react-icons/im";
@@ -332,26 +332,22 @@ export default function BookingPage() {
         </div>
       )}
       <div className="fixed top-0 left-0 w-full z-50 bg-emerald-600 shadow-md flex flex-wrap sm:flex-nowrap justify-between p-2 gap-2">
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
+        <button
           onClick={() => router.push("/")}
-          className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-1 sm:py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow text-sm sm:text-base transition"
+          className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-1 sm:py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow text-sm sm:text-base transition hover:bg-gray-300"
         >
           <Home className="w-4 h-4 sm:w-5 sm:h-5" /> หน้าแรก
-        </motion.button>
+        </button>
 
         <div className="flex gap-1 sm:gap-2 flex-wrap sm:flex-nowrap">
           {user?.role === "admin" && (
             <>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
+              <button
                 onClick={() => setAddPatientDialog(true)}
-                className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-1 sm:py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow text-sm sm:text-base transition"
+                className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-1 sm:py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow text-sm sm:text-base transition hover:bg-gray-300"
               >
                 HN ?
-              </motion.button>
+              </button>
               <Dialog.Root
                 open={addPatientDialog}
                 onOpenChange={(open) => {
@@ -457,14 +453,12 @@ export default function BookingPage() {
             </>
           )}
           {!isGuest && (
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+            <button
               onClick={() => router.push("/all-bookings")}
-              className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-1 sm:py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow text-sm sm:text-base transition"
+              className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-1 sm:py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow text-sm sm:text-base transition hover:bg-gray-300"
             >
               <FaHistory className="w-4 h-4 sm:w-5 sm:h-5" /> ประวัติการจอง
-            </motion.button>
+            </button>
           )}
         </div>
       </div>
@@ -505,7 +499,7 @@ export default function BookingPage() {
             const disabled = disabledSlots[t] || [];
 
             return (
-              <motion.div key={t} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className={`border p-5 rounded-2xl shadow-lg ${isOff ? "bg-gray-200" : "bg-white"} ${isSelected ? "ring-4 ring-emerald-300" : ""}`}>
+              <div key={t} className={`border p-5 rounded-2xl shadow-lg ${isOff ? "bg-gray-200" : "bg-white"} ${isSelected ? "ring-4 ring-emerald-300" : ""}`}>
                 <div className="flex items-center gap-2 mb-3">
                   <UserIcon className={`w-5 h-5 ${isOff ? "text-gray-500" : "text-emerald-600"}`} />
                   <h2 className={`text-lg font-semibold ${isOff ? "text-gray-500" : "text-emerald-700"}`}>{t}</h2>
@@ -542,7 +536,7 @@ export default function BookingPage() {
                             : isOff ? "bg-gray-300 text-gray-500 border-gray-400 cursor-not-allowed"
                             : isBooked ? "bg-red-100 text-red-600 border-red-400 cursor-not-allowed"
                             : isActive ? "bg-emerald-600 text-white border-emerald-600"
-                            : "bg-white hover:bg-emerald-50 text-emerald-800 border-gray-400"}`}
+                            : "bg-white hover:bg-gray-200 text-emerald-800 border-gray-400"}`}
                         >
                           <div className="flex items-center gap-1">
                             <Clock className="w-4 h-4" /> {slot}
@@ -572,9 +566,7 @@ export default function BookingPage() {
                   })}
                 </div>
                 {!isGuest && (
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.97 }}
+                  <button
                     onClick={handleOpenDialog}
                     disabled={!(isSelected && selectedTime && date) || isOff}
                     className={`mt-5 w-full py-2 rounded-xl font-bold shadow transition text-center ${
@@ -584,9 +576,9 @@ export default function BookingPage() {
                     }`}
                   >
                     เลือก
-                  </motion.button>
+                  </button>
                 )}
-              </motion.div>
+              </div>
             );
           })}
         </div>
@@ -713,10 +705,10 @@ export default function BookingPage() {
         {/* Alert popup */}
         <AnimatePresence>
           {showAlert && (
-            <motion.div key={Date.now()} initial={{ opacity: 0, y: -50 }} animate={{ opacity: 1, y: 65 }} exit={{ opacity: 0, y: -20 }} className="fixed top-6 left-1/2 -translate-x-1/2 bg-red-500 text-white px-4 py-2 rounded shadow z-50 flex items-center gap-2">
+            <div key={Date.now()} className="fixed top-6 left-1/2 -translate-x-1/2 bg-red-500 text-white px-4 py-2 rounded shadow z-50 flex items-center gap-2">
               <AlertCircle className="w-5 h-5" />
               <span>กรุณาเลือกวันที่ก่อน</span>
-            </motion.div>
+            </div>
           )}
         </AnimatePresence>
       </div>

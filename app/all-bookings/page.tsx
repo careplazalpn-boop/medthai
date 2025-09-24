@@ -48,10 +48,7 @@ function BookingSummary({ attended, cancelled }: SummaryProps) {
 
   return (
     <div className="flex flex-col sm:flex-row gap-4 sm:gap-3">
-      <motion.div
-        initial={{ scale: 0.95, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ duration: 0.5 }}
+      <div
         className="flex items-center gap-4 bg-emerald-50 text-emerald-900 rounded-xl p-4 shadow-sm border-2 border-emerald-200 w-full sm:min-w-[396px]"
       >
         <Smile className="w-12 h-10 text-emerald-500 flex-shrink-0" />
@@ -72,12 +69,9 @@ function BookingSummary({ attended, cancelled }: SummaryProps) {
             </div>
           </div>
         </div>
-      </motion.div>
+      </div>
 
-      <motion.div
-        initial={{ scale: 0.95, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ duration: 0.5, delay: 0.1 }}
+      <div
         className="flex items-center gap-4 bg-red-50 text-red-900 rounded-xl p-4 shadow-sm border-2 border-red-200 w-full sm:min-w-[397px]"
       >
         <Frown className="w-12 h-10 text-red-500 flex-shrink-0" />
@@ -98,7 +92,7 @@ function BookingSummary({ attended, cancelled }: SummaryProps) {
             </span>
           </div>
         </div>
-      </motion.div>
+      </div>
     </div>
   );
 }
@@ -328,34 +322,28 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
       <div className="fixed top-0 left-0 w-full z-50 bg-emerald-600 shadow-md flex flex-wrap sm:flex-nowrap justify-between p-2 gap-2">
         {/* กลุ่มปุ่มซ้าย */}
         <div className="flex gap-1 sm:gap-2 flex-wrap">
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+          <button
             onClick={() => router.back()}
-            className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1 sm:py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow text-sm sm:text-base transition"
+            className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1 sm:py-2 rounded-lg bg-white hover:bg-gray-300 text-emerald-700 font-semibold shadow text-sm sm:text-base transition"
           >
             <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
             ย้อนกลับ
-          </motion.button>
+          </button>
 
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+          <button
             onClick={() => router.push("/")}
-            className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1 sm:py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow text-sm sm:text-base transition"
+            className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1 sm:py-2 rounded-lg bg-white hover:bg-gray-300 text-emerald-700 font-semibold shadow text-sm sm:text-base transition"
           >
             <Home className="w-4 h-4 sm:w-5 sm:h-5" />
             หน้าแรก
-          </motion.button>
+          </button>
         </div>
 
         {/* กลุ่มปุ่มขวา */}
         <div className="flex gap-1 sm:gap-2 flex-wrap">
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+          <button
             onClick={exportToExcel}
-            className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1 sm:py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow text-sm sm:text-base transition"
+            className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1 sm:py-2 rounded-lg bg-white hover:bg-gray-300 text-emerald-700 font-semibold shadow text-sm sm:text-base transition"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -366,7 +354,7 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
               <path d="M19 2H8a2 2 0 0 0-2 2v4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-1h1a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2h-1V2zM8 4h11v16H5V8h1v-2zM7 10h10v2H7v-2zm0 4h10v2H7v-2z"/>
             </svg>
             Export Excel
-          </motion.button>
+          </button>
         </div>
       </div>
 
@@ -427,9 +415,7 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
         </div>
 
         <div className="flex w-full sm:w-auto items-end">
-          <motion.button 
-            whileHover={{scale:1.05}} 
-            whileTap={{scale:0.95}}
+          <button 
             onClick={() => {
               setFilterName(""); 
               setFilterTherapist("all"); 
@@ -441,7 +427,7 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
             className="h-10 px-4 bg-emerald-600 text-white rounded-md font-semibold hover:bg-emerald-700 transition"
           >
             รีเซ็ต
-          </motion.button>
+          </button>
         </div>
       </div>
 
@@ -664,18 +650,16 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
                 {getStatusLabel(b) === "ยกเลิก" && (
                   <Dialog.Root open={cancelDialogOpen && selectedId === b.id} onOpenChange={setCancelDialogOpen}>
                     <Dialog.Trigger asChild>
-                      <motion.button
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
+                      <button
                         onClick={() => {
                           setSelectedId(b.id);
                           setCancelDialogOpen(true);
                         }}
-                        className="px-4 py-2 rounded-md flex items-center gap-2 bg-gray-300 text-gray-600"
+                        className="px-4 py-2 rounded-md flex items-center gap-2 bg-gray-300 hover:bg-gray-400 text-gray-600"
                       >
                         <FaTimes className="text-red-500" />
                         ยกเลิกแล้ว
-                      </motion.button>
+                      </button>
                     </Dialog.Trigger>
                     <BookingDialog
                       title="ต้องการลบรายการนี้หรือไม่?"
@@ -705,14 +689,12 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
                     {getStatusLabel(b) === "รอดำเนินการ" && (
                       <Dialog.Root>
                         <Dialog.Trigger asChild>
-                          <motion.button
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
+                          <button
                             onClick={() => setSelectedId(b.id)}
                             className="flex items-center justify-center w-15 h-10 bg-emerald-600 rounded-md shadow hover:bg-emerald-700 transition"
                           >
                             <FaCheck className="text-white w-5 h-5" />
-                          </motion.button>
+                          </button>
                         </Dialog.Trigger>
                         <BookingDialog
                           title="ต้องการยืนยันรายการนี้หรือไม่?"
@@ -726,14 +708,12 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
                     {/* ยกเลิก */}
                     <Dialog.Root>
                       <Dialog.Trigger asChild>
-                        <motion.button
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
+                        <button
                           onClick={() => setSelectedId(b.id)}
                           className="flex items-center justify-center w-15 h-10 bg-red-500 rounded-md shadow hover:bg-red-600 transition"
                         >
                           <FaTimes className="text-white w-5 h-5" />
-                        </motion.button>
+                        </button>
                       </Dialog.Trigger>
                       <BookingDialog
                         title="ต้องการยกเลิกรายการนี้หรือไม่?"
@@ -775,7 +755,7 @@ function Label({ icon, text }: { icon: React.ReactNode, text: string }) {
 
 function Toast({ message }: { message: string }) {
   return (
-    <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-emerald-600 text-white px-6 py-3 rounded-xl shadow-lg z-50">{message}</motion.div>
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-emerald-600 text-white px-6 py-3 rounded-xl shadow-lg z-50">{message}</div>
   );
 }
 
@@ -785,7 +765,7 @@ function BookingDialog({ title, color, booking, onConfirm }: any) {
     <Dialog.Portal>
       <Dialog.Overlay className="fixed inset-0 bg-black/30 z-40"/>
       <Dialog.Content asChild>
-        <motion.div initial={{opacity:0,scale:0.9}} animate={{opacity:1,scale:1}} exit={{opacity:0,scale:0.9}} transition={{duration:0.2}} className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white p-6 rounded-xl shadow-lg z-50 w-96">
+        <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white p-6 rounded-xl shadow-lg z-50 w-96">
           <Dialog.Title className={`text-xl font-bold text-${color}-600 mb-4`}>{title}</Dialog.Title>
           <div className="mb-4 text-sm grid grid-cols-1 gap-2">
             {[
@@ -806,7 +786,7 @@ function BookingDialog({ title, color, booking, onConfirm }: any) {
             <Dialog.Close asChild><button className="px-4 py-2 rounded-md bg-gray-500 hover:bg-gray-600 transition">ยกเลิก</button></Dialog.Close>
             <button onClick={onConfirm} className={`px-4 py-2 rounded-md bg-${color}-600 text-white hover:bg-${color}-700 transition`}>ยืนยัน</button>
           </div>
-        </motion.div>
+        </div>
       </Dialog.Content>
     </Dialog.Portal>
   );

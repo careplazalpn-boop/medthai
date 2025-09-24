@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Pencil, Trash2, UserPlus, Home } from "lucide-react";
-import { motion } from "framer-motion";
 import { FaHistory } from "react-icons/fa";
 
 interface Person {
@@ -219,22 +218,18 @@ export default function ManageTherapistsPage() {
     <div className="min-h-screen bg-gray-50 text-emerald-700">
       {/* แถบเมนูบนสุด */}
       <div className="fixed top-0 left-0 w-full z-50 bg-emerald-600 shadow-md flex justify-between p-2">
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
+        <button
           onClick={() => router.push("/")}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow transition"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white hover:bg-gray-300 text-emerald-700 font-semibold shadow transition"
         >
           <Home className="w-5 h-5" /> หน้าแรก
-        </motion.button>
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
+        </button>
+        <button
           onClick={() => router.push("/all-bookings")}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow transition"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white hover:bg-gray-300 text-emerald-700 font-semibold shadow transition"
         >
           <FaHistory className="w-5 h-5" /> ประวัติการจอง
-        </motion.button>
+        </button>
       </div>
 
       {/* เนื้อหา */}

@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { User, Phone, UserCheck, Clock, CalendarDays, CheckCircle2, ChevronLeft, Home, Smile, Frown } from "lucide-react";
+import { User, Phone, UserCheck, Clock, CalendarDays, CheckCircle2, Smile, Frown } from "lucide-react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { FaCheck, FaTimes } from "react-icons/fa";
+import { FaCheck, FaSpa, FaTimes } from "react-icons/fa";
 import { ImSpinner2 } from "react-icons/im";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
@@ -319,31 +319,31 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
           <ImSpinner2 className="w-12 h-12 text-white animate-spin" />
         </div>
       )}
-      <div className="fixed top-0 left-0 w-full z-50 bg-emerald-600 shadow-md flex flex-wrap sm:flex-nowrap justify-between p-2 gap-2">
+      <div className="fixed top-0 left-0 w-full z-50 bg-gradient-to-r from-emerald-600 to-green-500 shadow-md flex justify-between items-center px-4 py-2">
         {/* กลุ่มปุ่มซ้าย */}
-        <div className="flex gap-1 sm:gap-2 flex-wrap">
-          <button
-            onClick={() => router.back()}
-            className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1 sm:py-2 rounded-lg bg-white hover:bg-gray-300 text-emerald-700 font-semibold shadow text-sm sm:text-base transition"
-          >
-            <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
-            ย้อนกลับ
-          </button>
-
-          <button
+        <div className="flex gap-2 sm:gap-2 flex-wrap">
+          <div
+            className="text-white font-bold text-lg flex items-center gap-2 cursor-pointer"
             onClick={() => router.push("/")}
-            className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1 sm:py-2 rounded-lg bg-white hover:bg-gray-300 text-emerald-700 font-semibold shadow text-sm sm:text-base transition"
+            title="หน้าหลัก"
           >
-            <Home className="w-4 h-4 sm:w-5 sm:h-5" />
-            หน้าแรก
-          </button>
+            <FaSpa /> แพทย์แผนไทย
+          </div>
         </div>
 
         {/* กลุ่มปุ่มขวา */}
         <div className="flex gap-1 sm:gap-2 flex-wrap">
           <button
+            onClick={() => router.push("/summary-history")}
+            className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1 sm:py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow text-sm sm:text-base transition hover:bg-gray-300"
+            title="สรุปประวัติ"
+          >
+            📊
+          </button>
+          <button
             onClick={exportToExcel}
             className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1 sm:py-2 rounded-lg bg-white hover:bg-gray-300 text-emerald-700 font-semibold shadow text-sm sm:text-base transition"
+            title="ส่งออก Excel"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -353,7 +353,6 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
             >
               <path d="M19 2H8a2 2 0 0 0-2 2v4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-1h1a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2h-1V2zM8 4h11v16H5V8h1v-2zM7 10h10v2H7v-2zm0 4h10v2H7v-2z"/>
             </svg>
-            Export Excel
           </button>
         </div>
       </div>

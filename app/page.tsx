@@ -83,23 +83,37 @@ export default function HomePage() {
     <div className="min-h-screen relative flex flex-col justify-center items-center p-4 sm:p-8 overflow-hidden">
       <BackgroundDecoration />
       {/* แถบเมนูบนสุด */}
-      <div className="fixed top-0 left-0 w-full z-50 bg-emerald-600 shadow-md flex flex-wrap sm:flex-nowrap items-center justify-between p-2 gap-2">
-        {/* ปุ่มซ้าย (เฉพาะ admin) */}
-        {user?.role === "admin" && (
-          <button
-            onClick={() => router.push("/manage-therapists")}
-            className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1 sm:py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow text-sm sm:text-base transition hover:bg-gray-300"
-            title="จัดการบุคลากร"
-          >
-            🧑‍⚕️
-            <span>จัดการบุคลากร</span>
-          </button>
-        )}
-
+      <div className="fixed top-0 left-0 w-full z-50 bg-gradient-to-r from-emerald-600 to-green-500 shadow-md flex justify-between items-center px-4 py-2">
+        {/* ปุ่มซ้าย */}
+          <div className="flex gap-2">
+            <div
+              className="text-white font-bold text-lg flex items-center gap-2 cursor-pointer"
+              onClick={() => router.push("/")}
+              title="หน้าหลัก"
+            >
+              <FaSpa /> แพทย์แผนไทย
+            </div>
+          </div>
         {/* ปุ่มขวา */}
-        <div className="flex gap-1 sm:gap-3 items-center ml-auto flex-wrap">
+        <div className="flex gap-2">
           {user ? (
             <>
+            {user?.role === "admin" && (
+            <button
+              onClick={() => router.push("/manage-therapists")}
+              className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1 sm:py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow text-sm sm:text-base transition hover:bg-gray-300"
+              title="จัดการบุคลากร"
+            >
+              🧑‍⚕️
+            </button>
+            )}
+            <button
+              onClick={() => router.push("/summary-history")}
+              className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1 sm:py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow text-sm sm:text-base transition hover:bg-gray-300"
+              title="สรุปประวัติ"
+            >
+              📊
+            </button>
               <button
                 onClick={() => {
                   const isAdminLike = user?.role === "admin" || user?.role === "user";
@@ -109,7 +123,6 @@ export default function HomePage() {
                 title="ประวัติการจอง"
               >
                 <FaHistory className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span>ประวัติการจอง</span>
               </button>
 
               <button
@@ -118,7 +131,6 @@ export default function HomePage() {
                 title="ลงชื่อออก"
               >
                 <FaSignOutAlt className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span>ลงชื่อออก</span>
               </button>
             </>
           ) : (
@@ -145,7 +157,7 @@ export default function HomePage() {
       {user ? (
         <button
           onClick={handleBookingClick}
-          className="flex flex-col sm:flex-row items-center justify-center space-y-2 sm:space-y-0 sm:space-x-3 px-6 sm:px-10 py-3 sm:py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full text-lg sm:text-2xl font-semibold shadow-lg transition z-10 text-center"
+          className="flex flex-col sm:flex-row items-center justify-center space-y-2 sm:space-y-0 sm:space-x-3 px-6 sm:px-10 py-3 sm:py-4 bg-emerald-600 hover:bg-gradient-to-r from-emerald-600 to-green-500 text-white rounded-full text-lg sm:text-2xl font-semibold shadow-lg transition z-10 text-center"
           title="จองคิวนวดแผนไทย"
         >
           <FaSpa size={30} />

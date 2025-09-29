@@ -16,7 +16,7 @@ export default function ConfirmPage() {
   const therapist = params.get("therapist");
   const time = params.get("time");
   const provider = params.get("provider");
-
+  const bookedbyrole = params.get("bookedbyrole"); // เพิ่มตรงนี้
   const [success, setSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [loading, setLoading] = useState(false);
@@ -37,10 +37,9 @@ const handleConfirm = async () => {
     const isNewUser = !hn;
     const endpoint = isNewUser ? "/api/new-user" : "/api/bookings";
 
-    // payload สำหรับ booking
-    const payload: any = isNewUser
-      ? { name, phone, idCard, therapist, time, date, provider }
-      : { hn, name, phone, therapist, time, date, provider };
+  const payload: any = isNewUser
+    ? { name, phone, idCard, therapist, time, date, provider, bookedbyrole }
+    : { hn, name, phone, therapist, time, date, provider, bookedbyrole };
 
     const res = await fetch(endpoint, {
       method: "POST",

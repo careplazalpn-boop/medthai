@@ -4,9 +4,9 @@ import { useState, useEffect, useContext } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence } from "framer-motion";
 import { AuthContext } from "@/context/AuthContext";
-import { CalendarIcon, UserIcon, Clock, Home, AlertCircle, UserCheck, UserX, Search } from "lucide-react";
+import { CalendarIcon, UserIcon, Clock, AlertCircle, UserCheck, UserX, Search } from "lucide-react";
 import { ImSpinner2 } from "react-icons/im";
-import { FaHistory, FaCheck, FaTimes } from "react-icons/fa";
+import { FaHistory, FaCheck, FaSpa, FaTimes } from "react-icons/fa";
 import * as Dialog from "@radix-ui/react-dialog";
 
 interface UserInfo {
@@ -19,6 +19,7 @@ interface UserInfo {
 interface BookingInfo {
   time_slot: string;
   name: string;
+  bookedbyrole?: string;
 }
 
 export default function BookingPage() {
@@ -114,7 +115,7 @@ export default function BookingPage() {
       const grouped: Record<string, BookingInfo[]> = {};
       data.bookings.forEach((b: any) => {
         if (!grouped[b.therapist]) grouped[b.therapist] = [];
-        grouped[b.therapist].push({ time_slot: b.time_slot, name: b.name });
+        grouped[b.therapist].push({ time_slot: b.time_slot, name: b.name, bookedbyrole: b.bookedbyrole });
       });
       setBookedSlots(grouped);
     } else setBookedSlots({});
@@ -139,35 +140,36 @@ export default function BookingPage() {
     setSelectedTime(time);
   };
 
-  const handleSubmit = () => {
-    if (isGuest) {
-      alert("โหมดดูอย่างเดียว ไม่สามารถบันทึกการจองได้");
+const handleSubmit = () => {
+  if (isGuest) {
+    alert("โหมดดูอย่างเดียว ไม่สามารถบันทึกการจองได้");
+    return;
+  }
+  if (!clientName || !clientPhone || !date || !selectedTherapist || !selectedTime || !dialogTherapist) {
+    alert("กรุณากรอกข้อมูลให้ครบถ้วน");
+    return;
+  }
+  if (noHN) {
+    // ไม่มี HN → ใช้บัตรประชาชนแทน
+  } else {
+    if (!clientHN || clientHN.length !== 9) {
+      alert("กรุณากรอก HN ให้ครบ 9 ตัว");
       return;
     }
-    if (!clientName || !clientPhone || !date || !selectedTherapist || !selectedTime || !dialogTherapist) {
-      alert("กรุณากรอกข้อมูลให้ครบถ้วน");
-      return;
-    }
-    if (noHN) {
-      // ไม่มี HN → ใช้บัตรประชาชนแทน
-    } else {
-      if (!clientHN || clientHN.length !== 9) {
-        alert("กรุณากรอก HN ให้ครบ 9 ตัว");
-        return;
-      }
-    }
+  }
 
-    router.push(`/confirm?${new URLSearchParams({
-      hn: clientHN,
-      name: clientName,
-      phone: clientPhone,
-      idCard: idCardNumber,
-      date,
-      therapist: selectedTherapist,
-      time: selectedTime,
-      provider: dialogTherapist,
-    }).toString()}`);
-  };
+  router.push(`/confirm?${new URLSearchParams({
+    hn: clientHN,
+    name: clientName,
+    phone: clientPhone,
+    idCard: idCardNumber,
+    date,
+    therapist: selectedTherapist,
+    time: selectedTime,
+    provider: dialogTherapist,
+    bookedbyrole: user?.role || "user" // เพิ่มตรงนี้
+  }).toString()}`);
+};
 
   const handleOpenDialog = () => {
     if (isGuest) {
@@ -331,20 +333,21 @@ export default function BookingPage() {
           <ImSpinner2 className="w-12 h-12 text-white animate-spin" />
         </div>
       )}
-      <div className="fixed top-0 left-0 w-full z-50 bg-emerald-600 shadow-md flex flex-wrap sm:flex-nowrap justify-between p-2 gap-2">
-        <button
+      <div className="fixed top-0 left-0 w-full z-50 bg-gradient-to-r from-emerald-600 to-green-500 shadow-md flex justify-between items-center px-4 py-2">
+        <div
+          className="text-white font-bold text-lg flex items-center gap-2 cursor-pointer"
           onClick={() => router.push("/")}
-          className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-1 sm:py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow text-sm sm:text-base transition hover:bg-gray-300"
+          title="หน้าหลัก"
         >
-          <Home className="w-4 h-4 sm:w-5 sm:h-5" /> หน้าแรก
-        </button>
-
-        <div className="flex gap-1 sm:gap-2 flex-wrap sm:flex-nowrap">
+          <FaSpa /> แพทย์แผนไทย
+        </div>
+        <div className="flex gap-2 sm:gap-2 flex-wrap sm:flex-nowrap">
           {user?.role === "admin" && (
             <>
               <button
                 onClick={() => setAddPatientDialog(true)}
                 className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-1 sm:py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow text-sm sm:text-base transition hover:bg-gray-300"
+                title="คนไข้มี HN แต่หาไม่เจอ"
               >
                 HN ?
               </button>
@@ -456,8 +459,9 @@ export default function BookingPage() {
             <button
               onClick={() => router.push("/all-bookings")}
               className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-1 sm:py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow text-sm sm:text-base transition hover:bg-gray-300"
+              title="สรุปประวัติ"
             >
-              <FaHistory className="w-4 h-4 sm:w-5 sm:h-5" /> ประวัติการจอง
+              <FaHistory className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
           )}
         </div>
@@ -520,50 +524,62 @@ export default function BookingPage() {
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
-                  {timeSlots.map(slot => {
-                    const slotInfo = bookedSlots[t]?.find(b => b.time_slot === slot);
-                    const isBooked = !!slotInfo;
-                    const isActive = isSelected && selectedTime === slot;
-                    const isSlotDisabled = disabled.includes(slot);
+                {timeSlots.map(slot => {
+                  const slotInfo = bookedSlots[t]?.find(b => b.time_slot === slot);
+                  const isBooked = !!slotInfo;
+                  const isActive = isSelected && selectedTime === slot;
+                  const isSlotDisabled = disabled.includes(slot);
 
-                    return (
-                      <div key={slot} className="flex gap-1 items-center">
-                        <button
-                          disabled={isBooked || isOff || isSlotDisabled || isGuest}
-                          onClick={() => handleSelect(t, slot)}
-                          className={`text-sm px-3 py-2 rounded-lg font-medium border flex-1 flex flex-col items-center justify-center gap-1 transition shadow-sm
-                            ${isSlotDisabled ? "bg-gray-300 text-gray-500 border-gray-400 cursor-not-allowed"
-                            : isOff ? "bg-gray-300 text-gray-500 border-gray-400 cursor-not-allowed"
-                            : isBooked ? "bg-red-100 text-red-600 border-red-400 cursor-not-allowed"
-                            : isActive ? "bg-emerald-600 text-white border-emerald-600"
-                            : "bg-white hover:bg-gray-200 text-emerald-800 border-gray-400"}`}
-                        >
-                          <div className="flex items-center gap-1">
-                            <Clock className="w-4 h-4" /> {slot}
+                  // กำหนดสีตาม bookedbyrole
+                  let bookedBg = "bg-red-100 text-red-600 border-red-400"; // default user
+
+                  if (!isGuest && slotInfo?.bookedbyrole === "admin") {
+                    bookedBg = "bg-purple-100 text-purple-700 border-purple-400";
+                  }
+                  return (
+                    <div key={slot} className="flex gap-1 items-center">
+                      <button
+                        disabled={isBooked || isOff || isSlotDisabled || isGuest}
+                        onClick={() => handleSelect(t, slot)}
+                        className={`text-sm px-3 py-2 rounded-lg font-medium border flex-1 flex flex-col items-center justify-center gap-1 transition shadow-sm
+                          ${
+                            isSlotDisabled || isOff
+                              ? "bg-gray-300 text-gray-500 border-gray-400 cursor-not-allowed"
+                              : isBooked
+                              ? bookedBg
+                              : isActive
+                              ? "bg-emerald-600 text-white border-emerald-600"
+                              : "bg-white hover:bg-gray-200 text-emerald-800 border-gray-400"
+                          }`}
+                      >
+                        <div className="flex items-center gap-1">
+                          <Clock className="w-4 h-4" /> {slot}
+                        </div>
+                        {isBooked && (
+                          <div className="text-xs">
+                            ({slotInfo?.name || "ไม่ระบุ"})
                           </div>
-                          {isBooked && (
-                            <div className="text-xs text-red-600">
-                              ({slotInfo?.name || "ไม่ระบุ"})
-                            </div>
-                          )}
-                        </button>
-                        {date && !isGuest && ( // เพิ่ม !isGuest
-                          <button
-                            onClick={() => toggleSlot(t, slot)}
-                            className={`px-2 py-1 rounded text-white ${
-                              isOff
-                                ? "bg-gray-400 cursor-not-allowed"
-                                : isSlotDisabled
-                                ? "bg-red-500 hover:bg-red-600"
-                                : "bg-emerald-500 hover:bg-emerald-600"
-                            }`}
-                          >
-                            {isSlotDisabled ? <FaTimes /> : <FaCheck />}
-                          </button>
                         )}
-                      </div>
-                    );
-                  })}
+                      </button>
+
+                      {/* ปุ่ม admin toggle slot */}
+                      {date && !isGuest && (
+                        <button
+                          onClick={() => toggleSlot(t, slot)}
+                          className={`px-2 py-1 rounded text-white ${
+                            isOff
+                              ? "bg-gray-400 cursor-not-allowed"
+                              : isSlotDisabled
+                              ? "bg-red-500 hover:bg-red-600"
+                              : "bg-emerald-500 hover:bg-emerald-600"
+                          }`}
+                        >
+                          {isSlotDisabled ? <FaTimes /> : <FaCheck />}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
                 </div>
                 {!isGuest && (
                   <button

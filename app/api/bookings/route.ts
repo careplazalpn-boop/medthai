@@ -12,9 +12,9 @@ export async function GET(request: Request) {
 
   try {
     const conn = await pool.getConnection();
-    // ดึง name ของผู้จองมาด้วย
+    // ดึง name และ bookedbyrole ของผู้จองมาด้วย
     const [rows] = await conn.query(
-      "SELECT therapist, time_slot, name, status FROM bookings WHERE date = ? AND status != 'ยกเลิก'",
+      "SELECT therapist, time_slot, name, status, bookedbyrole FROM bookings WHERE date = ? AND status != 'ยกเลิก'",
       [date]
     );
     conn.release();
@@ -30,12 +30,12 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { provider, hn, name, phone, therapist, time, date } =
+    const { provider, hn, name, phone, therapist, time, date, bookedbyrole } =
       await request.json();
 
+    // ตรวจ field จำเป็น (role เป็น optional)
     const missingFields = [];
     if (!provider) missingFields.push("provider");
-    if (!hn) missingFields.push("hn");
     if (!name) missingFields.push("name");
     if (!phone) missingFields.push("phone");
     if (!therapist) missingFields.push("therapist");
@@ -52,8 +52,8 @@ export async function POST(request: Request) {
     const conn = await pool.getConnection();
     try {
       await conn.query(
-        "INSERT INTO bookings (hn, name, phone, date, therapist, time_slot, provider, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'รอดำเนินการ')",
-        [hn, name, phone, date, therapist, time, provider]
+        "INSERT INTO bookings (hn, name, phone, date, therapist, time_slot, provider, bookedbyrole, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'รอดำเนินการ')",
+        [hn || null, name, phone, date, therapist, time, provider, bookedbyrole || 'user']
       );
     } finally {
       conn.release();

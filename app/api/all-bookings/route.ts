@@ -6,7 +6,7 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const confirmId = url.searchParams.get("confirmId");
 
-    // เพิ่ม create_at เพื่อให้ frontend เรียงได้
+    // ดึง booking ทั้งหมด
     const [rows]: any = await pool.execute(
       "SELECT id, provider, name, phone, therapist, time_slot, date, status, created_at FROM bookings ORDER BY id DESC"
     );
@@ -14,13 +14,12 @@ export async function GET(req: Request) {
     const now = new Date();
     let updatedStatus: string | null = null;
 
-    // ตัวอย่างฟังก์ชัน confirm booking
+    // ฟังก์ชัน confirm booking
     if (confirmId) {
       const booking = rows.find((b: any) => b.id.toString() === confirmId);
       if (booking) {
         const [, endStr] = booking.time_slot.split("-");
         const [endHour, endMinute = "00"] = endStr.split(":");
-
         const bookingDate = new Date(booking.date);
         const endTime = new Date(bookingDate);
         endTime.setHours(parseInt(endHour), parseInt(endMinute), 0, 0);
@@ -29,17 +28,15 @@ export async function GET(req: Request) {
 
         await pool.execute("UPDATE bookings SET status = ? WHERE id = ?", [newStatus, confirmId]);
         booking.status = newStatus;
-
         updatedStatus = newStatus;
       }
     }
 
-    // auto-update สำหรับทุก booking ที่อยู่ในคิว
+    // auto-update สำหรับ booking ที่อยู่ในคิว
     for (const booking of rows) {
       if (booking.status === "อยู่ในคิว") {
         const [, endStr] = booking.time_slot.split("-");
         const [endHour, endMinute = "00"] = endStr.split(":");
-
         const bookingDate = new Date(booking.date);
         const endTime = new Date(bookingDate);
         endTime.setHours(parseInt(endHour, 10), parseInt(endMinute, 10), 0, 0);
@@ -51,7 +48,15 @@ export async function GET(req: Request) {
       }
     }
 
-    return NextResponse.json({ success: true, bookings: rows, updatedStatus });
+    // ✅ เพิ่มคำนวณเฉลี่ยต่อเดือน (หาร 12 เดือนตายตัว)
+    const year = now.getFullYear(); // หรือจะรับจาก query ก็ได้
+    const [avgRows]: any = await pool.execute(
+      "SELECT COUNT(*) / 12 AS avg_per_month FROM bookings WHERE YEAR(date) = ?",
+      [year]
+    );
+    const avgPerMonth = avgRows[0].avg_per_month || 0;
+
+    return NextResponse.json({ success: true, bookings: rows, updatedStatus, avgPerMonth });
   } catch (error) {
     console.error("Error fetching all bookings:", error);
     return NextResponse.json({ success: false, error: "ไม่สามารถดึงข้อมูลการจองทั้งหมดได้" }, { status: 500 });

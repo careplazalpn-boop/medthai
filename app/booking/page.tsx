@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect, useContext } from "react";
+import { useState, useEffect, useContext, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { AuthContext } from "@/context/AuthContext";
 import { CalendarIcon, UserIcon, Clock, AlertCircle, UserCheck, UserX, Search } from "lucide-react";
 import { ImSpinner2 } from "react-icons/im";
-import { FaHistory, FaCheck, FaSpa, FaTimes } from "react-icons/fa";
+import { FaCheck, FaSpa, FaTimes, FaBars, FaSignOutAlt, FaSignInAlt, FaCalendarAlt, FaHistory, FaChartBar, FaUsersCog, FaFacebook, FaHospital} from "react-icons/fa";
+import { HiChevronDown, HiChevronUp } from "react-icons/hi";
 import * as Dialog from "@radix-ui/react-dialog";
 
 interface UserInfo {
@@ -24,10 +25,10 @@ interface BookingInfo {
 
 export default function BookingPage() {
   const router = useRouter();
-  const { user } = useContext(AuthContext);
-
+  const { user, logout } = useContext(AuthContext);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isGuest = !user;
-
+  const [menuOpen, setMenuOpen] = useState(false); // state สำหรับ hamburger
   const [idCardNumber, setIdCardNumber] = useState("");
   const [therapists, setTherapists] = useState<string[]>([]);
   const [medStaff, setMedStaff] = useState<string[]>([]);
@@ -53,6 +54,29 @@ export default function BookingPage() {
   const [patientFirstName, setPatientFirstName] = useState("");
   const [patientLastName, setPatientLastName] = useState("");
   const [patientPhone, setPatientPhone] = useState("");
+  const [contactOpen, setContactOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setMenuOpen(false);
+      }
+    };
+    if (menuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("keydown", handleEsc);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEsc);
+    };
+  }, [menuOpen]);
 
   useEffect(() => {
     if (!showAlert) return;
@@ -140,6 +164,24 @@ export default function BookingPage() {
     setSelectedTime(time);
   };
 
+  const handleBookingClick = () => {
+    if (!user) {
+      setShowAlert(true);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(() => {
+        setShowAlert(false);
+        timeoutRef.current = null;
+      }, 5000);
+      return;
+    }
+    router.push("/booking");
+  };
+  
+  const handleLogout = () => {
+    logout();
+    router.push("/login");
+  };
+  
 const handleSubmit = () => {
   if (isGuest) {
     alert("โหมดดูอย่างเดียว ไม่สามารถบันทึกการจองได้");
@@ -333,20 +375,33 @@ const handleSubmit = () => {
           <ImSpinner2 className="w-12 h-12 text-white animate-spin" />
         </div>
       )}
-      <div className="fixed top-0 left-0 w-full z-50 bg-gradient-to-r from-emerald-600 to-green-500 shadow-md flex justify-between items-center px-4 py-2">
-        <div
-          className="text-white font-bold text-lg flex items-center gap-2 cursor-pointer"
-          onClick={() => router.push("/")}
-          title="หน้าหลัก"
-        >
-          <FaSpa /> แพทย์แผนไทย
+      {/* แถบเมนูบนสุด */}
+      <div className="fixed top-0 left-0 w-full z-50 bg-gradient-to-r from-emerald-600 to-green-500 shadow-md flex justify-between items-center px-2 sm:px-4 py-2 sm:py-2">
+        <div className="flex items-center gap-2 sm:gap-13">
+          {/* Hamburger */}
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="text-white text-xl sm:text-2xl"
+            title="เมนู"
+          >
+            {menuOpen ? <FaTimes /> : <FaBars />}
+          </button>
+
+          {/* Logo */}
+          <div
+            className="ml-3 sm:ml-3 text-white font-bold text-base sm:text-lg flex items-center gap-1 cursor-pointer"
+            onClick={() => router.push("/")}
+            title="หน้าหลัก"
+          >
+            <FaSpa className="text-sm sm:text-base" /> แพทย์แผนไทย
+          </div>
         </div>
-        <div className="flex gap-2 sm:gap-2 flex-wrap sm:flex-nowrap">
+        <div className="flex gap-2 sm:gap-3 flex-wrap sm:flex-nowrap">
           {user?.role === "admin" && (
             <>
               <button
                 onClick={() => setAddPatientDialog(true)}
-                className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-1 sm:py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow text-sm sm:text-base transition hover:bg-gray-300"
+                className="flex items-center gap-1 sm:gap-2 px-3 py-3 sm:px-3 sm:py-3 rounded-lg bg-white text-emerald-700 font-semibold shadow text-xs sm:text-sm transition hover:bg-gray-300"
                 title="คนไข้มี HN แต่หาไม่เจอ"
               >
                 HN ?
@@ -455,18 +510,114 @@ const handleSubmit = () => {
               </Dialog.Root>
             </>
           )}
-          {!isGuest && (
-            <button
-              onClick={() => router.push("/all-bookings")}
-              className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-1 sm:py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow text-sm sm:text-base transition hover:bg-gray-300"
-              title="สรุปประวัติ"
-            >
-              <FaHistory className="w-4 h-4 sm:w-5 sm:h-5" />
-            </button>
-          )}
+          {/* User Buttons */}
+          <div className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+            {user ? (
+              <>
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-1 px-2 py-3 sm:px-4 sm:py-3 bg-red-600 text-white rounded-lg shadow font-semibold transition hover:bg-red-700 text-xs sm:text-sm"
+                  title="ลงชื่อออก"
+                >
+                  <FaSignOutAlt className="w-3 h-3 sm:w-5 sm:h-5" />
+                  <span>ลงชื่อออก</span>
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => router.push("/login")}
+                className="flex items-center gap-1 px-2 py-1 sm:px-4 sm:py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow transition hover:bg-gray-300 text-xs sm:text-sm"
+                title="ลงชื่อเข้าใช้"
+              >
+                <FaSignInAlt className="w-3 h-3 sm:w-5 sm:h-5" />
+                <span>สำหรับบุคลากร</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
+      {/* Hamburger Menu */}
+      <AnimatePresence>
+        {menuOpen && (
+          <motion.div
+            ref={menuRef}
+            initial={{ x: -300, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: -300, opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="fixed top-0 left-0 w-48 sm:w-64 h-full sm:h-full bg-black/70 z-40 flex flex-col pt-14 overflow-y-auto"
+          >
+            {/* จองคิว */}
+            <div
+              onClick={user ? handleBookingClick : () => router.push("/booking")}
+              className="w-full py-3 sm:py-4 px-4 sm:px-6 border-b-2 border-gray-400 cursor-pointer hover:bg-white/20 flex items-center justify-center gap-2 text-sm sm:text-lg font-semibold text-white"
+            >
+              <FaCalendarAlt /> {user ? "จองคิวนวดแผนไทย" : "ดูคิวจองนวดแผนไทย"}
+            </div>
 
+            {user && (
+              <>
+                <div
+                  onClick={() => router.push("/all-bookings")}
+                  className="w-full py-3 sm:py-4 px-4 sm:px-6 border-b-2 border-gray-400 cursor-pointer hover:bg-white/20 flex items-center justify-center gap-2 text-sm sm:text-lg font-semibold text-white"
+                >
+                  <FaHistory /> ประวัติการจอง
+                </div>
+                <div
+                  onClick={() => router.push("/summary-history")}
+                  className="w-full py-3 sm:py-4 px-4 sm:px-6 border-b-2 border-gray-400 cursor-pointer hover:bg-white/20 flex items-center justify-center gap-2 text-sm sm:text-lg font-semibold text-white"
+                >
+                  <FaChartBar /> สรุปประวัติ
+                </div>
+                {user.role === "admin" && (
+                  <button
+                    onClick={() => router.push("/manage-therapists")}
+                    className="w-full py-3 sm:py-4 px-4 sm:px-6 border-b-2 border-gray-400 cursor-pointer hover:bg-white/20 flex items-center justify-center gap-2 text-sm sm:text-lg font-semibold text-white"
+                    title="จัดการบุคลากร"
+                  >
+                    <FaUsersCog /> จัดการบุคลากร
+                  </button>
+                )}
+              </>
+            )}
+
+            {/* ช่องทางติดต่อ */}
+            <div className="w-full border-b-2 border-gray-400 relative">
+              <div
+                onClick={() => setContactOpen(!contactOpen)}
+                className="w-full py-3 sm:py-4 px-4 sm:px-6 cursor-pointer hover:bg-white/20 text-sm sm:text-lg font-semibold text-white text-center relative"
+              >
+                <span>ช่องทางอื่น</span>
+                <span className="absolute right-4 top-1/2 -translate-y-1/2">
+                  {contactOpen ? <HiChevronUp className="w-5 h-5" /> : <HiChevronDown className="w-5 h-5" />}
+                </span>
+              </div>
+              {contactOpen && (
+                <div className="flex flex-col bg-black/50 text-white text-sm sm:text-base">
+                  <a
+                    href="https://www.facebook.com/profile.php?id=100070719421986"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="py-2 px-6 hover:bg-white/20 flex items-center justify-center gap-2"
+                  >
+                    <FaFacebook className="w-4 h-4 sm:w-5 sm:h-5" />
+                    <span>Facebook</span>
+                  </a>
+                  <a
+                    href="https://www.lmwcc.com/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="py-2 px-6 hover:bg-white/20 flex items-center justify-center gap-2"
+                  >
+                    <FaHospital className="w-4 h-4 sm:w-5 sm:h-5" />
+                    <span>เพจหลักศูนย์บริการ</span>
+                  </a>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <div className="max-w-6xl mx-auto p-6 pt-27 relative z-10">
         <h1
           className="text-3xl sm:text-4xl font-extrabold text-emerald-700 mb-12 sm:mb-12 text-center drop-shadow-sm"

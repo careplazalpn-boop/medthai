@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
+import { AnimatePresence, motion } from "framer-motion";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid, LabelList } from "recharts";
-import { FaHistory, FaCheckCircle, FaClock, FaSpa, FaTimesCircle } from "react-icons/fa";
+import { FaHistory, FaCalendarAlt, FaFacebook, FaHospital, FaChartBar, FaUsersCog, FaSignOutAlt, FaSignInAlt, FaTimes, FaBars, FaCheckCircle, FaClock, FaSpa, FaTimesCircle } from "react-icons/fa";
+import { HiChevronDown, HiChevronUp } from "react-icons/hi";
 
 type Booking = {
   id: number;
@@ -14,6 +17,7 @@ type Booking = {
 
 export default function SummaryHistoryPage() {
   const router = useRouter();
+  const { user, logout } = useAuth();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [therapists, setTherapists] = useState<string[]>([]);
   const [filtered, setFiltered] = useState<Booking[]>([]);
@@ -25,6 +29,46 @@ export default function SummaryHistoryPage() {
   const [statusFilter, setStatusFilter] = useState<"success" | "pending" | "cancelled">("success");
   const buddhistYear = (y: number) => y + 543;
   const monthNames = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [, setShowAlert] = useState(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [contactOpen, setContactOpen] = useState(false);
+  const [windowWidth, setWindowWidth] = useState(0);
+
+  useEffect(() => {
+    setWindowWidth(window.innerWidth);
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setMenuOpen(false);
+      }
+    };
+    if (menuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("keydown", handleEsc);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEsc);
+    };
+  }, [menuOpen]);
+
+  useEffect(() => {
+    if (!user) {
+      router.push("/login");
+    }
+  }, [user, router]);
 
   // โหลด bookings
   useEffect(() => {
@@ -78,6 +122,9 @@ export default function SummaryHistoryPage() {
     setMonths(Array.from({ length: 12 }, (_, i) => i));
   }, [bookings, year, month, dayRange]);
 
+  if (!user) {
+    return <p>กำลังตรวจสอบสิทธิ์...</p>; // render ชั่วคราว
+  }
   // Summary รายเดือน
   const monthlySummary = Array.from({ length: 12 }).map((_, idx) => {
     const monthBookings = filtered.filter(b => new Date(b.date).getMonth() === idx);
@@ -89,7 +136,7 @@ export default function SummaryHistoryPage() {
       total: monthBookings.length,
     };
   });
-
+  
   // Summary ตามหมอนวด
   const therapistSummary: Record<string, { success: number; pending: number; cancelled: number }> = {};
   therapists.forEach(name => therapistSummary[name] = { success: 0, pending: 0, cancelled: 0 });
@@ -108,29 +155,161 @@ export default function SummaryHistoryPage() {
     ยกเลิก: counts.cancelled,
   }));
 
+  const handleLogout = () => {
+    logout();
+    router.push("/login");
+  };
+
+  const handleBookingClick = () => {
+    if (!user) {
+      setShowAlert(true);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(() => {
+        setShowAlert(false);
+        timeoutRef.current = null;
+      }, 5000);
+      return;
+    }
+    router.push("/booking");
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 pt-28">
-      {/* Navbar */}
-      <div className="fixed top-0 left-0 w-full z-50 bg-gradient-to-r from-emerald-600 to-green-500 shadow-md flex justify-between items-center px-4 py-2">
-        <div className="text-white font-bold text-lg flex items-center gap-2 cursor-pointer" onClick={() => router.push("/")}>
-          <FaSpa /> แพทย์แผนไทย
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => router.push("/all-bookings")}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white hover:bg-gray-200 text-emerald-700 font-semibold shadow transition"
+      {/* Header */}
+            <div className="fixed top-0 left-0 w-full z-50 bg-gradient-to-r from-emerald-600 to-green-500 shadow-md flex justify-between items-center px-2 sm:px-4 py-2 sm:py-2">
+              <div className="flex items-center gap-2 sm:gap-13">
+                {/* Hamburger */}
+                <button
+                  onClick={() => setMenuOpen(!menuOpen)}
+                  className="text-white text-xl sm:text-2xl"
+                  title="เมนู"
+                >
+                  {menuOpen ? <FaTimes /> : <FaBars />}
+                </button>
+      
+                {/* Logo */}
+                <div
+                  className="ml-3 sm:ml-3 text-white font-bold text-base sm:text-lg flex items-center gap-1 cursor-pointer"
+                  onClick={() => router.push("/")}
+                  title="หน้าหลัก"
+                >
+                  <FaSpa className="text-sm sm:text-base" /> แพทย์แผนไทย
+                </div>
+              </div>
+      
+              {/* User Buttons */}
+              <div className="flex items-center gap-3 sm:gap-3 text-xs sm:text-sm">
+                {user ? (
+                  <>
+                    <button
+                      onClick={handleLogout}
+                      className="flex items-center gap-1 px-2 py-3 sm:px-4 sm:py-3 bg-red-600 text-white rounded-lg shadow font-semibold transition hover:bg-red-700 text-xs sm:text-sm"
+                      title="ลงชื่อออก"
+                    >
+                      <FaSignOutAlt className="w-3 h-3 sm:w-5 sm:h-5" />
+                      <span>ลงชื่อออก</span>
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => router.push("/login")}
+                    className="flex items-center gap-1 px-2 py-1 sm:px-4 sm:py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow transition hover:bg-gray-300 text-xs sm:text-sm"
+                    title="ลงชื่อเข้าใช้"
+                  >
+                    <FaSignInAlt className="w-3 h-3 sm:w-5 sm:h-5" />
+                    <span>สำหรับบุคลากร</span>
+                  </button>
+                )}
+              </div>
+            </div>
+        <AnimatePresence>
+        {menuOpen && (
+          <motion.div
+            ref={menuRef}
+            initial={{ x: -300, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: -300, opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="fixed top-0 left-0 w-48 sm:w-64 h-full bg-black/70 z-40 flex flex-col pt-14 overflow-y-auto"
           >
-            <FaHistory className="w-5 h-6" />
-          </button>
-        </div>
-      </div>
+            {/* จองคิว */}
+            <div
+              onClick={user ? handleBookingClick : () => router.push("/booking")}
+              className="w-full py-3 sm:py-4 px-4 sm:px-6 border-b-2 border-gray-400 cursor-pointer hover:bg-white/20 flex items-center justify-center gap-2 text-sm sm:text-lg font-semibold text-white"
+            >
+              <FaCalendarAlt /> {user ? "จองคิวนวดแผนไทย" : "ดูคิวจองนวดแผนไทย"}
+            </div>
+
+            {user && (
+              <>
+                <div
+                  onClick={() => router.push("/all-bookings")}
+                  className="w-full py-3 sm:py-4 px-4 sm:px-6 border-b-2 border-gray-400 cursor-pointer hover:bg-white/20 flex items-center justify-center gap-2 text-sm sm:text-lg font-semibold text-white"
+                >
+                  <FaHistory /> ประวัติการจอง
+                </div>
+                <div
+                  onClick={() => router.push("/summary-history")}
+                  className="w-full py-3 sm:py-4 px-4 sm:px-6 border-b-2 border-gray-400 cursor-pointer hover:bg-white/20 flex items-center justify-center gap-2 text-sm sm:text-lg font-semibold text-white"
+                >
+                  <FaChartBar /> สรุปประวัติ
+                </div>
+                {user.role === "admin" && (
+                  <button
+                    onClick={() => router.push("/manage-therapists")}
+                    className="w-full py-3 sm:py-4 px-4 sm:px-6 border-b-2 border-gray-400 cursor-pointer hover:bg-white/20 flex items-center justify-center gap-2 text-sm sm:text-lg font-semibold text-white"
+                    title="จัดการบุคลากร"
+                  >
+                    <FaUsersCog /> จัดการบุคลากร
+                  </button>
+                )}
+              </>
+            )}
+
+            {/* ช่องทางติดต่อ */}
+            <div className="w-full border-b-2 border-gray-400 relative">
+              <div
+                onClick={() => setContactOpen(!contactOpen)}
+                className="w-full py-3 sm:py-4 px-4 sm:px-6 cursor-pointer hover:bg-white/20 text-sm sm:text-lg font-semibold text-white text-center relative"
+              >
+                <span>ช่องทางอื่น</span>
+                <span className="absolute right-4 top-1/2 -translate-y-1/2">
+                  {contactOpen ? <HiChevronUp className="w-5 h-5" /> : <HiChevronDown className="w-5 h-5" />}
+                </span>
+              </div>
+              {contactOpen && (
+                <div className="flex flex-col bg-black/50 text-white text-sm sm:text-base">
+                  <a
+                    href="https://www.facebook.com/profile.php?id=100070719421986"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="py-2 px-6 hover:bg-white/20 flex items-center justify-center gap-2"
+                  >
+                    <FaFacebook className="w-4 h-4 sm:w-5 sm:h-5" />
+                    <span>Facebook</span>
+                  </a>
+                  <a
+                    href="https://www.lmwcc.com/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="py-2 px-6 hover:bg-white/20 flex items-center justify-center gap-2"
+                  >
+                    <FaHospital className="w-4 h-4 sm:w-5 sm:h-5" />
+                    <span>เพจหลักศูนย์บริการ</span>
+                  </a>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <h1 className="text-3xl font-bold text-emerald-800 mb-6 text-center">
         📊 Dashboard สรุปประวัติ
       </h1>
 
       {/* Dropdown สำหรับกราฟ/summary */}
-      <div className="flex gap-4 mb-6 justify-center flex-wrap">
+      <div className="flex gap-2 mb-6 justify-center flex-wrap">
         {years.length > 0 && (
           <select className="border border-emerald-400 rounded px-3 py-2 bg-white text-emerald-800 shadow-sm" value={year ?? ""} onChange={e => setYear(Number(e.target.value))}>
             {years.map(y => <option key={y} value={y}>พ.ศ. {buddhistYear(y)}</option>)}
@@ -187,61 +366,87 @@ export default function SummaryHistoryPage() {
       </div>
 
       {/* BarChart ตามหมอนวด */}
-      <div className="bg-white shadow rounded-lg p-4 max-w-6xl mx-auto mt-8 px-4">
-        <h2 className="text-xl font-semibold text-emerald-700 mb-4 text-center">จำนวนการจองต่อคน</h2>
-        <ResponsiveContainer width="100%" height={Math.max(50 * therapistChartData.length, 300)}>
-          <BarChart
-            layout="vertical"
-            data={therapistChartData.sort(
-              (a, b) => (b.สำเร็จ + b.รอดำเนินการ + b.ยกเลิก) - (a.สำเร็จ + a.รอดำเนินการ + a.ยกเลิก)
-            )}
-            margin={{ top: 20, right: 120, left: 20, bottom: 20 }}
+<div className="bg-white shadow rounded-lg p-4 max-w-6xl mx-auto mt-8 px-4">
+  <h2 className="text-xl font-semibold text-emerald-700 mb-4 text-center">จำนวนการจองต่อคน</h2>
+
+  {/* ResponsiveContainer สำหรับมือถือ/desktop */}
+  <ResponsiveContainer
+    width="100%"
+    height={windowWidth < 640 ? 300 : Math.max(50 * therapistChartData.length, 300)}
+  >
+    <BarChart
+      layout="vertical"
+      data={therapistChartData.sort(
+        (a, b) =>
+          b.สำเร็จ + b.รอดำเนินการ + b.ยกเลิก - (a.สำเร็จ + a.รอดำเนินการ + a.ยกเลิก)
+      )}
+      margin={{
+        top: 20,
+        right: windowWidth < 640 ? 20 : 120,
+        left: 20,
+        bottom: 20,
+      }}
+    >
+      <CartesianGrid strokeDasharray="3 3" />
+      <XAxis type="number" />
+      <YAxis dataKey="name" type="category" width={windowWidth < 640 ? 120 : 200} />
+      <Tooltip />
+      <Legend />
+      <Bar dataKey="สำเร็จ" stackId="b" fill="#22C55E" />
+      <Bar dataKey="รอดำเนินการ" stackId="b" fill="#6B7280" />
+      <Bar dataKey="ยกเลิก" stackId="b" fill="#EF4444">
+        <LabelList
+          dataKey={(d: any) => d.สำเร็จ + d.รอดำเนินการ + d.ยกเลิก}
+          position="right"
+          formatter={(v) => (v === 0 ? "" : v)}
+        />
+      </Bar>
+    </BarChart>
+  </ResponsiveContainer>
+
+  {/* รายละเอียดหมอนวด */}
+  <div className="mt-4 max-w-6xl mx-auto">
+    <h3 className="text-lg font-semibold text-emerald-700 mb-2 text-center">จำนวนครั้งสถานะทั้งหมดต่อคน</h3>
+    {/* Dropdown เลือกสถานะ */}
+    <div className="flex justify-center mb-4">
+      <select
+        className="border border-emerald-400 rounded px-3 py-2 bg-white text-emerald-800 shadow-sm"
+        value={statusFilter}
+        onChange={(e) => setStatusFilter(e.target.value as "success" | "pending" | "cancelled")}
+      >
+        <option value="success">สำเร็จ</option>
+        <option value="pending">รอดำเนินการ</option>
+        <option value="cancelled">ยกเลิก</option>
+      </select>
+    </div>
+
+    {/* การ์ดรายหมอนวด */}
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+      {Object.entries(therapistSummary).map(([name, counts]) => (
+        <div key={name} className="bg-white rounded shadow p-3 flex justify-between items-center">
+          <span className="font-medium text-gray-600">{name}</span>
+          <span
+            className={`font-bold ${
+              statusFilter === "success"
+                ? "text-green-600"
+                : statusFilter === "pending"
+                ? "text-gray-600"
+                : "text-red-600"
+            }`}
           >
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis type="number" />
-            <YAxis dataKey="name" type="category" width={200} />
-            <Tooltip />
-            <Legend />
-            <Bar dataKey="สำเร็จ" stackId="b" fill="#22C55E" />
-            <Bar dataKey="รอดำเนินการ" stackId="b" fill="#6B7280" />
-            <Bar dataKey="ยกเลิก" stackId="b" fill="#EF4444">
-              <LabelList dataKey={(d: any) => d.สำเร็จ + d.รอดำเนินการ + d.ยกเลิก} position="right" formatter={(v) => (v === 0 ? "" : v)} />
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-        {/* รายละเอียดหมอนวด */}
-        <div className="mt-4 max-w-6xl mx-auto">
-          <h3 className="text-lg font-semibold text-emerald-700 mb-2 text-center">จำนวนครั้งสถานะทั้งหมดต่อคน</h3>
-          {/* Dropdown เลือกสถานะ */}
-          <div className="flex justify-center mb-4">
-            <select
-              className="border border-emerald-400 rounded px-3 py-2 bg-white text-emerald-800 shadow-sm"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as "success" | "pending" | "cancelled")}
-            >
-              <option value="success">สำเร็จ</option>
-              <option value="pending">รอดำเนินการ</option>
-              <option value="cancelled">ยกเลิก</option>
-            </select>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-            {Object.entries(therapistSummary).map(([name, counts]) => (
-              <div key={name} className="bg-white rounded shadow p-3 flex justify-between items-center">
-                <span className="font-medium text-gray-600">{name}</span>
-                <span className={`font-bold ${
-                  statusFilter === "success" ? "text-green-600" :
-                  statusFilter === "pending" ? "text-gray-600" :
-                  "text-red-600"
-                }`}>
-                  {statusFilter === "success" ? counts.success :
-                  statusFilter === "pending" ? counts.pending :
-                  counts.cancelled} ครั้ง
-                </span>
-              </div>
-            ))}
-          </div>
+            {statusFilter === "success"
+              ? counts.success
+              : statusFilter === "pending"
+              ? counts.pending
+              : counts.cancelled}{" "}
+            ครั้ง
+          </span>
         </div>
-      </div>
+      ))}
+    </div>
+  </div>
+</div>
+
     </div>
   );
 }

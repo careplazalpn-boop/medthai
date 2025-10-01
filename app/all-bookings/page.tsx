@@ -1,14 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { User, Phone, UserCheck, Clock, CalendarDays, CheckCircle2, Smile, Frown } from "lucide-react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { FaCheck, FaSpa, FaTimes } from "react-icons/fa";
+import { FaCheck, FaSpa, FaTimes, FaBars, FaSignOutAlt, FaSignInAlt } from "react-icons/fa";
 import { ImSpinner2 } from "react-icons/im";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
+import { useAuth } from "@/context/AuthContext";
 
 interface Booking {
   id: number;
@@ -99,7 +100,7 @@ function BookingSummary({ attended, cancelled }: SummaryProps) {
 
 export default function AllBookingsPage() {
   const router = useRouter();
-
+  const { user, logout } = useAuth();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [providers, setProviders] = useState<string[]>([]);
@@ -113,8 +114,10 @@ export default function AllBookingsPage() {
   const [editingPnameValue, setEditingPnameValue] = useState("");
   const [editingFnameValue, setEditingFnameValue] = useState("");
   const [editingLnameValue, setEditingLnameValue] = useState("");
-
-  
+  const [editingPhoneId, setEditingPhoneId] = useState<number | null>(null);
+  const [editingPhoneValue, setEditingPhoneValue] = useState<string>("");
+  const [menuOpen, setMenuOpen] = useState(false); // state สำหรับ hamburger
+  const [, setShowAlert] = useState(false);
   const [filterName, setFilterName] = useState("");
   const [filterTherapist, setFilterTherapist] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -123,6 +126,35 @@ export default function AllBookingsPage() {
   const [filterProvider, setFilterProvider] = useState("all");
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setMenuOpen(false);
+      }
+    };
+    if (menuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("keydown", handleEsc);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEsc);
+    };
+  }, [menuOpen]);
+
+  useEffect(() => {
+    if (!user) {
+      router.push("/login");
+    }
+  }, [user, router]);
 
   useEffect(() => {
     if (!filterDate) { setBookings([]); return; }
@@ -167,6 +199,10 @@ export default function AllBookingsPage() {
       }
     })();
   }, []);
+
+  if (!user) {
+    return <p>กำลังตรวจสอบสิทธิ์...</p>; // render ชั่วคราว
+  }
 
 const exportToExcel = () => {
   // กรองเฉพาะวันที่ที่เลือก
@@ -268,6 +304,24 @@ bookings.forEach(b => {
   }
 });
 
+  const handleBookingClick = () => {
+    if (!user) {
+      setShowAlert(true);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(() => {
+        setShowAlert(false);
+        timeoutRef.current = null;
+      }, 5000);
+      return;
+    }
+    router.push("/booking");
+  };
+
+  const handleLogout = () => {
+    logout();
+    router.push("/login");
+  };
+
 const attendedBookings = Array.from(attendedKeys).map(k => {
   const [name, date] = k.split("-");
   return bookings.find(b => b.name === name && formatDate(b.date) === date)!;
@@ -319,30 +373,33 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
           <ImSpinner2 className="w-12 h-12 text-white animate-spin" />
         </div>
       )}
-      <div className="fixed top-0 left-0 w-full z-50 bg-gradient-to-r from-emerald-600 to-green-500 shadow-md flex justify-between items-center px-4 py-2">
-        {/* กลุ่มปุ่มซ้าย */}
-        <div className="flex gap-2 sm:gap-2 flex-wrap">
+      {/* แถบเมนูบนสุด */}
+      <div className="fixed top-0 left-0 w-full z-50 bg-gradient-to-r from-emerald-600 to-green-500 shadow-md flex justify-between items-center px-2 sm:px-4 py-2 sm:py-2">
+        <div className="flex items-center gap-2 sm:gap-13">
+          {/* Hamburger */}
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="text-white text-xl sm:text-2xl"
+            title="เมนู"
+          >
+            {menuOpen ? <FaTimes /> : <FaBars />}
+          </button>
+
+          {/* Logo */}
           <div
-            className="text-white font-bold text-lg flex items-center gap-2 cursor-pointer"
+            className="ml-3 sm:ml-3 text-white font-bold text-base sm:text-lg flex items-center gap-1 cursor-pointer"
             onClick={() => router.push("/")}
             title="หน้าหลัก"
           >
-            <FaSpa /> แพทย์แผนไทย
+            <FaSpa className="text-sm sm:text-base" /> แพทย์แผนไทย
           </div>
         </div>
 
         {/* กลุ่มปุ่มขวา */}
-        <div className="flex gap-1 sm:gap-2 flex-wrap">
-          <button
-            onClick={() => router.push("/summary-history")}
-            className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1 sm:py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow text-sm sm:text-base transition hover:bg-gray-300"
-            title="สรุปประวัติ"
-          >
-            📊
-          </button>
+        <div className="flex items-center gap-2  sm:gap-3 text-xs sm:text-sm">
           <button
             onClick={exportToExcel}
-            className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1 sm:py-2 rounded-lg bg-white hover:bg-gray-300 text-emerald-700 font-semibold shadow text-sm sm:text-base transition"
+            className="flex items-center gap-1 sm:gap-2 px-4 sm:px-4 py-3 sm:py-3 rounded-lg bg-white text-emerald-700 font-semibold shadow text-sm sm:text-base transition hover:bg-gray-300"
             title="ส่งออก Excel"
           >
             <svg
@@ -354,9 +411,75 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
               <path d="M19 2H8a2 2 0 0 0-2 2v4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-1h1a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2h-1V2zM8 4h11v16H5V8h1v-2zM7 10h10v2H7v-2zm0 4h10v2H7v-2z"/>
             </svg>
           </button>
+          {user ? (
+            <>
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-1 px-2 py-3 sm:px-4 sm:py-3 bg-red-600 text-white rounded-lg shadow font-semibold transition hover:bg-red-700 text-xs sm:text-sm"
+                title="ลงชื่อออก"
+              >
+                <FaSignOutAlt className="w-3 h-3 sm:w-5 sm:h-5" />
+                <span>ลงชื่อออก</span>
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => router.push("/login")}
+              className="flex items-center gap-1 px-2 py-1 sm:px-4 sm:py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow transition hover:bg-gray-300 text-xs sm:text-sm"
+              title="ลงชื่อเข้าใช้"
+            >
+              <FaSignInAlt className="w-3 h-3 sm:w-5 sm:h-5" />
+              <span>สำหรับบุคลากร</span>
+            </button>
+          )}
         </div>
       </div>
+      <AnimatePresence>
+        {menuOpen && (
+          <motion.div
+            ref={menuRef}
+            initial={{ x: -300, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: -300, opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="fixed top-0 left-0 w-64 h-full bg-black/70 z-40 flex flex-col pt-14"
+          >
+            {/* แถบเมนูแต่ละรายการ */}
+            <div
+              onClick={user ? handleBookingClick : () => router.push("/booking")}
+              className="w-full py-4 px-6 border-b-2 border-gray-400 cursor-pointer hover:bg-white/20 text-center text-lg font-semibold text-white"
+            >
+              {user ? "จองคิวนวดแผนไทย" : "ดูคิวจองนวดแผนไทย"}
+            </div>
 
+            {user && (
+              <>
+                <div
+                  onClick={() => router.push("/all-bookings")}
+                  className="w-full py-4 px-6 border-b-2 border-gray-400 cursor-pointer hover:bg-white/20 text-center text-lg font-semibold text-white"
+                >
+                  ประวัติการจอง
+                </div>
+                <div
+                  onClick={() => router.push("/summary-history")}
+                  className="w-full py-4 px-6 border-b-2 border-gray-400 cursor-pointer hover:bg-white/20 text-center text-lg font-semibold text-white"
+                >
+                  สรุปประวัติ
+                </div>
+                {user.role === "admin" && (
+                  <button
+                    onClick={() => router.push("/manage-therapists")}
+                    className="w-full py-4 px-6 border-b-2 border-gray-400 cursor-pointer hover:bg-white/20 text-center text-lg font-semibold text-white"
+                    title="จัดการบุคลากร"
+                  >
+                    จัดการบุคลากร
+                  </button>
+                )}
+              </>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
       <h1 className="text-3xl sm:text-4xl font-extrabold text-emerald-700 mb-8 sm:mb-12 pt-15 text-center drop-shadow-sm">
         ประวัติการจอง
       </h1>
@@ -597,9 +720,67 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
                 {/* เบอร์โทร */}
                 <div className="flex flex-col sm:flex-col gap-1">
                   <Label icon={<Phone className="w-4 h-4" />} text="เบอร์โทร" />
-                  <span className="font-normal text-base">{b.phone}</span>
+                  {editingPhoneId === b.id ? (
+                    <div className="flex flex-col gap-1">
+                      <input
+                        value={editingPhoneValue}
+                        onChange={(e) => setEditingPhoneValue(e.target.value)}
+                        className="px-2 py-1 border border-gray-300 rounded-md text-gray-900 w-32"
+                        autoFocus
+                      />
+                      <div className="flex gap-2 mt-1">
+                        <button
+                          onClick={async () => {
+                            if (editingPhoneValue && editingPhoneValue !== b.phone) {
+                              try {
+                                const res = await fetch("/api/update-booking-phone", {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({
+                                    id: b.id,
+                                    phone: editingPhoneValue,
+                                  }),
+                                });
+                                const data = await res.json();
+                                if (data.success) {
+                                  setBookings((prev) =>
+                                    prev.map((x) =>
+                                      x.id === b.id ? { ...x, phone: editingPhoneValue } : x
+                                    )
+                                  );
+                                } else {
+                                  alert("ไม่สามารถอัปเดตเบอร์โทรได้: " + data.error);
+                                }
+                              } catch (err) {
+                                alert("เกิดข้อผิดพลาด: " + err);
+                              }
+                            }
+                            setEditingPhoneId(null);
+                          }}
+                          className="px-2 py-1 text-xs bg-emerald-600 text-white rounded hover:bg-emerald-700 transition"
+                        >
+                          ยืนยัน
+                        </button>
+                        <button
+                          onClick={() => setEditingPhoneId(null)}
+                          className="px-2 py-1 text-xs bg-gray-300 text-gray-700 rounded hover:bg-gray-400 transition"
+                        >
+                          ยกเลิก
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <span
+                      className="font-normal text-base cursor-pointer"
+                      onClick={() => {
+                        setEditingPhoneId(b.id);
+                        setEditingPhoneValue(b.phone ?? "");
+                      }}
+                    >
+                      {b.phone}
+                    </span>
+                  )}
                 </div>
-
                 {/* หมอนวด */}
                 <div className="flex flex-col sm:flex-col gap-1">
                   <Label icon={<UserCheck className="w-4 h-4" />} text="หมอนวด" />

@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Pencil, Trash2, UserPlus } from "lucide-react";
-import { FaHistory, FaSpa } from "react-icons/fa";
+import { FaHistory, FaFacebook, FaHospital, FaUsersCog, FaChartBar, FaCalendarAlt, FaSignOutAlt, FaSignInAlt, FaTimes, FaBars, FaSpa } from "react-icons/fa";
+import { HiChevronDown, HiChevronUp } from "react-icons/hi";
+import { AnimatePresence, motion } from "framer-motion";
+import { useAuth } from "@/context/AuthContext";
 
 interface Person {
   id: number;
@@ -15,12 +18,18 @@ interface Person {
 
 export default function ManageTherapistsPage() {
   const router = useRouter();
+  const { user, logout } = useAuth();
   const [therapists, setTherapists] = useState<Person[]>([]);
   const [medStaff, setMedStaff] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState<Partial<Person>>({});
   const [selectedTable, setSelectedTable] = useState<"therapist" | "med_staff" | null>(null);
   const [editingPerson, setEditingPerson] = useState<Person | null>(null); // สำหรับแก้ไข
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [, setShowAlert] = useState(false);
+  const [contactOpen, setContactOpen] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -32,8 +41,39 @@ export default function ManageTherapistsPage() {
   };
 
   useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setMenuOpen(false);
+      }
+    };
+    if (menuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("keydown", handleEsc);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEsc);
+    };
+  }, [menuOpen]);
+
+  useEffect(() => {
+    if (!user) {
+      router.push("/login");
+    }
+  }, [user, router]);
+
+  useEffect(() => {
     fetchData();
   }, []);
+
+  if (!user) {
+    return <p>กำลังตรวจสอบสิทธิ์...</p>; // render ชั่วคราว
+  }
 
   // ฟังก์ชันเพิ่มข้อมูล
   const handleAddSave = async () => {
@@ -104,6 +144,24 @@ export default function ManageTherapistsPage() {
     setEditingPerson(p);
   };
 
+  const handleLogout = () => {
+    logout();
+    router.push("/login");
+  };
+
+  const handleBookingClick = () => {
+    if (!user) {
+      setShowAlert(true);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(() => {
+        setShowAlert(false);
+        timeoutRef.current = null;
+      }, 5000);
+      return;
+    }
+    router.push("/booking");
+  };
+
   const renderAddForm = () => (
     <div className="mb-8">
       <h2 className="text-2xl font-bold mb-4 flex items-center gap-2 text-emerald-700">
@@ -168,67 +226,217 @@ export default function ManageTherapistsPage() {
     </div>
   );
 
-  const renderTable = (data: Person[], type: "therapist" | "med_staff") => (
-    <div className="mb-12">
-      <h2 className="text-2xl font-bold text-emerald-700 mb-4">{type === "therapist" ? "ตารางหมอนวด" : "ตารางผู้ให้บริการ"}</h2>
-      <div className="overflow-x-auto rounded-lg shadow">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-emerald-600 text-white">
-            <tr>
-              <th className="px-6 py-3 text-left text-sm font-medium">ลำดับ</th>
-              <th className="px-6 py-3 text-left text-sm font-medium">ชื่อเต็ม</th>
-              <th className="px-6 py-3 text-center text-sm font-medium">การจัดการ</th>
+const renderTable = (data: Person[], type: "therapist" | "med_staff") => (
+  <div className="mb-12">
+    <h2 className="text-2xl font-bold text-emerald-700 mb-4">{type === "therapist" ? "ตารางหมอนวด" : "ตารางผู้ให้บริการ"}</h2>
+
+    {/* Desktop Table */}
+    <div className="hidden sm:block overflow-hidden rounded-lg shadow">
+      <table className="min-w-full divide-y divide-gray-200">
+        <thead className="bg-emerald-600 text-white">
+          <tr>
+            <th className="px-6 py-3 text-left text-sm font-medium">ลำดับ</th>
+            <th className="px-6 py-3 text-left text-sm font-medium">ชื่อเต็ม</th>
+            <th className="px-6 py-3 text-center text-sm font-medium">การจัดการ</th>
+          </tr>
+        </thead>
+        <tbody className="bg-white divide-y divide-gray-300">
+          {data.map((p, index) => (
+            <tr key={p.id} className="hover:bg-emerald-50 transition">
+              <td className="px-6 py-3">{index + 1}</td>
+              <td className="px-6 py-3">{p.pname}{p.fname} {p.lname}</td>
+              <td className="px-6 py-3 flex justify-center gap-2">
+                <button
+                  onClick={() => openEditDialog(p, type)}
+                  className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 transition flex items-center gap-1"
+                >
+                  <Pencil size={16} /> แก้ไข
+                </button>
+                <button
+                  onClick={() => handleDelete(p.id)}
+                  className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 transition flex items-center gap-1"
+                >
+                  <Trash2 size={16} /> ลบ
+                </button>
+              </td>
             </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-300">
-            {data.map((p, index) => (
-              <tr key={p.id} className="hover:bg-emerald-50 transition">
-                <td className="px-6 py-3">{index + 1}</td>
-                <td className="px-6 py-3">{p.pname}{p.fname} {p.lname}</td>
-                <td className="px-6 py-3 flex justify-center gap-2">
-                  <button
-                    onClick={() => openEditDialog(p, type)}
-                    className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 transition flex items-center"
-                  >
-                    <Pencil size={16} /> แก้ไข
-                  </button>
-                  <button
-                    onClick={() => handleDelete(p.id)}
-                    className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 transition flex items-center"
-                  >
-                    <Trash2 size={16} /> ลบ
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {data.length === 0 && (
-              <tr>
-                <td colSpan={3} className="text-center text-gray-500 italic py-4">
-                  ไม่มีข้อมูล
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+          ))}
+          {data.length === 0 && (
+            <tr>
+              <td colSpan={3} className="text-center text-gray-500 italic py-4">ไม่มีข้อมูล</td>
+            </tr>
+          )}
+        </tbody>
+      </table>
     </div>
-  );
+
+    {/* Mobile Cards */}
+    <div className="sm:hidden space-y-4">
+      {data.map((p, index) => (
+        <div key={p.id} className="bg-white rounded-xl shadow-lg p-4 border border-gray-200">
+          <div className="mb-2">
+            <span className="font-semibold text-gray-600">ลำดับ: </span>
+            <span className="text-gray-800">{index + 1}</span>
+          </div>
+          <div className="mb-2">
+            <span className="font-semibold text-gray-600">ชื่อเต็ม: </span>
+            <span className="text-gray-800">{p.pname}{p.fname} {p.lname}</span>
+          </div>
+
+          <div className="flex gap-2 mt-3">
+            <button
+              onClick={() => openEditDialog(p, type)}
+              className="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white py-2 rounded-lg shadow hover:from-blue-600 hover:to-blue-700 transition flex items-center justify-center gap-1 text-sm"
+            >
+              <Pencil size={14} /> แก้ไข
+            </button>
+            <button
+              onClick={() => handleDelete(p.id)}
+              className="flex-1 bg-gradient-to-r from-red-500 to-red-600 text-white py-2 rounded-lg shadow hover:from-red-600 hover:to-red-700 transition flex items-center justify-center gap-1 text-sm"
+            >
+              <Trash2 size={14} /> ลบ
+            </button>
+          </div>
+        </div>
+      ))}
+      {data.length === 0 && (
+        <p className="text-center text-gray-500 italic">ไม่มีข้อมูล</p>
+      )}
+    </div>
+  </div>
+);
 
   return (
     <div className="min-h-screen bg-gray-50 text-emerald-700">
       {/* แถบเมนูบนสุด */}
-      <div className="fixed top-0 left-0 w-full z-50 bg-gradient-to-r from-emerald-600 to-green-500 shadow-md flex justify-between items-center px-4 py-2">
-        <div className="text-white font-bold text-lg flex items-center gap-2 cursor-pointer" onClick={() => router.push("/")}>
-          <FaSpa /> แพทย์แผนไทย
-        </div>
-        <button
-          onClick={() => router.push("/all-bookings")}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white hover:bg-gray-300 text-emerald-700 font-semibold shadow transition"
-          title = "ประวัติการจอง"
-        >
-          <FaHistory className="w-5 h-6" />
-        </button>
-      </div>
+      {/* Header */}
+            <div className="fixed top-0 left-0 w-full z-50 bg-gradient-to-r from-emerald-600 to-green-500 shadow-md flex justify-between items-center px-2 sm:px-4 py-2 sm:py-2">
+              <div className="flex items-center gap-2 sm:gap-13">
+                {/* Hamburger */}
+                <button
+                  onClick={() => setMenuOpen(!menuOpen)}
+                  className="text-white text-xl sm:text-2xl"
+                  title="เมนู"
+                >
+                  {menuOpen ? <FaTimes /> : <FaBars />}
+                </button>
+      
+                {/* Logo */}
+                <div
+                  className="ml-3 sm:ml-3 text-white font-bold text-base sm:text-lg flex items-center gap-1 cursor-pointer"
+                  onClick={() => router.push("/")}
+                  title="หน้าหลัก"
+                >
+                  <FaSpa className="text-sm sm:text-base" /> แพทย์แผนไทย
+                </div>
+              </div>
+      
+              {/* User Buttons */}
+              <div className="flex items-center gap-3 sm:gap-3 text-xs sm:text-sm">
+                {user ? (
+                  <>
+                    <button
+                      onClick={handleLogout}
+                      className="flex items-center gap-1 px-2 py-3 sm:px-4 sm:py-3 bg-red-600 text-white rounded-lg shadow font-semibold transition hover:bg-red-700 text-xs sm:text-sm"
+                      title="ลงชื่อออก"
+                    >
+                      <FaSignOutAlt className="w-3 h-3 sm:w-5 sm:h-5" />
+                      <span>ลงชื่อออก</span>
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => router.push("/login")}
+                    className="flex items-center gap-1 px-2 py-1 sm:px-4 sm:py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow transition hover:bg-gray-300 text-xs sm:text-sm"
+                    title="ลงชื่อเข้าใช้"
+                  >
+                    <FaSignInAlt className="w-3 h-3 sm:w-5 sm:h-5" />
+                    <span>สำหรับบุคลากร</span>
+                  </button>
+                )}
+              </div>
+            </div>
+            <AnimatePresence>
+        {menuOpen && (
+          <motion.div
+            ref={menuRef}
+            initial={{ x: -300, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: -300, opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="fixed top-0 left-0 w-48 sm:w-64 h-full bg-black/70 z-40 flex flex-col pt-14 overflow-y-auto"
+          >
+            {/* จองคิว */}
+            <div
+              onClick={user ? handleBookingClick : () => router.push("/booking")}
+              className="w-full py-3 sm:py-4 px-4 sm:px-6 border-b-2 border-gray-400 cursor-pointer hover:bg-white/20 flex items-center justify-center gap-2 text-sm sm:text-lg font-semibold text-white"
+            >
+              <FaCalendarAlt /> {user ? "จองคิวนวดแผนไทย" : "ดูคิวจองนวดแผนไทย"}
+            </div>
+
+            {user && (
+              <>
+                <div
+                  onClick={() => router.push("/all-bookings")}
+                  className="w-full py-3 sm:py-4 px-4 sm:px-6 border-b-2 border-gray-400 cursor-pointer hover:bg-white/20 flex items-center justify-center gap-2 text-sm sm:text-lg font-semibold text-white"
+                >
+                  <FaHistory /> ประวัติการจอง
+                </div>
+                <div
+                  onClick={() => router.push("/summary-history")}
+                  className="w-full py-3 sm:py-4 px-4 sm:px-6 border-b-2 border-gray-400 cursor-pointer hover:bg-white/20 flex items-center justify-center gap-2 text-sm sm:text-lg font-semibold text-white"
+                >
+                  <FaChartBar /> สรุปประวัติ
+                </div>
+                {user.role === "admin" && (
+                  <button
+                    onClick={() => router.push("/manage-therapists")}
+                    className="w-full py-3 sm:py-4 px-4 sm:px-6 border-b-2 border-gray-400 cursor-pointer hover:bg-white/20 flex items-center justify-center gap-2 text-sm sm:text-lg font-semibold text-white"
+                    title="จัดการบุคลากร"
+                  >
+                    <FaUsersCog /> จัดการบุคลากร
+                  </button>
+                )}
+              </>
+            )}
+
+            {/* ช่องทางติดต่อ */}
+            <div className="w-full border-b-2 border-gray-400 relative">
+              <div
+                onClick={() => setContactOpen(!contactOpen)}
+                className="w-full py-3 sm:py-4 px-4 sm:px-6 cursor-pointer hover:bg-white/20 text-sm sm:text-lg font-semibold text-white text-center relative"
+              >
+                <span>ช่องทางอื่น</span>
+                <span className="absolute right-4 top-1/2 -translate-y-1/2">
+                  {contactOpen ? <HiChevronUp className="w-5 h-5" /> : <HiChevronDown className="w-5 h-5" />}
+                </span>
+              </div>
+              {contactOpen && (
+                <div className="flex flex-col bg-black/50 text-white text-sm sm:text-base">
+                  <a
+                    href="https://www.facebook.com/profile.php?id=100070719421986"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="py-2 px-6 hover:bg-white/20 flex items-center justify-center gap-2"
+                  >
+                    <FaFacebook className="w-4 h-4 sm:w-5 sm:h-5" />
+                    <span>Facebook</span>
+                  </a>
+                  <a
+                    href="https://www.lmwcc.com/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="py-2 px-6 hover:bg-white/20 flex items-center justify-center gap-2"
+                  >
+                    <FaHospital className="w-4 h-4 sm:w-5 sm:h-5" />
+                    <span>เพจหลักศูนย์บริการ</span>
+                  </a>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* เนื้อหา */}
       <div className="max-w-6xl mx-auto p-6 pt-27">

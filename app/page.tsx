@@ -102,7 +102,7 @@ export default function HomePage() {
           ) : (
             <button
               onClick={() => router.push("/login")}
-              className="flex items-center gap-1 px-2 py-1 sm:px-4 sm:py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow transition hover:bg-gray-300 text-xs sm:text-sm"
+              className="flex items-center gap-1 px-2 py-3 sm:px-4 sm:py-3 rounded-lg bg-white text-emerald-700 font-semibold shadow transition hover:bg-gray-300 text-xs sm:text-sm"
               title="ลงชื่อเข้าใช้"
             >
               <FaSignInAlt className="w-3 h-3 sm:w-5 sm:h-5" />
@@ -120,7 +120,7 @@ export default function HomePage() {
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: -300, opacity: 0 }}
             transition={{ duration: 0.3 }}
-            className="fixed top-0 left-0 w-48 sm:w-64 h-full bg-black/70 z-40 flex flex-col pt-14 overflow-y-auto"
+            className="fixed top-0 left-0 w-48 sm:w-64 h-full bg-black/70 z-40 flex flex-col pt-15 overflow-y-auto"
           >
             {/* จองคิว */}
             <div

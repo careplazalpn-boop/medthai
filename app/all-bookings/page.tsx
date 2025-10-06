@@ -5,7 +5,7 @@ import { User, Phone, UserCheck, Clock, CalendarDays, CheckCircle2, Smile, Frown
 import * as Dialog from "@radix-ui/react-dialog";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { FaCheck, FaSpa, FaTimes, FaBars, FaSignOutAlt, FaSignInAlt } from "react-icons/fa";
+import { FaCheck, FaHistory, FaChartBar, FaCalendarAlt, FaUsersCog, FaSpa, FaTimes, FaBars, FaSignOutAlt, FaSignInAlt } from "react-icons/fa";
 import { ImSpinner2 } from "react-icons/im";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
@@ -442,37 +442,36 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: -300, opacity: 0 }}
             transition={{ duration: 0.3 }}
-            className="fixed top-0 left-0 w-64 h-full bg-black/70 z-40 flex flex-col pt-14"
+          className="fixed top-0 left-0 w-64 h-full bg-black/70 z-40 flex flex-col pt-15 overflow-y-auto"
           >
             {/* แถบเมนูแต่ละรายการ */}
             <div
               onClick={user ? handleBookingClick : () => router.push("/booking")}
-              className="w-full py-4 px-6 border-b-2 border-gray-400 cursor-pointer hover:bg-white/20 text-center text-lg font-semibold text-white"
+              className="w-full py-3 sm:py-4 px-4 sm:px-6 border-b-2 border-gray-400 cursor-pointer hover:bg-white/20 flex items-center justify-center gap-2 text-sm sm:text-lg font-semibold text-white"
             >
-              {user ? "จองคิวนวดแผนไทย" : "ดูคิวจองนวดแผนไทย"}
+              <FaCalendarAlt /> {user ? "จองคิวนวดแผนไทย" : "ดูคิวจองนวดแผนไทย"}
             </div>
-
             {user && (
               <>
                 <div
                   onClick={() => router.push("/all-bookings")}
-                  className="w-full py-4 px-6 border-b-2 border-gray-400 cursor-pointer hover:bg-white/20 text-center text-lg font-semibold text-white"
+                  className="w-full py-3 sm:py-4 px-4 sm:px-6 border-b-2 border-gray-400 cursor-pointer hover:bg-white/20 flex items-center justify-center gap-2 text-sm sm:text-lg font-semibold text-white"
                 >
-                  ประวัติการจอง
+                  <FaHistory /> ประวัติการจอง
                 </div>
                 <div
                   onClick={() => router.push("/summary-history")}
-                  className="w-full py-4 px-6 border-b-2 border-gray-400 cursor-pointer hover:bg-white/20 text-center text-lg font-semibold text-white"
+                  className="w-full py-3 sm:py-4 px-4 sm:px-6 border-b-2 border-gray-400 cursor-pointer hover:bg-white/20 flex items-center justify-center gap-2 text-sm sm:text-lg font-semibold text-white"
                 >
-                  สรุปประวัติ
+                  <FaChartBar /> สรุปประวัติ
                 </div>
                 {user.role === "admin" && (
                   <button
                     onClick={() => router.push("/manage-therapists")}
-                    className="w-full py-4 px-6 border-b-2 border-gray-400 cursor-pointer hover:bg-white/20 text-center text-lg font-semibold text-white"
+                    className="w-full py-3 sm:py-4 px-4 sm:px-6 border-b-2 border-gray-400 cursor-pointer hover:bg-white/20 flex items-center justify-center gap-2 text-sm sm:text-lg font-semibold text-white"
                     title="จัดการบุคลากร"
                   >
-                    จัดการบุคลากร
+                    <FaUsersCog /> จัดการบุคลากร
                   </button>
                 )}
               </>

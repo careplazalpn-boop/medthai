@@ -35,6 +35,8 @@ export default function SummaryHistoryPage() {
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [contactOpen, setContactOpen] = useState(false);
   const [windowWidth, setWindowWidth] = useState(0);
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
 
   useEffect(() => {
     setWindowWidth(window.innerWidth);
@@ -104,23 +106,24 @@ export default function SummaryHistoryPage() {
     })();
   }, []);
 
-  // Filter bookings ตามปี+เดือน+วัน
-  useEffect(() => {
-    if (!year) return;
-    const f = bookings.filter(b => {
-      const d = new Date(b.date);
+useEffect(() => {
+  if (!year) return;
+
+  const f = bookings.filter(b => {
+    const d = new Date(b.date);
+    if (startDate && endDate) {
+      return d >= new Date(startDate) && d <= new Date(endDate);
+    }
+    if (year && month !== "all") {
       const y = d.getFullYear();
       const m = d.getMonth();
-      const day = d.getDate();
-      if (y !== year) return false;
-      if (month !== "all" && m !== month) return false;
-      if (dayRange === "1-15" && day > 15) return false;
-      if (dayRange === "16-31" && day <= 15) return false;
-      return true;
-    });
-    setFiltered(f);
-    setMonths(Array.from({ length: 12 }, (_, i) => i));
-  }, [bookings, year, month, dayRange]);
+      return y === year && m === month;
+    }
+    return true;
+  });
+
+  setFiltered(f);
+}, [bookings, year, month, startDate, endDate]);
 
   if (!user) {
     return <p>กำลังตรวจสอบสิทธิ์...</p>; // render ชั่วคราว
@@ -230,7 +233,7 @@ export default function SummaryHistoryPage() {
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: -300, opacity: 0 }}
             transition={{ duration: 0.3 }}
-            className="fixed top-0 left-0 w-48 sm:w-64 h-full bg-black/70 z-40 flex flex-col pt-14 overflow-y-auto"
+            className="fixed top-0 left-0 w-48 sm:w-64 h-full bg-black/70 z-40 flex flex-col pt-15 overflow-y-auto"
           >
             {/* จองคิว */}
             <div
@@ -305,48 +308,56 @@ export default function SummaryHistoryPage() {
       </AnimatePresence>
 
       <h1 className="text-3xl font-bold text-emerald-800 mb-6 text-center">
-        📊 Dashboard สรุปประวัติ
+        📊 สรุปประวัติ
       </h1>
-
-      {/* Dropdown สำหรับกราฟ/summary */}
-      <div className="flex gap-2 mb-6 justify-center flex-wrap">
-        {years.length > 0 && (
-          <select className="border border-emerald-400 rounded px-3 py-2 bg-white text-emerald-800 shadow-sm" value={year ?? ""} onChange={e => setYear(Number(e.target.value))}>
-            {years.map(y => <option key={y} value={y}>พ.ศ. {buddhistYear(y)}</option>)}
-          </select>
-        )}
-        {months.length > 0 && (
-          <select className="border border-emerald-400 rounded px-3 py-2 bg-white text-emerald-800 shadow-sm" value={month} onChange={e => setMonth(e.target.value === "all" ? "all" : Number(e.target.value))}>
-            <option value="all">ทั้งปี</option>
-            {months.map(m => <option key={m} value={m}>{monthNames[m]}</option>)}
-          </select>
-        )}
-        <select className="border border-emerald-400 rounded px-3 py-2 bg-white text-emerald-800 shadow-sm" value={dayRange} onChange={e => setDayRange(e.target.value as "all" | "1-15" | "16-31")}>
-          <option value="all">ทั้งเดือน</option>
-          <option value="1-15">วันที่ 1-15</option>
-          <option value="16-31">วันที่ 16-31</option>
-        </select>
+      {/* ตัวเลือกช่วงวันที่สำหรับกราฟ/summary */}
+      <div className="flex gap-2 sm:gap-3 mb-7 justify-center flex-wrap items-center">
+        <input
+          type="date"
+          value={startDate}
+          onChange={(e) => setStartDate(e.target.value)}
+          className="w-30 sm:w-35 border border-emerald-400 rounded-lg px-2 sm:px-3 py-2 sm:py-2 text-sm sm:text-base bg-white text-emerald-800 shadow-sm focus:ring-2 focus:ring-emerald-300 outline-none"
+        />
+        <span className="text-sm sm:text-base text-emerald-800 mx-1 sm:mx-0">-</span>
+        <input
+          type="date"
+          value={endDate}
+          onChange={(e) => setEndDate(e.target.value)}
+          className="w-30 sm:w-35 border border-emerald-400 rounded-lg px-2 sm:px-3 py-2 sm:py-2 text-sm sm:text-base bg-white text-emerald-800 shadow-sm focus:ring-2 focus:ring-emerald-300 outline-none"
+        />
       </div>
+{/* Summary Cards */}
+<div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8 max-w-6xl mx-auto px-4">
+  <div className="bg-white shadow rounded-lg p-2 sm:p-4 text-center border-l-4 border-green-800">
+    <div className="text-gray-600 font-semibold text-sm sm:text-base">ทั้งหมด</div>
+    <div className="text-2xl sm:text-3xl font-bold text-green-800">{filtered.length}</div>
+  </div>
+  <div className="bg-white shadow rounded-lg p-2 sm:p-4 text-center border-l-4 border-green-400">
+    <div className="flex justify-center items-center gap-1 text-gray-600 font-semibold text-sm sm:text-base">
+      <FaCheckCircle className="text-green-500" /> สำเร็จ
+    </div>
+    <div className="text-2xl sm:text-3xl font-bold text-green-500">
+      {filtered.filter(b => b.status === "สำเร็จ").length}
+    </div>
+  </div>
+  <div className="bg-white shadow rounded-lg p-2 sm:p-4 text-center border-l-4 border-gray-400">
+    <div className="flex justify-center items-center gap-1 text-gray-600 font-semibold text-sm sm:text-base">
+      <FaClock className="text-gray-500" /> รอดำเนินการ
+    </div>
+    <div className="text-2xl sm:text-3xl font-bold text-gray-500">
+      {filtered.filter(b => b.status === "รอดำเนินการ").length}
+    </div>
+  </div>
+  <div className="bg-white shadow rounded-lg p-2 sm:p-4 text-center border-l-4 border-red-400">
+    <div className="flex justify-center items-center gap-1 text-gray-600 font-semibold text-sm sm:text-base">
+      <FaTimesCircle className="text-red-600" /> ยกเลิก
+    </div>
+    <div className="text-2xl sm:text-3xl font-bold text-red-600">
+      {filtered.filter(b => b.status === "ยกเลิก").length}
+    </div>
+  </div>
+</div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8 max-w-6xl mx-auto px-4">
-        <div className="bg-white shadow rounded-lg p-4 text-center border-l-4 border-green-800">
-          <div className="text-gray-600 font-semibold">ทั้งหมด</div>
-          <div className="text-3xl font-bold text-green-800">{filtered.length}</div>
-        </div>
-        <div className="bg-white shadow rounded-lg p-4 text-center border-l-4 border-green-400">
-          <div className="flex justify-center items-center gap-1 text-gray-600 font-semibold"><FaCheckCircle className="text-green-500" /> สำเร็จ</div>
-          <div className="text-3xl font-bold text-green-500">{filtered.filter(b => b.status === "สำเร็จ").length}</div>
-        </div>
-        <div className="bg-white shadow rounded-lg p-4 text-center border-l-4 border-gray-400">
-          <div className="flex justify-center items-center gap-1 text-gray-600 font-semibold"><FaClock className="text-gray-500" /> รอดำเนินการ</div>
-          <div className="text-3xl font-bold text-gray-500">{filtered.filter(b => b.status === "รอดำเนินการ").length}</div>
-        </div>
-        <div className="bg-white shadow rounded-lg p-4 text-center border-l-4 border-red-400">
-          <div className="flex justify-center items-center gap-1 text-gray-600 font-semibold"><FaTimesCircle className="text-red-600" /> ยกเลิก</div>
-          <div className="text-3xl font-bold text-red-600">{filtered.filter(b => b.status === "ยกเลิก").length}</div>
-        </div>
-      </div>
 
       {/* BarChart รายเดือน */}
       <div className="bg-white shadow rounded-lg p-4 mb-8 max-w-6xl mx-auto px-4">
@@ -410,7 +421,7 @@ export default function SummaryHistoryPage() {
     {/* Dropdown เลือกสถานะ */}
     <div className="flex justify-center mb-4">
       <select
-        className="border border-emerald-400 rounded px-3 py-2 bg-white text-emerald-800 shadow-sm"
+        className="border border-emerald-400 rounded-lg px-3 py-2 bg-white text-emerald-800 shadow-sm"
         value={statusFilter}
         onChange={(e) => setStatusFilter(e.target.value as "success" | "pending" | "cancelled")}
       >

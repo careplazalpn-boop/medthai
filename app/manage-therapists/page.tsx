@@ -364,7 +364,7 @@ const renderTable = (data: Person[], type: "therapist" | "med_staff") => (
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: -300, opacity: 0 }}
             transition={{ duration: 0.3 }}
-            className="fixed top-0 left-0 w-48 sm:w-64 h-full bg-black/70 z-40 flex flex-col pt-14 overflow-y-auto"
+            className="fixed top-0 left-0 w-48 sm:w-64 h-full bg-black/70 z-40 flex flex-col pt-15 overflow-y-auto"
           >
             {/* จองคิว */}
             <div

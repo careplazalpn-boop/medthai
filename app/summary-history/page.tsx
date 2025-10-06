@@ -326,39 +326,37 @@ useEffect(() => {
           className="w-30 sm:w-35 border border-emerald-400 rounded-lg px-2 sm:px-3 py-2 sm:py-2 text-sm sm:text-base bg-white text-emerald-800 shadow-sm focus:ring-2 focus:ring-emerald-300 outline-none"
         />
       </div>
-{/* Summary Cards */}
-<div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8 max-w-6xl mx-auto px-4">
-  <div className="bg-white shadow rounded-lg p-2 sm:p-4 text-center border-l-4 border-green-800">
-    <div className="text-gray-600 font-semibold text-sm sm:text-base">ทั้งหมด</div>
-    <div className="text-2xl sm:text-3xl font-bold text-green-800">{filtered.length}</div>
-  </div>
-  <div className="bg-white shadow rounded-lg p-2 sm:p-4 text-center border-l-4 border-green-400">
-    <div className="flex justify-center items-center gap-1 text-gray-600 font-semibold text-sm sm:text-base">
-      <FaCheckCircle className="text-green-500" /> สำเร็จ
-    </div>
-    <div className="text-2xl sm:text-3xl font-bold text-green-500">
-      {filtered.filter(b => b.status === "สำเร็จ").length}
-    </div>
-  </div>
-  <div className="bg-white shadow rounded-lg p-2 sm:p-4 text-center border-l-4 border-gray-400">
-    <div className="flex justify-center items-center gap-1 text-gray-600 font-semibold text-sm sm:text-base">
-      <FaClock className="text-gray-500" /> รอดำเนินการ
-    </div>
-    <div className="text-2xl sm:text-3xl font-bold text-gray-500">
-      {filtered.filter(b => b.status === "รอดำเนินการ").length}
-    </div>
-  </div>
-  <div className="bg-white shadow rounded-lg p-2 sm:p-4 text-center border-l-4 border-red-400">
-    <div className="flex justify-center items-center gap-1 text-gray-600 font-semibold text-sm sm:text-base">
-      <FaTimesCircle className="text-red-600" /> ยกเลิก
-    </div>
-    <div className="text-2xl sm:text-3xl font-bold text-red-600">
-      {filtered.filter(b => b.status === "ยกเลิก").length}
-    </div>
-  </div>
-</div>
-
-
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8 max-w-6xl mx-auto px-4">
+        <div className="bg-white shadow rounded-lg p-2 sm:p-4 text-center border-l-4 border-green-800">
+          <div className="text-gray-600 font-semibold text-sm sm:text-base">ทั้งหมด</div>
+          <div className="text-2xl sm:text-3xl font-bold text-green-800">{filtered.length}</div>
+        </div>
+        <div className="bg-white shadow rounded-lg p-2 sm:p-4 text-center border-l-4 border-green-400">
+          <div className="flex justify-center items-center gap-1 text-gray-600 font-semibold text-sm sm:text-base">
+            <FaCheckCircle className="text-green-500" /> สำเร็จ
+          </div>
+          <div className="text-2xl sm:text-3xl font-bold text-green-500">
+            {filtered.filter(b => b.status === "สำเร็จ").length}
+          </div>
+        </div>
+        <div className="bg-white shadow rounded-lg p-2 sm:p-4 text-center border-l-4 border-gray-400">
+          <div className="flex justify-center items-center gap-1 text-gray-600 font-semibold text-sm sm:text-base">
+            <FaClock className="text-gray-500" /> รอดำเนินการ
+          </div>
+          <div className="text-2xl sm:text-3xl font-bold text-gray-500">
+            {filtered.filter(b => b.status === "รอดำเนินการ").length}
+          </div>
+        </div>
+        <div className="bg-white shadow rounded-lg p-2 sm:p-4 text-center border-l-4 border-red-400">
+          <div className="flex justify-center items-center gap-1 text-gray-600 font-semibold text-sm sm:text-base">
+            <FaTimesCircle className="text-red-600" /> ยกเลิก
+          </div>
+          <div className="text-2xl sm:text-3xl font-bold text-red-600">
+            {filtered.filter(b => b.status === "ยกเลิก").length}
+          </div>
+        </div>
+      </div>
       {/* BarChart รายเดือน */}
       <div className="bg-white shadow rounded-lg p-4 mb-8 max-w-6xl mx-auto px-4">
         <h2 className="text-xl font-semibold text-emerald-700 mb-4 text-center">จำนวนการจองต่อเดือน</h2>

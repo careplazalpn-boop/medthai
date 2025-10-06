@@ -310,7 +310,7 @@ const renderTable = (data: Person[], type: "therapist" | "med_staff") => (
     <div className="min-h-screen bg-gray-50 text-emerald-700">
       {/* แถบเมนูบนสุด */}
       {/* Header */}
-            <div className="fixed top-0 left-0 w-full z-50 bg-gradient-to-r from-emerald-600 to-green-500 shadow-md flex justify-between items-center px-2 sm:px-4 py-2 sm:py-2">
+            <div className="fixed top-0 left-0 w-full z-50 bg-gray-700 shadow-md flex justify-between items-center px-2 sm:px-4 py-2 sm:py-2">
               <div className="flex items-center gap-2 sm:gap-13">
                 {/* Hamburger */}
                 <button

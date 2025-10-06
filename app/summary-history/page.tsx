@@ -111,19 +111,45 @@ useEffect(() => {
 
   const f = bookings.filter(b => {
     const d = new Date(b.date);
-    if (startDate && endDate) {
-      return d >= new Date(startDate) && d <= new Date(endDate);
+
+    const dY = d.getFullYear();
+    const dM = d.getMonth();
+    const dD = d.getDate();
+
+    const s = startDate ? new Date(startDate) : null;
+    const e = endDate ? new Date(endDate) : null;
+
+    const sY = s?.getFullYear();
+    const sM = s?.getMonth();
+    const sD = s?.getDate();
+
+    const eY = e?.getFullYear();
+    const eM = e?.getMonth();
+    const eD = e?.getDate();
+
+    // กรองช่วง start-end
+    if (s && e) {
+      const dDateOnly = new Date(dY, dM, dD);
+      const startDateOnly = new Date(sY!, sM!, sD!);
+      const endDateOnly = new Date(eY!, eM!, eD!);
+      return dDateOnly >= startDateOnly && dDateOnly <= endDateOnly;
     }
-    if (year && month !== "all") {
-      const y = d.getFullYear();
-      const m = d.getMonth();
-      return y === year && m === month;
-    }
+
+    // กรองวันเดียวจาก startDate
+    if (s && !e) return dY === sY && dM === sM && dD === sD;
+
+    // กรองวันเดียวจาก endDate
+    if (!s && e) return dY === eY && dM === eM && dD === eD;
+
+    // กรองเดือน/ปี
+    if (year && month !== "all") return dY === year && dM === month;
+
     return true;
   });
 
   setFiltered(f);
 }, [bookings, year, month, startDate, endDate]);
+
 
   if (!user) {
     return <p>กำลังตรวจสอบสิทธิ์...</p>; // render ชั่วคราว
@@ -179,7 +205,7 @@ useEffect(() => {
   return (
     <div className="min-h-screen bg-gray-50 pt-28">
       {/* Header */}
-            <div className="fixed top-0 left-0 w-full z-50 bg-gradient-to-r from-emerald-600 to-green-500 shadow-md flex justify-between items-center px-2 sm:px-4 py-2 sm:py-2">
+            <div className="fixed top-0 left-0 w-full z-50 bg-gray-700 shadow-md flex justify-between items-center px-2 sm:px-4 py-2 sm:py-2">
               <div className="flex items-center gap-2 sm:gap-13">
                 {/* Hamburger */}
                 <button
@@ -306,7 +332,6 @@ useEffect(() => {
           </motion.div>
         )}
       </AnimatePresence>
-
       <h1 className="text-3xl font-bold text-emerald-800 mb-6 text-center">
         📊 สรุปประวัติ
       </h1>

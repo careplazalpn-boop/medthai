@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     const { provider, hn, name, phone, therapist, time, date, bookedbyrole } =
       await request.json();
 
-    // ตรวจ field จำเป็น (role เป็น optional)
+    // ตรวจ field จำเป็น
     const missingFields = [];
     if (!provider) missingFields.push("provider");
     if (!name) missingFields.push("name");
@@ -51,6 +51,21 @@ export async function POST(request: Request) {
 
     const conn = await pool.getConnection();
     try {
+      // เช็คว่ามีการจองซ้ำหรือยัง
+      const [existing] = await conn.query(
+        "SELECT * FROM bookings WHERE hn = ? AND name = ? AND phone = ? AND therapist = ? AND time_slot = ? AND date = ? AND status != 'ยกเลิก'",
+        [hn || null, name, phone, therapist, time, date]
+      );
+
+      // ถ้ามี record อยู่แล้ว
+      if ((existing as any).length > 0) {
+        return NextResponse.json(
+          { success: false, error: "คุณได้ทำการจองในช่วงเวลานี้แล้ว" },
+          { status: 400 }
+        );
+      }
+
+      // Insert ข้อมูลใหม่
       await conn.query(
         "INSERT INTO bookings (hn, name, phone, date, therapist, time_slot, provider, bookedbyrole, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'รอดำเนินการ')",
         [hn || null, name, phone, date, therapist, time, provider, bookedbyrole || 'user']

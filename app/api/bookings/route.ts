@@ -51,13 +51,12 @@ export async function POST(request: Request) {
 
     const conn = await pool.getConnection();
     try {
-      // เช็คว่ามีการจองซ้ำหรือยัง
+      // เช็ค booking ซ้ำเฉพาะ HN + therapist + time_slot + date
       const [existing] = await conn.query(
-        "SELECT * FROM bookings WHERE hn = ? AND name = ? AND phone = ? AND therapist = ? AND time_slot = ? AND date = ? AND status != 'ยกเลิก'",
-        [hn || null, name, phone, therapist, time, date]
+        "SELECT * FROM bookings WHERE hn = ? AND therapist = ? AND time_slot = ? AND date = ? AND status != 'ยกเลิก'",
+        [hn || null, therapist, time, date]
       );
 
-      // ถ้ามี record อยู่แล้ว
       if ((existing as any).length > 0) {
         return NextResponse.json(
           { success: false, error: "คุณได้ทำการจองในช่วงเวลานี้แล้ว" },

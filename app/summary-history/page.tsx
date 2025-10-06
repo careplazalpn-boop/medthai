@@ -21,13 +21,10 @@ export default function SummaryHistoryPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [therapists, setTherapists] = useState<string[]>([]);
   const [filtered, setFiltered] = useState<Booking[]>([]);
-  const [years, setYears] = useState<number[]>([]);
-  const [months, setMonths] = useState<number[]>([]);
+  const [, setYears] = useState<number[]>([]);
   const [year, setYear] = useState<number | null>(null);
-  const [month, setMonth] = useState<number | "all">("all");
-  const [dayRange, setDayRange] = useState<"all" | "1-15" | "16-31">("all");
+  const [month,] = useState<number | "all">("all");
   const [statusFilter, setStatusFilter] = useState<"success" | "pending" | "cancelled">("success");
-  const buddhistYear = (y: number) => y + 543;
   const monthNames = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);

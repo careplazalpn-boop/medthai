@@ -5,7 +5,8 @@ import { User, Phone, UserCheck, Clock, CalendarDays, CheckCircle2, Smile, Frown
 import * as Dialog from "@radix-ui/react-dialog";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { FaCheck, FaHistory, FaChartBar, FaCalendarAlt, FaUsersCog, FaSpa, FaTimes, FaBars, FaSignOutAlt, FaSignInAlt } from "react-icons/fa";
+import { FaCheck, FaFacebook, FaHospital, FaHistory, FaChartBar, FaCalendarAlt, FaUsersCog, FaSpa, FaTimes, FaBars, FaSignOutAlt, FaSignInAlt } from "react-icons/fa";
+import { HiChevronDown, HiChevronUp } from "react-icons/hi";
 import { ImSpinner2 } from "react-icons/im";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
@@ -128,6 +129,7 @@ export default function AllBookingsPage() {
   const [loading, setLoading] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const [contactOpen, setContactOpen] = useState(false);
 
     useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -447,7 +449,7 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
             {/* แถบเมนูแต่ละรายการ */}
             <div
               onClick={user ? handleBookingClick : () => router.push("/booking")}
-              className="w-full py-3 sm:py-4 px-4 sm:px-6 border-b-2 border-gray-400 cursor-pointer hover:bg-white/20 flex items-center justify-center gap-2 text-sm sm:text-lg font-semibold text-white"
+              className="w-full py-3 sm:py-4 px-4 sm:px-6 border-b-1 border-gray-400 cursor-pointer hover:bg-white/20 flex items-center justify-center gap-2 text-sm sm:text-lg font-semibold text-white"
             >
               <FaCalendarAlt /> {user ? "จองคิวนวดแผนไทย" : "ดูคิวจองนวดแผนไทย"}
             </div>
@@ -455,20 +457,20 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
               <>
                 <div
                   onClick={() => router.push("/all-bookings")}
-                  className="w-full py-3 sm:py-4 px-4 sm:px-6 border-b-2 border-gray-400 cursor-pointer hover:bg-white/20 flex items-center justify-center gap-2 text-sm sm:text-lg font-semibold text-white"
+                  className="w-full py-3 sm:py-4 px-4 sm:px-6 border-b-1 border-gray-400 cursor-pointer hover:bg-white/20 flex items-center justify-center gap-2 text-sm sm:text-lg font-semibold text-white"
                 >
                   <FaHistory /> ประวัติการจอง
                 </div>
                 <div
                   onClick={() => router.push("/summary-history")}
-                  className="w-full py-3 sm:py-4 px-4 sm:px-6 border-b-2 border-gray-400 cursor-pointer hover:bg-white/20 flex items-center justify-center gap-2 text-sm sm:text-lg font-semibold text-white"
+                  className="w-full py-3 sm:py-4 px-4 sm:px-6 border-b-1 border-gray-400 cursor-pointer hover:bg-white/20 flex items-center justify-center gap-2 text-sm sm:text-lg font-semibold text-white"
                 >
                   <FaChartBar /> สรุปประวัติ
                 </div>
                 {user.role === "admin" && (
                   <button
                     onClick={() => router.push("/manage-therapists")}
-                    className="w-full py-3 sm:py-4 px-4 sm:px-6 border-b-2 border-gray-400 cursor-pointer hover:bg-white/20 flex items-center justify-center gap-2 text-sm sm:text-lg font-semibold text-white"
+                    className="w-full py-3 sm:py-4 px-4 sm:px-6 border-b-1 border-gray-400 cursor-pointer hover:bg-white/20 flex items-center justify-center gap-2 text-sm sm:text-lg font-semibold text-white"
                     title="จัดการบุคลากร"
                   >
                     <FaUsersCog /> จัดการบุคลากร
@@ -476,6 +478,40 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
                 )}
               </>
             )}
+            {/* ช่องทางติดต่อ */}
+            <div className="w-full border-b-1 border-gray-400 relative">
+              <div
+                onClick={() => setContactOpen(!contactOpen)}
+                className="w-full py-3 sm:py-4 px-4 sm:px-6 cursor-pointer hover:bg-white/20 text-sm sm:text-lg font-semibold text-white text-center relative"
+              >
+                <span>ช่องทางอื่น</span>
+                <span className="absolute right-4 top-1/2 -translate-y-1/2">
+                  {contactOpen ? <HiChevronUp className="w-5 h-5" /> : <HiChevronDown className="w-5 h-5" />}
+                </span>
+              </div>
+              {contactOpen && (
+                <div className="flex flex-col bg-black/50 text-white text-sm sm:text-base">
+                  <a
+                    href="https://www.facebook.com/profile.php?id=100070719421986"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="py-2 px-6 hover:bg-white/20 flex items-center justify-center gap-2"
+                  >
+                    <FaFacebook className="w-4 h-4 sm:w-5 sm:h-5" />
+                    <span>Facebook</span>
+                  </a>
+                  <a
+                    href="https://www.lmwcc.com/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="py-2 px-6 hover:bg-white/20 flex items-center justify-center gap-2"
+                  >
+                    <FaHospital className="w-4 h-4 sm:w-5 sm:h-5" />
+                    <span>เพจหลักศูนย์บริการ</span>
+                  </a>
+                </div>
+              )}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

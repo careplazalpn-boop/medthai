@@ -550,7 +550,7 @@ const handleSubmit = () => {
             {/* จองคิว */}
             <div
               onClick={user ? handleBookingClick : () => router.push("/booking")}
-              className="w-full py-3 sm:py-4 px-4 sm:px-6 border-b-2 border-gray-400 cursor-pointer hover:bg-white/20 flex items-center justify-center gap-2 text-sm sm:text-lg font-semibold text-white"
+              className="w-full py-3 sm:py-4 px-4 sm:px-6 border-b-1 border-gray-400 cursor-pointer hover:bg-white/20 flex items-center justify-center gap-2 text-sm sm:text-lg font-semibold text-white"
             >
               <FaCalendarAlt /> {user ? "จองคิวนวดแผนไทย" : "ดูคิวจองนวดแผนไทย"}
             </div>
@@ -559,20 +559,20 @@ const handleSubmit = () => {
               <>
                 <div
                   onClick={() => router.push("/all-bookings")}
-                  className="w-full py-3 sm:py-4 px-4 sm:px-6 border-b-2 border-gray-400 cursor-pointer hover:bg-white/20 flex items-center justify-center gap-2 text-sm sm:text-lg font-semibold text-white"
+                  className="w-full py-3 sm:py-4 px-4 sm:px-6 border-b-1 border-gray-400 cursor-pointer hover:bg-white/20 flex items-center justify-center gap-2 text-sm sm:text-lg font-semibold text-white"
                 >
                   <FaHistory /> ประวัติการจอง
                 </div>
                 <div
                   onClick={() => router.push("/summary-history")}
-                  className="w-full py-3 sm:py-4 px-4 sm:px-6 border-b-2 border-gray-400 cursor-pointer hover:bg-white/20 flex items-center justify-center gap-2 text-sm sm:text-lg font-semibold text-white"
+                  className="w-full py-3 sm:py-4 px-4 sm:px-6 border-b-1 border-gray-400 cursor-pointer hover:bg-white/20 flex items-center justify-center gap-2 text-sm sm:text-lg font-semibold text-white"
                 >
                   <FaChartBar /> สรุปประวัติ
                 </div>
                 {user.role === "admin" && (
                   <button
                     onClick={() => router.push("/manage-therapists")}
-                    className="w-full py-3 sm:py-4 px-4 sm:px-6 border-b-2 border-gray-400 cursor-pointer hover:bg-white/20 flex items-center justify-center gap-2 text-sm sm:text-lg font-semibold text-white"
+                    className="w-full py-3 sm:py-4 px-4 sm:px-6 border-b-1 border-gray-400 cursor-pointer hover:bg-white/20 flex items-center justify-center gap-2 text-sm sm:text-lg font-semibold text-white"
                     title="จัดการบุคลากร"
                   >
                     <FaUsersCog /> จัดการบุคลากร
@@ -582,7 +582,7 @@ const handleSubmit = () => {
             )}
 
             {/* ช่องทางติดต่อ */}
-            <div className="w-full border-b-2 border-gray-400 relative">
+            <div className="w-full border-b-1 border-gray-400 relative">
               <div
                 onClick={() => setContactOpen(!contactOpen)}
                 className="w-full py-3 sm:py-4 px-4 sm:px-6 cursor-pointer hover:bg-white/20 text-sm sm:text-lg font-semibold text-white text-center relative"

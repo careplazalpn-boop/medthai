@@ -59,12 +59,11 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen relative flex flex-col justify-center items-center p-2 sm:p-8 overflow-hidden">
-      {/* Background Image */}
       <Image
-        src="/0b3211badeb0b1d07d8b8bf06f7a50b8_t.png"
+        src="/แผนไทย.png"
         alt="พื้นหลัง"
         fill
-        className="object-cover object-top -z-20"
+        className="object-cover object-bottom -z-20"
       />
       {/* Header */}
       <div className="fixed top-0 left-0 w-full z-50 bg-gray-700 shadow-md flex justify-between items-center px-2 sm:px-4 py-2 sm:py-2">
@@ -130,7 +129,7 @@ export default function HomePage() {
             {/* จองคิว */}
             <div
               onClick={user ? handleBookingClick : () => router.push("/booking")}
-              className="w-full py-3 sm:py-4 px-4 sm:px-6 border-b-2 border-gray-400 cursor-pointer hover:bg-white/20 flex items-center justify-center gap-2 text-sm sm:text-lg font-semibold text-white"
+              className="w-full py-3 sm:py-4 px-4 sm:px-6 border-b-1 border-gray-400 cursor-pointer hover:bg-white/20 flex items-center justify-center gap-2 text-sm sm:text-lg font-semibold text-white"
             >
               <FaCalendarAlt /> {user ? "จองคิวนวดแผนไทย" : "ดูคิวจองนวดแผนไทย"}
             </div>
@@ -139,20 +138,20 @@ export default function HomePage() {
               <>
                 <div
                   onClick={() => router.push("/all-bookings")}
-                  className="w-full py-3 sm:py-4 px-4 sm:px-6 border-b-2 border-gray-400 cursor-pointer hover:bg-white/20 flex items-center justify-center gap-2 text-sm sm:text-lg font-semibold text-white"
+                  className="w-full py-3 sm:py-4 px-4 sm:px-6 border-b-1 border-gray-400 cursor-pointer hover:bg-white/20 flex items-center justify-center gap-2 text-sm sm:text-lg font-semibold text-white"
                 >
                   <FaHistory /> ประวัติการจอง
                 </div>
                 <div
                   onClick={() => router.push("/summary-history")}
-                  className="w-full py-3 sm:py-4 px-4 sm:px-6 border-b-2 border-gray-400 cursor-pointer hover:bg-white/20 flex items-center justify-center gap-2 text-sm sm:text-lg font-semibold text-white"
+                  className="w-full py-3 sm:py-4 px-4 sm:px-6 border-b-1 border-gray-400 cursor-pointer hover:bg-white/20 flex items-center justify-center gap-2 text-sm sm:text-lg font-semibold text-white"
                 >
                   <FaChartBar /> สรุปประวัติ
                 </div>
                 {user.role === "admin" && (
                   <button
                     onClick={() => router.push("/manage-therapists")}
-                    className="w-full py-3 sm:py-4 px-4 sm:px-6 border-b-2 border-gray-400 cursor-pointer hover:bg-white/20 flex items-center justify-center gap-2 text-sm sm:text-lg font-semibold text-white"
+                    className="w-full py-3 sm:py-4 px-4 sm:px-6 border-b-1 border-gray-400 cursor-pointer hover:bg-white/20 flex items-center justify-center gap-2 text-sm sm:text-lg font-semibold text-white"
                     title="จัดการบุคลากร"
                   >
                     <FaUsersCog /> จัดการบุคลากร
@@ -162,7 +161,7 @@ export default function HomePage() {
             )}
 
             {/* ช่องทางติดต่อ */}
-            <div className="w-full border-b-2 border-gray-400 relative">
+            <div className="w-full border-b-1 border-gray-400 relative">
               <div
                 onClick={() => setContactOpen(!contactOpen)}
                 className="w-full py-3 sm:py-4 px-4 sm:px-6 cursor-pointer hover:bg-white/20 text-sm sm:text-lg font-semibold text-white text-center relative"
@@ -198,19 +197,6 @@ export default function HomePage() {
           </motion.div>
         )}
       </AnimatePresence>
-      {/* Title */}
-<h1
-  className="absolute top-25 text-xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold text-white text-center z-10 leading-snug max-w-full"
-  style={{
-    WebkitTextStroke: "1.5px black", // กำหนดขอบตัวอักษรสีดำ
-    fontWeight: 800,               // ความหนา
-  }}
->
-  คลินิกแพทย์แผนไทยประยุกต์<br />
-  ศูนย์บริการสาธารณสุข เทศบาลเมืองลำพูน
-</h1>
-
-
       {/* Alert */}
       <AnimatePresence>
         {showAlert && (
@@ -233,31 +219,6 @@ export default function HomePage() {
           </div>
         )}
       </AnimatePresence>
-
-      {/* Footer */}
-<footer className="fixed bottom-0 left-0 w-full bg-gray-700 shadow-md border-t border-gray-800 px-2 sm:px-8 py-2 sm:py-4 z-50 text-[12px] sm:text-base">
-  <div className="flex items-center justify-center gap-2 sm:gap-4 relative">
-    {/* Logo ชิดซ้าย */}
-    <div className="absolute left-2 sm:left-4 flex-shrink-0">
-      <Image
-        src="/logo.png"
-        alt="โลโก้เทศบาล"
-        width={50}
-        height={50}
-        className="sm:w-[110px] sm:h-[110px]"
-      />
-    </div>
-
-    {/* ข้อความกลาง อยู่ตรงกลาง */}
-    <p className="text-center text-gray-200 text-sm sm:text-base leading-snug mx-auto">
-      🏥 คลินิกแพทย์แผนไทยประยุกต์ — ศูนย์บริการสาธารณสุข เทศบาลเมืองลำพูน<br />
-      🌿 บริการ: นวดประคบสมุนไพร • อบไอน้ำสมุนไพร • ดูแลมารดาหลังคลอด<br />
-      ⏰ เวลาเปิดบริการ: จันทร์ - ศุกร์ 08:00 - 18:00 น. | เสาร์ 08:00 - 16:00 น.<br />
-      📞 ติดต่อ: 053-525776 ต่อ 320, 094-6422111
-    </p>
-  </div>
-</footer>
-
     </div>
   );
 }

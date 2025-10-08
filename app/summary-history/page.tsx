@@ -69,39 +69,77 @@ export default function SummaryHistoryPage() {
     }
   }, [user, router]);
 
-  // โหลด bookings
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch("/api/all-bookings");
-        const data = await res.json();
-        if (data.success) {
-          setBookings(data.bookings);
+useEffect(() => {
+  if (!startDate && !endDate) return;
+  (async () => {
+    try {
+      const res = await fetch("/api/all-bookings");
+      const data = await res.json();
+      if (data.success) {
+        setBookings(data.bookings);
 
-          const yearSet = new Set<number>();
-          data.bookings.forEach((b: Booking) => yearSet.add(new Date(b.date).getFullYear()));
-          const yearArr = Array.from(yearSet).sort((a, b) => a - b);
-          setYears(yearArr);
-          if (yearArr.length > 0) setYear(yearArr[yearArr.length - 1]);
-        }
-      } catch (e) {
-        console.error("โหลดข้อมูล bookings ล้มเหลว", e);
+        const yearSet = new Set<number>();
+        data.bookings.forEach((b: Booking) => yearSet.add(new Date(b.date).getFullYear()));
+        const yearArr = Array.from(yearSet).sort((a, b) => a - b);
+        setYears(yearArr);
+        if (yearArr.length > 0) setYear(yearArr[yearArr.length - 1]);
       }
-    })();
-  }, []);
+    } catch (e) {
+      console.error("โหลดข้อมูล bookings ล้มเหลว", e);
+    }
+  })();
+}, [startDate, endDate]);
 
-  // โหลด therapists
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch("/api/therapists");
-        const data = await res.json();
-        if (data.success) setTherapists(data.therapists);
-      } catch (e) {
-        console.error("โหลดข้อมูล therapists ล้มเหลว", e);
-      }
-    })();
-  }, []);
+useEffect(() => {
+  if (!startDate && !endDate) return;
+  (async () => {
+    try {
+      const res = await fetch("/api/therapists");
+      const data = await res.json();
+      if (data.success) setTherapists(data.therapists);
+    } catch (e) {
+      console.error("โหลดข้อมูล therapists ล้มเหลว", e);
+    }
+  })();
+}, [startDate, endDate]);
+
+useEffect(() => {
+  if (!startDate && !endDate) {
+    setFiltered([]);
+    return;
+  }
+
+  const f = bookings.filter((b) => {
+    const d = new Date(b.date);
+    const s = startDate ? new Date(startDate) : null;
+    const e = endDate ? new Date(endDate) : null;
+
+    if (s && e) {
+      const dOnly = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      const sOnly = new Date(s.getFullYear(), s.getMonth(), s.getDate());
+      const eOnly = new Date(e.getFullYear(), e.getMonth(), e.getDate());
+      return dOnly >= sOnly && dOnly <= eOnly;
+    }
+
+    if (s && !e)
+      return (
+        d.getFullYear() === s.getFullYear() &&
+        d.getMonth() === s.getMonth() &&
+        d.getDate() === s.getDate()
+      );
+
+    if (!s && e)
+      return (
+        d.getFullYear() === e.getFullYear() &&
+        d.getMonth() === e.getMonth() &&
+        d.getDate() === e.getDate()
+      );
+
+    return false;
+  });
+
+  setFiltered(f);
+}, [bookings, startDate, endDate]);
 
 useEffect(() => {
   if (!year) return;
@@ -348,6 +386,16 @@ useEffect(() => {
           className="w-30 sm:w-35 border border-emerald-400 rounded-lg px-2 sm:px-3 py-2 sm:py-2 text-sm sm:text-base bg-white text-emerald-800 shadow-sm focus:ring-2 focus:ring-emerald-300 outline-none"
         />
       </div>
+{!startDate && !endDate ? (
+  <div className="text-center text-gray-500 text-base mt-10">
+    🗓️ กรุณาเลือกวันที่เพื่อดูสรุปข้อมูล
+  </div>
+) : filtered.length === 0 ? (
+  <div className="text-center text-gray-500 text-base mt-10">
+    ไม่มีข้อมูลในช่วงวันที่ที่เลือก
+  </div>
+) : (
+        <>
       {/* Summary Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8 max-w-6xl mx-auto px-4">
         <div className="bg-white shadow rounded-lg p-2 sm:p-4 text-center border-l-4 border-green-800">
@@ -395,89 +443,88 @@ useEffect(() => {
           </BarChart>
         </ResponsiveContainer>
       </div>
-
       {/* BarChart ตามหมอนวด */}
-<div className="bg-white shadow rounded-lg p-4 max-w-6xl mx-auto mt-8 px-4">
-  <h2 className="text-xl font-semibold text-emerald-700 mb-4 text-center">จำนวนการจองต่อคน</h2>
+      <div className="bg-white shadow rounded-lg p-4 max-w-6xl mx-auto mt-8 px-4">
+        <h2 className="text-xl font-semibold text-emerald-700 mb-4 text-center">จำนวนการจองต่อคน</h2>
 
-  {/* ResponsiveContainer สำหรับมือถือ/desktop */}
-  <ResponsiveContainer
-    width="100%"
-    height={windowWidth < 640 ? 300 : Math.max(50 * therapistChartData.length, 300)}
-  >
-    <BarChart
-      layout="vertical"
-      data={therapistChartData.sort(
-        (a, b) =>
-          b.สำเร็จ + b.รอดำเนินการ + b.ยกเลิก - (a.สำเร็จ + a.รอดำเนินการ + a.ยกเลิก)
-      )}
-      margin={{
-        top: 20,
-        right: windowWidth < 640 ? 20 : 120,
-        left: 20,
-        bottom: 20,
-      }}
-    >
-      <CartesianGrid strokeDasharray="3 3" />
-      <XAxis type="number" />
-      <YAxis dataKey="name" type="category" width={windowWidth < 640 ? 120 : 200} />
-      <Tooltip />
-      <Legend />
-      <Bar dataKey="สำเร็จ" stackId="b" fill="#22C55E" />
-      <Bar dataKey="รอดำเนินการ" stackId="b" fill="#6B7280" />
-      <Bar dataKey="ยกเลิก" stackId="b" fill="#EF4444">
-        <LabelList
-          dataKey={(d: any) => d.สำเร็จ + d.รอดำเนินการ + d.ยกเลิก}
-          position="right"
-          formatter={(v) => (v === 0 ? "" : v)}
-        />
-      </Bar>
-    </BarChart>
-  </ResponsiveContainer>
-
-  {/* รายละเอียดหมอนวด */}
-  <div className="mt-4 max-w-6xl mx-auto">
-    <h3 className="text-lg font-semibold text-emerald-700 mb-2 text-center">จำนวนครั้งสถานะทั้งหมดต่อคน</h3>
-    {/* Dropdown เลือกสถานะ */}
-    <div className="flex justify-center mb-4">
-      <select
-        className="border border-emerald-400 rounded-lg px-3 py-2 bg-white text-emerald-800 shadow-sm"
-        value={statusFilter}
-        onChange={(e) => setStatusFilter(e.target.value as "success" | "pending" | "cancelled")}
-      >
-        <option value="success">สำเร็จ</option>
-        <option value="pending">รอดำเนินการ</option>
-        <option value="cancelled">ยกเลิก</option>
-      </select>
-    </div>
-
-    {/* การ์ดรายหมอนวด */}
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-      {Object.entries(therapistSummary).map(([name, counts]) => (
-        <div key={name} className="bg-white rounded shadow p-3 flex justify-between items-center">
-          <span className="font-medium text-gray-600">{name}</span>
-          <span
-            className={`font-bold ${
-              statusFilter === "success"
-                ? "text-green-600"
-                : statusFilter === "pending"
-                ? "text-gray-600"
-                : "text-red-600"
-            }`}
+        {/* ResponsiveContainer สำหรับมือถือ/desktop */}
+        <ResponsiveContainer
+          width="100%"
+          height={windowWidth < 640 ? 300 : Math.max(50 * therapistChartData.length, 300)}
+        >
+          <BarChart
+            layout="vertical"
+            data={therapistChartData.sort(
+              (a, b) =>
+                b.สำเร็จ + b.รอดำเนินการ + b.ยกเลิก - (a.สำเร็จ + a.รอดำเนินการ + a.ยกเลิก)
+            )}
+            margin={{
+              top: 20,
+              right: windowWidth < 640 ? 20 : 120,
+              left: 20,
+              bottom: 20,
+            }}
           >
-            {statusFilter === "success"
-              ? counts.success
-              : statusFilter === "pending"
-              ? counts.pending
-              : counts.cancelled}{" "}
-            ครั้ง
-          </span>
-        </div>
-      ))}
-    </div>
-  </div>
-</div>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis type="number" />
+            <YAxis dataKey="name" type="category" width={windowWidth < 640 ? 120 : 200} />
+            <Tooltip />
+            <Legend />
+            <Bar dataKey="สำเร็จ" stackId="b" fill="#22C55E" />
+            <Bar dataKey="รอดำเนินการ" stackId="b" fill="#6B7280" />
+            <Bar dataKey="ยกเลิก" stackId="b" fill="#EF4444">
+              <LabelList
+                dataKey={(d: any) => d.สำเร็จ + d.รอดำเนินการ + d.ยกเลิก}
+                position="right"
+                formatter={(v) => (v === 0 ? "" : v)}
+              />
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+        {/* รายละเอียดหมอนวด */}
+        <div className="mt-4 max-w-6xl mx-auto">
+          <h3 className="text-lg font-semibold text-emerald-700 mb-2 text-center">จำนวนครั้งสถานะทั้งหมดต่อคน</h3>
+          {/* Dropdown เลือกสถานะ */}
+          <div className="flex justify-center mb-4">
+            <select
+              className="border border-emerald-400 rounded-lg px-3 py-2 bg-white text-emerald-800 shadow-sm"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as "success" | "pending" | "cancelled")}
+            >
+              <option value="success">สำเร็จ</option>
+              <option value="pending">รอดำเนินการ</option>
+              <option value="cancelled">ยกเลิก</option>
+            </select>
+          </div>
 
-    </div>
+          {/* การ์ดรายหมอนวด */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            {Object.entries(therapistSummary).map(([name, counts]) => (
+              <div key={name} className="bg-white rounded shadow p-3 flex justify-between items-center">
+                <span className="font-medium text-gray-600">{name}</span>
+                <span
+                  className={`font-bold ${
+                    statusFilter === "success"
+                      ? "text-green-600"
+                      : statusFilter === "pending"
+                      ? "text-gray-600"
+                      : "text-red-600"
+                  }`}
+                >
+                  {statusFilter === "success"
+                    ? counts.success
+                    : statusFilter === "pending"
+                    ? counts.pending
+                    : counts.cancelled}{" "}
+                  ครั้ง
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+     </>
+    )}
+  </div>
   );
 }

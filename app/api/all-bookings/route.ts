@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
 import pool from '../dbconnection/db';
 
+// GET: ดึง bookings ทั้งหมด พร้อม payment_status
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
     const confirmId = url.searchParams.get("confirmId");
 
-    // ดึง booking ทั้งหมด
+    // ดึง booking ทั้งหมด พร้อม payment_status
     const [rows]: any = await pool.execute(
-      "SELECT id, provider, name, phone, therapist, time_slot, date, status, created_at FROM bookings ORDER BY id DESC"
+      "SELECT id, provider, name, phone, therapist, time_slot, date, status, payment_status, created_at FROM bookings ORDER BY id DESC"
     );
 
     const now = new Date();
@@ -48,8 +49,8 @@ export async function GET(req: Request) {
       }
     }
 
-    // ✅ เพิ่มคำนวณเฉลี่ยต่อเดือน (หาร 12 เดือนตายตัว)
-    const year = now.getFullYear(); // หรือจะรับจาก query ก็ได้
+    // ✅ เพิ่มคำนวณเฉลี่ยต่อเดือน
+    const year = now.getFullYear();
     const [avgRows]: any = await pool.execute(
       "SELECT COUNT(*) / 12 AS avg_per_month FROM bookings WHERE YEAR(date) = ?",
       [year]
@@ -63,6 +64,7 @@ export async function GET(req: Request) {
   }
 }
 
+// DELETE: ลบ booking
 export async function DELETE(req: Request) {
   try {
     const url = new URL(req.url);
@@ -74,5 +76,20 @@ export async function DELETE(req: Request) {
   } catch (error) {
     console.error("Error deleting booking:", error);
     return NextResponse.json({ success: false, error: "ไม่สามารถลบรายการได้" }, { status: 500 });
+  }
+}
+
+// POST: mark payment
+export async function POST(req: Request) {
+  try {
+    const body = await req.json();
+    const { id } = body;
+    if (!id) return NextResponse.json({ success: false, error: "ไม่พบ id" }, { status: 400 });
+
+    await pool.execute("UPDATE bookings SET payment_status = 'paid' WHERE id = ?", [id]);
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Error updating payment status:", error);
+    return NextResponse.json({ success: false, error: "ไม่สามารถอัปเดตการจ่ายเงินได้" }, { status: 500 });
   }
 }

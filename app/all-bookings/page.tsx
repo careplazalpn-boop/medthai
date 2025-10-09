@@ -5,7 +5,7 @@ import { User, Phone, UserCheck, Clock, CalendarDays, CheckCircle2, Smile, Frown
 import * as Dialog from "@radix-ui/react-dialog";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { FaCheck, FaFacebook, FaHospital, FaHistory, FaChartBar, FaCalendarAlt, FaUsersCog, FaSpa, FaTimes, FaBars, FaSignOutAlt, FaSignInAlt } from "react-icons/fa";
+import { FaCheck, FaFacebook, FaHospital, FaMoneyBillWave, FaHistory, FaChartBar, FaCalendarAlt, FaUsersCog, FaSpa, FaTimes, FaBars, FaSignOutAlt, FaSignInAlt } from "react-icons/fa";
 import { HiChevronDown, HiChevronUp } from "react-icons/hi";
 import { ImSpinner2 } from "react-icons/im";
 import * as XLSX from "xlsx";
@@ -25,6 +25,7 @@ interface Booking {
   date: string;
   status: string;
   created_at: string; // หรือ Date ถ้า parse เป็น Date แล้ว
+  payment_status?: string;
 }
 
 const getStatusLabel = (b: Booking) => {
@@ -638,7 +639,6 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
                   {filteredBookings.length - idx}
                 </span>
               </div>
-
               {/* ข้อมูล */}
               <div className="grid grid-cols-1 sm:grid-cols-[200px_211px_130px_200px_120px_120px_120px] gap-y-2 sm:gap-x-6 text-gray-700 flex-grow">
                 {/* ผู้ให้บริการ */}
@@ -750,6 +750,43 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
                     >
                       {b.name}
                     </span>
+                  )}
+                  {/* ปุ่ม toggle การจ่ายเงิน */}
+                  <button
+                    onClick={async () => {
+                      const newStatus = b.payment_status === "paid" ? "unpaid" : "paid";
+                      try {
+                        const res = await fetch("/api/update-payment-status", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ id: b.id, status: newStatus }),
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                          setBookings((prev) =>
+                            prev.map((x) =>
+                              x.id === b.id ? { ...x, payment_status: newStatus } : x
+                            )
+                          );
+                        } else {
+                          alert("อัปเดตสถานะการจ่ายเงินไม่สำเร็จ");
+                        }
+                      } catch (err) {
+                        alert("เกิดข้อผิดพลาด: " + err);
+                      }
+                    }}
+                    className={`mt-1 px-2 py-1 text-xs rounded transition w-28 ${
+                      b.payment_status === "paid"
+                        ? "bg-emerald-600 text-white font-bold hover:bg-emerald-700"
+                        : "bg-yellow-600 text-white font-bold hover:bg-yellow-700"
+                    }`}
+                  >
+                    {b.payment_status === "paid" ? "จ่ายเงินแล้ว" : "รอจ่ายเงิน"}
+                  </button>
+
+                  {/* สัญลักษณ์ 💰 */}
+                  {b.payment_status === "paid" && (
+                    <span className="absolute top-0 right-0 text-emerald-600 font-bold text-lg">💰</span>
                   )}
                 </div>
                 {/* เบอร์โทร */}
@@ -898,47 +935,46 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
                   </Dialog.Root>
                 )}
 
-                {(getStatusLabel(b) === "รอดำเนินการ" || getStatusLabel(b) === "อยู่ในคิว") && (
-                  <>
-                    {/* ยืนยัน */}
-                    {getStatusLabel(b) === "รอดำเนินการ" && (
-                      <Dialog.Root>
-                        <Dialog.Trigger asChild>
-                          <button
-                            onClick={() => setSelectedId(b.id)}
-                            className="flex items-center justify-center w-15 h-10 bg-emerald-600 rounded-md shadow hover:bg-emerald-700 transition"
-                          >
-                            <FaCheck className="text-white w-5 h-5" />
-                          </button>
-                        </Dialog.Trigger>
-                        <BookingDialog
-                          title="ต้องการยืนยันรายการนี้หรือไม่?"
-                          color="emerald"
-                          booking={b}
-                          onConfirm={() => handleBookingAction("confirm")}
-                        />
-                      </Dialog.Root>
-                    )}
-
-                    {/* ยกเลิก */}
-                    <Dialog.Root>
-                      <Dialog.Trigger asChild>
-                        <button
-                          onClick={() => setSelectedId(b.id)}
-                          className="flex items-center justify-center w-15 h-10 bg-red-500 rounded-md shadow hover:bg-red-600 transition"
-                        >
-                          <FaTimes className="text-white w-5 h-5" />
-                        </button>
-                      </Dialog.Trigger>
-                      <BookingDialog
-                        title="ต้องการยกเลิกรายการนี้หรือไม่?"
-                        color="red"
-                        booking={b}
-                        onConfirm={() => handleBookingAction("cancel")}
-                      />
-                    </Dialog.Root>
-                  </>
-                )}
+{(getStatusLabel(b) === "รอดำเนินการ" || getStatusLabel(b) === "อยู่ในคิว") && (
+  <>
+    {/* ยืนยัน */}
+    {getStatusLabel(b) === "รอดำเนินการ" && (
+      <Dialog.Root>
+        <Dialog.Trigger asChild>
+          <button
+            onClick={() => setSelectedId(b.id)}
+            className="flex items-center justify-center w-15 h-10 bg-emerald-600 rounded-md shadow hover:bg-emerald-700 transition"
+          >
+            <FaCheck className="text-white w-5 h-5" />
+          </button>
+        </Dialog.Trigger>
+        <BookingDialog
+          title="ต้องการยืนยันรายการนี้หรือไม่?"
+          color="emerald"
+          booking={b}
+          onConfirm={() => handleBookingAction("confirm")}
+        />
+      </Dialog.Root>
+    )}
+    {/* ยกเลิก */}
+    <Dialog.Root>
+      <Dialog.Trigger asChild>
+        <button
+          onClick={() => setSelectedId(b.id)}
+          className="flex items-center justify-center w-15 h-10 bg-red-500 rounded-md shadow hover:bg-red-600 transition"
+        >
+          <FaTimes className="text-white w-5 h-5" />
+        </button>
+      </Dialog.Trigger>
+      <BookingDialog
+        title="ต้องการยกเลิกรายการนี้หรือไม่?"
+        color="red"
+        booking={b}
+        onConfirm={() => handleBookingAction("cancel")}
+      />
+    </Dialog.Root>
+  </>
+)}
 
                 {getStatusLabel(b) === "สำเร็จ" && (
                   <button

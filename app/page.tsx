@@ -59,12 +59,27 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen relative flex flex-col justify-center items-center p-2 sm:p-8 overflow-hidden">
-      <Image
-        src="/แผนไทย.png"
-        alt="พื้นหลัง"
-        fill
-        className="object-cover object-bottom -z-20"
-      />
+    {/* Desktop */}
+    <Image
+      src="/แผนไทย.png"
+      alt="พื้นหลัง"
+      fill
+      className="hidden sm:block object-cover object-bottom -z-20"
+    />
+    {/* Mobile แนวตั้ง */}
+    <Image
+      src="/แผนไทยมือถือแนวตั้ง.png"
+      alt="พื้นหลังแนวตั้ง"
+      fill
+      className="block sm:hidden object-cover object-top -z-20 portrait:block landscape:hidden"
+    />
+    {/* Mobile แนวนอน */}
+    <Image
+      src="/แผนไทยมือถือแนวนอน.png"
+      alt="พื้นหลัแนวนอน"
+      fill
+      className="block sm:hidden object-cover object-bottom -z-20 portrait:hidden landscape:block"
+    />
       {/* Header */}
       <div className="fixed top-0 left-0 w-full z-50 bg-gray-700 shadow-md flex justify-between items-center px-2 sm:px-4 py-2 sm:py-2">
         <div className="flex items-center gap-2 sm:gap-13">
@@ -180,7 +195,7 @@ export default function HomePage() {
                     className="py-2 px-6 hover:bg-white/20 flex items-center justify-center gap-2"
                   >
                     <FaFacebook className="w-4 h-4 sm:w-5 sm:h-5" />
-                    <span>Facebook</span>
+                    <span>Facebook (จองคิว)</span>
                   </a>
                   <a
                     href="https://www.lmwcc.com/"

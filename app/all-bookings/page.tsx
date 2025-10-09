@@ -5,7 +5,7 @@ import { User, Phone, UserCheck, Clock, CalendarDays, CheckCircle2, Smile, Frown
 import * as Dialog from "@radix-ui/react-dialog";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { FaCheck, FaFacebook, FaHospital, FaMoneyBillWave, FaHistory, FaChartBar, FaCalendarAlt, FaUsersCog, FaSpa, FaTimes, FaBars, FaSignOutAlt, FaSignInAlt } from "react-icons/fa";
+import { FaCheck, FaFacebook, FaHospital, FaHistory, FaChartBar, FaCalendarAlt, FaUsersCog, FaSpa, FaTimes, FaBars, FaSignOutAlt, FaSignInAlt } from "react-icons/fa";
 import { HiChevronDown, HiChevronUp } from "react-icons/hi";
 import { ImSpinner2 } from "react-icons/im";
 import * as XLSX from "xlsx";
@@ -213,14 +213,10 @@ const exportToExcel = () => {
     .filter(b => formatDate(b.date) === filterDate)
     // sort: time_slot จากน้อยไปมาก + create_at ใหม่สุดล่าง
     .sort((a, b) => {
-      // แปลงเวลาเริ่มต้นเป็นนาที
       const [aStart] = a.time_slot.split("-");
       const [bStart] = b.time_slot.split("-");
       const timeDiff = parseTime(aStart) - parseTime(bStart);
-
       if (timeDiff !== 0) return timeDiff;
-
-      // ถ้าเวลาเท่ากัน ให้เอา create_at ใหม่สุดล่าง
       return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
     });
 
@@ -235,6 +231,7 @@ const exportToExcel = () => {
     "วันที่": new Date(b.date).toLocaleDateString("th-TH",{year:"numeric",month:"2-digit",day:"2-digit",timeZone:"Asia/Bangkok"}),
     "ช่วงเวลา": b.time_slot,
     "สถานะ": getStatusLabel(b),
+    "การชำระเงิน": b.payment_status === "paid" ? "ชำระเงิน" : "เบิกได้",
   }));
 
   const ws = XLSX.utils.json_to_sheet(data);
@@ -246,10 +243,12 @@ const exportToExcel = () => {
     );
 
     const maxWidths: Record<string, number> = {
-      "ผู้ให้บริการ": 29,
-      "ผู้มารับบริการ": 29,
-      "หมอนวด": 29,
-      "ช่วงเวลา": 12
+      "ผู้ให้บริการ": 30,
+      "ผู้มารับบริการ": 30,
+      "หมอนวด": 30,
+      "ช่วงเวลา": 15,
+      "สถานะ" : 15,
+      "สถานะการชำระเงิน": 15,
     };
 
     return { wch: Math.min(maxLength + 2, maxWidths[key] || maxLength + 2) };
@@ -263,6 +262,7 @@ const exportToExcel = () => {
   const file = new Blob([buf], { type: "application/octet-stream" });
   saveAs(file, `BookingHistory-${filterDate}.xlsx`);
 };
+
 // ฟังก์ชันช่วยแปลง "HH:MM" เป็นนาที
 const parseTime = (timeStr: string) => {
   const [h, m] = timeStr.split(":").map(Number);
@@ -499,7 +499,7 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
                     className="py-2 px-6 hover:bg-white/20 flex items-center justify-center gap-2"
                   >
                     <FaFacebook className="w-4 h-4 sm:w-5 sm:h-5" />
-                    <span>Facebook</span>
+                    <span>Facebook (จองคิว)</span>
                   </a>
                   <a
                     href="https://www.lmwcc.com/"
@@ -781,7 +781,7 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
                         : "bg-yellow-600 text-white font-bold hover:bg-yellow-700"
                     }`}
                   >
-                    {b.payment_status === "paid" ? "จ่ายเงินแล้ว" : "รอจ่ายเงิน"}
+                    {b.payment_status === "paid" ? "ชำระเงิน" : "เบิกได้"}
                   </button>
 
                   {/* สัญลักษณ์ 💰 */}

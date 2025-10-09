@@ -420,7 +420,7 @@ const renderTable = (data: Person[], type: "therapist" | "med_staff") => (
                     className="py-2 px-6 hover:bg-white/20 flex items-center justify-center gap-2"
                   >
                     <FaFacebook className="w-4 h-4 sm:w-5 sm:h-5" />
-                    <span>Facebook</span>
+                    <span>Facebook (จองคิว)</span>
                   </a>
                   <a
                     href="https://www.lmwcc.com/"

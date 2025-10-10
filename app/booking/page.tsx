@@ -708,11 +708,10 @@ const handleSubmit = () => {
                         </div>
                         {isBooked && (
                           <div className="text-xs">
-                            ({slotInfo?.name || "ไม่ระบุ"})
+                            {!isGuest ? `(${slotInfo?.name || "ไม่ระบุ"})` : "(ไม่ว่าง)"}
                           </div>
                         )}
                       </button>
-
                       {/* ปุ่ม admin toggle slot */}
                       {date && !isGuest && (
                         <button

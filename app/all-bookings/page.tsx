@@ -622,6 +622,10 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
         </div>
       </div>
 
+      <h1 className="text-3xl sm:text-4xl font-extrabold text-emerald-700 mb-8 sm:mb-12 pt-15 text-center drop-shadow-sm">
+        ประวัติการจอง9999999999
+      </h1>
+
       {filteredBookings.length === 0 ? (
         <p className="text-center text-gray-500 italic select-none">ยังไม่มีประวัติ</p>
       ) : (
@@ -996,9 +1000,15 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
         {showConfirmSuccess && <Toast key="confirm" message="ยืนยันการจองสำเร็จ" />}
         {showDeleteSuccess && <Toast key="delete" message="ลบรายการสำเร็จ" />}
       </AnimatePresence>
+      <h1 className="text-3xl sm:text-4xl font-extrabold text-emerald-700 mb-8 sm:mb-12 pt-15 text-center drop-shadow-sm">
+        ประวัติการจอง9999999999
+      </h1>
+
     </div>
   );
 }
+
+
 
 function Label({ icon, text }: { icon: React.ReactNode, text: string }) {
   return <div className="flex items-center gap-1 text-emerald-700 font-medium text-sm">{icon} {text}</div>;

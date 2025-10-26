@@ -48,7 +48,7 @@ function BookingSummary({ attended, cancelled }: SummaryProps) {
   const total = totalAttended + totalCancelled;
   const attendedPercent = total ? Math.round((totalAttended / total) * 100) : 0;
   const cancelledPercent = total ? 100 - attendedPercent : 0;
-
+  
   return (
     <div className="flex flex-col sm:flex-row gap-4 sm:gap-3">
       <div
@@ -81,6 +81,7 @@ function BookingSummary({ attended, cancelled }: SummaryProps) {
         <div className="flex flex-col flex-grow justify-center">
           <div className="flex justify-center items-baseline gap-2">
             <span className="text-lg text-red-700">ไม่มานวด :</span>
+            
             <span className="text-lg font-bold">{totalCancelled} คน</span>
           </div>
           <div className="w-full h-4 bg-red-200 rounded-full mt-2 relative overflow-hidden">
@@ -131,6 +132,12 @@ export default function AllBookingsPage() {
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [contactOpen, setContactOpen] = useState(false);
+  const [page, setPage] = useState(1);
+  const [limit] = useState(90);
+  const [totalPages, setTotalPages] = useState(1);
+  const [summary, setSummary] = useState<{ totalAttended: number; totalCancelled: number }>({
+  totalAttended: 0,
+  totalCancelled: 0, });
 
     useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -165,17 +172,34 @@ export default function AllBookingsPage() {
     setLoading(true); // เริ่มโหลด
     (async () => {
       try {
-        const res = await fetch(`/api/all-bookings?date=${filterDate}`);
+        const res = await fetch(`/api/all-bookings?date=${filterDate}&page=${page}&limit=${limit}`);
         const data = await res.json();
         if (!data.success) throw new Error(data.error || "เกิดข้อผิดพลาด");
         setBookings(data.bookings);
+        setTotalPages(data.pagination.totalPages || 1);
+
+          if (data.summary) {
+        setSummary({
+          totalAttended: data.summary.totalAttended,
+          totalCancelled: data.summary.totalCancelled,
+        });
+      }
+      
       } catch (e: any) {
         setError(e.message || "เกิดข้อผิดพลาดไม่ทราบสาเหตุ");
       } finally {
         setLoading(false); // โหลดเสร็จ
       }
     })();
-  }, [filterDate]);
+  }, [filterDate, page]);
+
+    const handleNext = () => {
+    if (page < totalPages) setPage((p) => p + 1);
+  };
+
+  const handlePrev = () => {
+    if (page > 1) setPage((p) => p - 1);
+  };
 
   useEffect(() => {
     setLoading(true);
@@ -616,19 +640,14 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
             {timeSlots.map((slot,i)=><option key={i} value={slot}>{slot}</option>)}
           </select>
         </div>
-
         <div className="w-full sm:flex-1">
           <BookingSummary attended={attendedBookings} cancelled={cancelledBookings} />
         </div>
-      </div>
-
-      <h1 className="text-3xl sm:text-4xl font-extrabold text-emerald-700 mb-8 sm:mb-12 pt-15 text-center drop-shadow-sm">
-        ประวัติการจอง9999999999
-      </h1>
-
+      </div>      
       {filteredBookings.length === 0 ? (
         <p className="text-center text-gray-500 italic select-none">ยังไม่มีประวัติ</p>
       ) : (
+        
         <ul className="space-y-4 w-full max-w-[92rem] mx-auto">
           {filteredBookings.map((b, idx) => (
             <li
@@ -640,7 +659,7 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
               {/* เลขลำดับ */}
               <div className="flex items-center gap-2 pr-0 sm:pr-4 mb-3 sm:mb-0">
                 <span className="w-8 h-8 flex items-center justify-center bg-emerald-200 text-emerald-700 font-bold rounded-full">
-                  {filteredBookings.length - idx}
+                  {(page - 1) * limit + idx + 1}
                 </span>
               </div>
               {/* ข้อมูล */}
@@ -1000,11 +1019,28 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
         {showConfirmSuccess && <Toast key="confirm" message="ยืนยันการจองสำเร็จ" />}
         {showDeleteSuccess && <Toast key="delete" message="ลบรายการสำเร็จ" />}
       </AnimatePresence>
-      <h1 className="text-3xl sm:text-4xl font-extrabold text-emerald-700 mb-8 sm:mb-12 pt-15 text-center drop-shadow-sm">
-        ประวัติการจอง9999999999
-      </h1>
 
+    <div className="flex justify-center items-center gap-4 mt-6">
+      <button
+        onClick={handlePrev}
+        disabled={page <= 1}
+        className="px-4 py-2 bg-gray-200 rounded-lg disabled:opacity-50 hover:bg-gray-300"
+      >
+        ก่อนหน้า
+      </button>
+      <span className="text-gray-700">
+        หน้า {page} / {totalPages}
+      </span>
+      <button
+        onClick={handleNext}
+        disabled={page >= totalPages}
+        className="px-4 py-2 bg-gray-200 rounded-lg disabled:opacity-50 hover:bg-gray-300"
+      >
+        ถัดไป
+      </button>
     </div>
+    </div>
+    
   );
 }
 

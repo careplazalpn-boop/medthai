@@ -73,7 +73,7 @@ useEffect(() => {
   if (!startDate && !endDate) return;
   (async () => {
     try {
-      const res = await fetch("/api/all-bookings");
+      const res = await fetch("/api/summary-history");
       const data = await res.json();
       if (data.success) {
         setBookings(data.bookings);
@@ -307,7 +307,7 @@ useEffect(() => {
             {user && (
               <>
                 <div
-                  onClick={() => router.push("/all-bookings")}
+                  onClick={() => router.push("/summary-history")}
                   className="w-full py-3 sm:py-4 px-4 sm:px-6 border-b-1 border-gray-400 cursor-pointer hover:bg-white/20 flex items-center justify-center gap-2 text-sm sm:text-lg font-semibold text-white"
                 >
                   <FaHistory /> ประวัติการจอง

@@ -13,7 +13,7 @@ export async function GET(req: Request) {
 
     // --- Pagination ---
     const page = parseInt(url.searchParams.get("page") || "1");
-    const limit = parseInt(url.searchParams.get("limit") || "90");
+    const limit = parseInt(url.searchParams.get("limit") || "20");
     const offset = (page - 1) * limit;
 
     // --- Filter by date ---

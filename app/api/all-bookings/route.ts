@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import pool from "../dbconnection/db";
 
-// ฟังก์ชันสำหรับอัปเดตสถานะ
+// 🧩 ฟังก์ชันสำหรับอัปเดตสถานะ
 async function updateBookingStatus(status: string, bookingId: string | number) {
   await pool.execute("UPDATE bookings SET status = ? WHERE id = ?", [status, bookingId]);
 }
 
-// GET: ดึง bookings ทั้งหมด พร้อม pagination + filterDate + summary
+// 🧠 GET: ดึง bookings ทั้งหมด พร้อม pagination + filterDate + summary
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
@@ -16,7 +16,7 @@ export async function GET(req: Request) {
     const limit = parseInt(url.searchParams.get("limit") || "20");
     const offset = (page - 1) * limit;
 
-    // --- Filter by query params ---
+    // --- Filter ---
     const filterDate = url.searchParams.get("date");
     const provider = url.searchParams.get("provider");
     const status = url.searchParams.get("status");
@@ -68,22 +68,26 @@ export async function GET(req: Request) {
     `;
     let countQuery = `SELECT COUNT(*) AS total FROM bookings WHERE 1=1`;
     const queryParams: any[] = [];
+    const countParams: any[] = [];
 
-    // เพิ่ม filter
+    // --- Apply Filters ---
     if (filterDate) {
       query += ` AND date = ?`;
       countQuery += ` AND date = ?`;
       queryParams.push(filterDate);
+      countParams.push(filterDate);
     }
     if (provider) {
       query += ` AND provider = ?`;
       countQuery += ` AND provider = ?`;
       queryParams.push(provider);
+      countParams.push(provider);
     }
     if (status) {
       query += ` AND status = ?`;
       countQuery += ` AND status = ?`;
       queryParams.push(status);
+      countParams.push(status);
     }
 
     query += `
@@ -91,18 +95,24 @@ export async function GET(req: Request) {
         date ASC,
         STR_TO_DATE(SUBSTRING_INDEX(time_slot, '-', 1), '%H:%i') ASC,
         name ASC
-      LIMIT ? OFFSET ?`;
+      LIMIT ? OFFSET ?
+    `;
     queryParams.push(limit, offset);
 
     const [rows]: any = await pool.execute(query, queryParams);
-    const [countRows]: any = await pool.execute(countQuery, queryParams.slice(0, queryParams.length - 2));
+    const [countRows]: any = await pool.execute(countQuery, countParams);
+
     const total = countRows[0]?.total || 0;
     const totalPages = Math.ceil(total / limit);
 
     // --- Summary: สถานะ สำเร็จ / ยกเลิก ---
     const [allRows]: any = await pool.execute("SELECT status FROM bookings");
-    const totalAttended = (allRows as { status: string }[]).filter((b) => b.status === "สำเร็จ").length;
-    const totalCancelled = (allRows as { status: string }[]).filter((b) => b.status === "ยกเลิก").length;
+    const totalAttended = (allRows as { status: string }[]).filter(
+      (b) => b.status === "สำเร็จ"
+    ).length;
+    const totalCancelled = (allRows as { status: string }[]).filter(
+      (b) => b.status === "ยกเลิก"
+    ).length;
 
     // --- Avg per month ---
     const now = new Date();
@@ -113,6 +123,7 @@ export async function GET(req: Request) {
     );
     const avgPerMonth = avgRows[0].avg_per_month || 0;
 
+    // ✅ ส่งข้อมูลทั้งหมดกลับ
     return NextResponse.json({
       success: true,
       bookings: rows,
@@ -130,7 +141,7 @@ export async function GET(req: Request) {
   }
 }
 
-// DELETE: ลบ booking
+// 🗑️ DELETE: ลบ booking
 export async function DELETE(req: Request) {
   try {
     const url = new URL(req.url);
@@ -149,7 +160,7 @@ export async function DELETE(req: Request) {
   }
 }
 
-// POST: mark payment
+// 💳 POST: mark payment
 export async function POST(req: Request) {
   try {
     const body = await req.json();

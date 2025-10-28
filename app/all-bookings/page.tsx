@@ -517,7 +517,7 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
               {contactOpen && (
                 <div className="flex flex-col bg-black/50 text-white text-sm sm:text-base">
                   <a
-                    href="https://www.facebook.com/profile.php?id=100070719421986"
+                    href="https://m.me/100070719421986"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="py-2 px-6 hover:bg-white/20 flex items-center justify-center gap-2"

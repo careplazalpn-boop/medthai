@@ -16,8 +16,10 @@ export async function GET(req: Request) {
     const limit = parseInt(url.searchParams.get("limit") || "20");
     const offset = (page - 1) * limit;
 
-    // --- Filter by date ---
+    // --- Filter by query params ---
     const filterDate = url.searchParams.get("date");
+    const provider = url.searchParams.get("provider");
+    const status = url.searchParams.get("status");
 
     // --- Auto-update status ---
     await pool.execute(`
@@ -37,13 +39,15 @@ export async function GET(req: Request) {
       );
       const booking = bookingRows[0];
       if (booking) {
-        const [result]: any = await pool.execute(`
+        const [result]: any = await pool.execute(
+          `
           UPDATE bookings
           SET status = CASE
             WHEN CONCAT(date, ' ', SUBSTRING_INDEX(time_slot, '-', -1)) <= NOW() THEN 'สำเร็จ'
             ELSE 'อยู่ในคิว'
           END
-          WHERE id = ?`,
+          WHERE id = ?
+        `,
           [confirmId]
         );
         if (result.affectedRows > 0) {
@@ -60,35 +64,45 @@ export async function GET(req: Request) {
     let query = `
       SELECT id, provider, name, phone, therapist, time_slot, date, status, payment_status, created_at
       FROM bookings
+      WHERE 1=1
     `;
-    let countQuery = `SELECT COUNT(*) AS total FROM bookings`;
+    let countQuery = `SELECT COUNT(*) AS total FROM bookings WHERE 1=1`;
     const queryParams: any[] = [];
 
+    // เพิ่ม filter
     if (filterDate) {
-      query += ` WHERE date = ?`;
-      countQuery += ` WHERE date = ?`;
+      query += ` AND date = ?`;
+      countQuery += ` AND date = ?`;
       queryParams.push(filterDate);
+    }
+    if (provider) {
+      query += ` AND provider = ?`;
+      countQuery += ` AND provider = ?`;
+      queryParams.push(provider);
+    }
+    if (status) {
+      query += ` AND status = ?`;
+      countQuery += ` AND status = ?`;
+      queryParams.push(status);
     }
 
     query += `
       ORDER BY 
-        STR_TO_DATE(SUBSTRING_INDEX(time_slot, '-', 1), '%H:%i') ASC,
         date ASC,
+        STR_TO_DATE(SUBSTRING_INDEX(time_slot, '-', 1), '%H:%i') ASC,
         name ASC
       LIMIT ? OFFSET ?`;
     queryParams.push(limit, offset);
 
     const [rows]: any = await pool.execute(query, queryParams);
-    const [countRows]: any = await pool.execute(countQuery, filterDate ? [filterDate] : []);
-    const total = countRows[0].total;
+    const [countRows]: any = await pool.execute(countQuery, queryParams.slice(0, queryParams.length - 2));
+    const total = countRows[0]?.total || 0;
     const totalPages = Math.ceil(total / limit);
 
     // --- Summary: สถานะ สำเร็จ / ยกเลิก ---
-    const [allRows]: any = await pool.execute(
-      "SELECT status FROM bookings"
-    );
-    const totalAttended = (allRows as { status: string }[]).filter(b => b.status === 'สำเร็จ').length;
-    const totalCancelled = (allRows as { status: string }[]).filter(b => b.status === 'ยกเลิก').length;
+    const [allRows]: any = await pool.execute("SELECT status FROM bookings");
+    const totalAttended = (allRows as { status: string }[]).filter((b) => b.status === "สำเร็จ").length;
+    const totalCancelled = (allRows as { status: string }[]).filter((b) => b.status === "ยกเลิก").length;
 
     // --- Avg per month ---
     const now = new Date();

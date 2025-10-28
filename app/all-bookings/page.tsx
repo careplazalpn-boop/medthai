@@ -42,12 +42,19 @@ const getStatusColor = (b: Booking) => {
 };
 
 interface SummaryProps { attended: Booking[]; cancelled: Booking[]; }
-function BookingSummary({ attended, cancelled }: SummaryProps) {
-  const totalAttended = attended.length;
-  const totalCancelled = cancelled.length;
+
+function BookingSummary({ summary }: { summary: { totalAttended: number; totalCancelled: number } }) {
+  const { totalAttended, totalCancelled } = summary;
   const total = totalAttended + totalCancelled;
   const attendedPercent = total ? Math.round((totalAttended / total) * 100) : 0;
   const cancelledPercent = total ? 100 - attendedPercent : 0;
+  
+//function BookingSummary({ attended, cancelled }: SummaryProps) {
+//  const totalAttended = attended.length;
+//  const totalCancelled = cancelled.length;
+//  const total = totalAttended + totalCancelled;
+//  const attendedPercent = total ? Math.round((totalAttended / total) * 100) : 0;
+//  const cancelledPercent = total ? 100 - attendedPercent : 0;
   
   return (
     <div className="flex flex-col sm:flex-row gap-4 sm:gap-3">
@@ -134,11 +141,9 @@ export default function AllBookingsPage() {
   const [contactOpen, setContactOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [limit] = useState(20);
-  const [totalPages, setTotalPages] = useState(1);
-  const [summary, setSummary] = useState<{ totalAttended: number; totalCancelled: number }>({
-  totalAttended: 0,
-  totalCancelled: 0, });
+  const [totalPages, setTotalPages] = useState(1);  const [summary, setSummary] = useState<{ totalAttended: number; totalCancelled: number }>({  totalAttended: 0,  totalCancelled: 0, });
 
+  
     useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
@@ -166,32 +171,48 @@ export default function AllBookingsPage() {
     }
   }, [user, router]);
 
-  useEffect(() => {
-    if (!filterDate) { setBookings([]); return; }
-    
-    setLoading(true); // เริ่มโหลด
-    (async () => {
-      try {
-        const res = await fetch(`/api/all-bookings?date=${filterDate}&page=${page}&limit=${limit}`);
-        const data = await res.json();
-        if (!data.success) throw new Error(data.error || "เกิดข้อผิดพลาด");
-        setBookings(data.bookings);
-        setTotalPages(data.pagination.totalPages || 1);
 
-          if (data.summary) {
+  useEffect(() => {
+    setPage(1);
+  }, [filterDate, filterProvider, filterStatus]);
+
+
+  useEffect(() => {
+  //if (!filterDate) { setBookings([]); return; }
+  if (!filterDate) {
+  setBookings([]);
+  setSummary({ totalAttended: 0, totalCancelled: 0 });
+  return;
+  }
+
+  setLoading(true);
+  (async () => {
+    try {
+      const res = await fetch(
+        `/api/all-bookings?date=${filterDate || ""}&provider=${filterProvider || ""}&status=${filterStatus || ""}&page=${page}&limit=${limit}`
+      );
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || "เกิดข้อผิดพลาด");
+
+      setBookings(data.bookings);
+      setTotalPages(data.pagination.totalPages || 1);
+
+      if (data.summary) {
         setSummary({
           totalAttended: data.summary.totalAttended,
           totalCancelled: data.summary.totalCancelled,
         });
       }
-      
-      } catch (e: any) {
-        setError(e.message || "เกิดข้อผิดพลาดไม่ทราบสาเหตุ");
-      } finally {
-        setLoading(false); // โหลดเสร็จ
-      }
-    })();
-  }, [filterDate, page]);
+    } catch (e: any) {
+      setError(e.message || "เกิดข้อผิดพลาดไม่ทราบสาเหตุ");
+    } finally {
+      setLoading(false);
+    }
+  })();
+}, [filterDate, filterProvider, filterStatus, page, limit]);
+    
+   //////////
+    
 
     const handleNext = () => {
     if (page < totalPages) setPage((p) => p + 1);

@@ -133,7 +133,7 @@ export default function AllBookingsPage() {
   const menuRef = useRef<HTMLDivElement>(null);
   const [contactOpen, setContactOpen] = useState(false);
   const [page, setPage] = useState(1);
-  const [limit] = useState(90);
+  const [limit] = useState(20);
   const [totalPages, setTotalPages] = useState(1);
   const [summary, setSummary] = useState<{ totalAttended: number; totalCancelled: number }>({
   totalAttended: 0,

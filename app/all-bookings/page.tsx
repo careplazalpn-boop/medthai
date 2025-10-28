@@ -661,8 +661,8 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
             {timeSlots.map((slot,i)=><option key={i} value={slot}>{slot}</option>)}
           </select>
         </div>
-        <div className="w-full sm:flex-1">
-          <BookingSummary attended={totalAttended} cancelled={totalCancelled} />
+        <div className="w-full sm:flex-1">          
+          <BookingSummary summary={{ totalAttended, totalCancelled }} />
         </div>
       </div>      
       {filteredBookings.length === 0 ? (

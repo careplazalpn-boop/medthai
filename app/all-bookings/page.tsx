@@ -43,7 +43,7 @@ const getStatusColor = (b: Booking) => {
 
 interface SummaryProps { attended: Booking[]; cancelled: Booking[]; }
 
-function BookingSummary({ summary }: { summary: { totalAttended: number; totalCancelled: number } }) {
+  function BookingSummary({ summary }: { summary: { totalAttended: number; totalCancelled: number } }) { 
   const { totalAttended, totalCancelled } = summary;
   const total = totalAttended + totalCancelled;
   const attendedPercent = total ? Math.round((totalAttended / total) * 100) : 0;
@@ -662,7 +662,7 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
           </select>
         </div>
         <div className="w-full sm:flex-1">          
-          <BookingSummary summary={{ totalAttended, totalCancelled }} />
+          <BookingSummary summary={summary} />
         </div>
       </div>      
       {filteredBookings.length === 0 ? (

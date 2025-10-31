@@ -147,13 +147,13 @@ export async function GET(req: Request) {
     const total = countRows[0]?.total || 0;
     const totalPages = Math.ceil(total / limit);
 // 1. Query สำหรับนับ "สำเร็จ" (Attended)
-    let attendedQuery = `
+    const attendedQuery = `
       SELECT COUNT(*) AS totalAttended FROM bookings 
       WHERE 1=1 AND status = 'สำเร็จ' ${countQuery.replace('SELECT COUNT(*) AS total FROM bookings WHERE 1=1', '').replace('WHERE 1=1', '')}
     `;
 
     // 2. Query สำหรับนับ "ยกเลิก" (Cancelled)
-    let cancelledQuery = `
+    const cancelledQuery = `
       SELECT COUNT(*) AS totalCancelled FROM bookings 
       WHERE 1=1 AND status = 'ยกเลิก' ${countQuery.replace('SELECT COUNT(*) AS total FROM bookings WHERE 1=1', '').replace('WHERE 1=1', '')}
     `;

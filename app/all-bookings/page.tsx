@@ -41,30 +41,27 @@ const getStatusColor = (b: Booking) => {
   }
 };
 
-interface SummaryProps { attended: Booking[]; cancelled: Booking[]; }
 
-  function BookingSummary({ summary }: { summary: { totalAttended: number; totalCancelled: number } }) { 
-  const { totalAttended, totalCancelled } = summary;
+interface BookingSummaryProps {
+  bookings?: Booking[]; // ให้ optional
+}
+
+function BookingSummary({ bookings = [] }: BookingSummaryProps) {
+  // คำนวณสถิติจาก bookings (ใช้ default เป็น array ว่าง)
+  const totalAttended = bookings.filter(b => b.status === "สำเร็จ").length;
+  const totalCancelled = bookings.filter(b => b.status === "ยกเลิก").length;
   const total = totalAttended + totalCancelled;
   const attendedPercent = total ? Math.round((totalAttended / total) * 100) : 0;
   const cancelledPercent = total ? 100 - attendedPercent : 0;
-  
-//function BookingSummary({ attended, cancelled }: SummaryProps) {
-//  const totalAttended = attended.length;
-//  const totalCancelled = cancelled.length;
-//  const total = totalAttended + totalCancelled;
-//  const attendedPercent = total ? Math.round((totalAttended / total) * 100) : 0;
-//  const cancelledPercent = total ? 100 - attendedPercent : 0;
-  
+
   return (
     <div className="flex flex-col sm:flex-row gap-4 sm:gap-3">
-      <div
-        className="flex items-center gap-4 bg-emerald-50 text-emerald-900 rounded-xl p-4 shadow-sm border-2 border-emerald-200 w-full sm:min-w-[396px]"
-      >
+      {/* สำเร็จ */}
+      <div className="flex items-center gap-4 bg-emerald-50 text-emerald-900 rounded-xl p-4 shadow-sm border-2 border-emerald-200 w-full sm:min-w-[396px]">
         <Smile className="w-12 h-10 text-emerald-500 flex-shrink-0" />
         <div className="flex flex-col flex-grow justify-center">
           <div className="flex justify-center items-baseline gap-2">
-            <span className="text-lg text-emerald-700">มานวด :</span>
+            <span className="text-lg text-emerald-700">สำเร็จ :</span>
             <span className="text-lg font-bold">{totalAttended} คน</span>
           </div>
           <div className="w-full h-4 bg-emerald-200 rounded-full mt-2 relative overflow-hidden">
@@ -81,14 +78,12 @@ interface SummaryProps { attended: Booking[]; cancelled: Booking[]; }
         </div>
       </div>
 
-      <div
-        className="flex items-center gap-4 bg-red-50 text-red-900 rounded-xl p-4 shadow-sm border-2 border-red-200 w-full sm:min-w-[397px]"
-      >
+      {/* ยกเลิก */}
+      <div className="flex items-center gap-4 bg-red-50 text-red-900 rounded-xl p-4 shadow-sm border-2 border-red-200 w-full sm:min-w-[397px]">
         <Frown className="w-12 h-10 text-red-500 flex-shrink-0" />
         <div className="flex flex-col flex-grow justify-center">
           <div className="flex justify-center items-baseline gap-2">
-            <span className="text-lg text-red-700">ไม่มานวด :</span>
-            
+            <span className="text-lg text-red-700">ยกเลิก :</span>
             <span className="text-lg font-bold">{totalCancelled} คน</span>
           </div>
           <div className="w-full h-4 bg-red-200 rounded-full mt-2 relative overflow-hidden">
@@ -107,6 +102,7 @@ interface SummaryProps { attended: Booking[]; cancelled: Booking[]; }
     </div>
   );
 }
+
 
 export default function AllBookingsPage() {
   const router = useRouter();
@@ -174,7 +170,7 @@ export default function AllBookingsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [filterDate, filterProvider, filterStatus]);
+  }, [filterDate, filterProvider, filterTherapist, filterTimeSlot, filterStatus]);
 
 
   useEffect(() => {
@@ -189,7 +185,7 @@ export default function AllBookingsPage() {
   (async () => {
     try {
       const res = await fetch(
-        `/api/all-bookings?date=${filterDate || ""}&provider=${filterProvider || ""}&status=${filterStatus || ""}&page=${page}&limit=${limit}`
+        `/api/all-bookings?date=${filterDate || ""}&provider=${filterProvider || ""}&therapist=${filterTherapist || ""}&timeSlots=${filterTimeSlot || ""}&status=${filterStatus || ""}&page=${page}&limit=${limit}`
       );
       const data = await res.json();
       if (!data.success) throw new Error(data.error || "เกิดข้อผิดพลาด");
@@ -209,7 +205,7 @@ export default function AllBookingsPage() {
       setLoading(false);
     }
   })();
-}, [filterDate, filterProvider, filterStatus, page, limit]);
+}, [filterDate, filterProvider, filterTherapist, filterTimeSlot, filterStatus, page, limit]);
     
    //////////
     
@@ -318,13 +314,16 @@ const parseTime = (timeStr: string) => {
     const d = new Date(dateStr);
     return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,"0")}-${d.getDate().toString().padStart(2,"0")}`;
   };
+    const normalizeTimeSlot = (time: string) => time.replace(/\s/g, '');
 
-  const filteredBookings = bookings.filter(b => {
+    const filteredBookings = bookings.filter(b => {
     const nameMatch = b.name.toLowerCase().includes(filterName.toLowerCase());
     const therapistMatch = filterTherapist === "all" || b.therapist === filterTherapist;
     const providerMatch = filterProvider === "all" || b.provider === filterProvider;
     const dateMatch = !filterDate || formatDate(b.date) === filterDate;
-    const timeMatch = filterTimeSlot === "all" || b.time_slot === filterTimeSlot;
+    //const timeMatch = filterTimeSlot === "all" || b.time_slot === filterTimeSlot;
+    const timeMatch = filterTimeSlot === "all" || normalizeTimeSlot(b.time_slot) === normalizeTimeSlot(filterTimeSlot);
+    
     const statusLabel = getStatusLabel(b);
 
     switch(filterStatus) {
@@ -335,9 +334,11 @@ const parseTime = (timeStr: string) => {
       default: return nameMatch && therapistMatch && providerMatch && dateMatch && timeMatch;
     }
   });
+  const totalAttended = filteredBookings.filter(b => b.status === "สำเร็จ").length;
+  const totalCancelled = filteredBookings.filter(b => b.status === "ยกเลิก").length;
 
-const attendedKeys = new Set<string>();
-const cancelledKeys = new Set<string>();
+  const attendedKeys = new Set<string>();
+  const cancelledKeys = new Set<string>();
 
 bookings.forEach(b => {
   if (filterDate && formatDate(b.date) !== filterDate) return; // กรองตามวันที่ก่อน
@@ -662,11 +663,32 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
           </select>
         </div>
         <div className="w-full sm:flex-1">          
-          <BookingSummary summary={summary} />
+          
+          <BookingSummary bookings={bookings} />
         </div>
       </div>      
+        <div className="flex justify-center items-center gap-4 mt-6">
+          <button
+            onClick={handlePrev}
+            disabled={page <= 1}
+            className="px-4 py-2 bg-gray-200 rounded-lg disabled:opacity-50 hover:bg-gray-300"
+          >
+            ก่อนหน้า
+          </button>
+          <span className="text-gray-700">
+            หน้า {page} / {totalPages}
+          </span>
+          <button
+            onClick={handleNext}
+            disabled={page >= totalPages}
+            className="px-4 py-2 bg-gray-200 rounded-lg disabled:opacity-50 hover:bg-gray-300"
+          >
+            ถัดไป
+          </button>
+        </div>
       {filteredBookings.length === 0 ? (
         <p className="text-center text-gray-500 italic select-none">ยังไม่มีประวัติ</p>
+
       ) : (
         
         <ul className="space-y-4 w-full max-w-[92rem] mx-auto">

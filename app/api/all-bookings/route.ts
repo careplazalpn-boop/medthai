@@ -11,7 +11,7 @@ export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
     // --- Pagination ---
-    let page = parseInt(url.searchParams.get("page") || "1"); // 👈 ใช้ let แทน const
+    const page = parseInt(url.searchParams.get("page") || "1"); // 👈 ใช้ let แทน const
     const limit = parseInt(url.searchParams.get("limit") || "20");
     const isExport = url.searchParams.get("export") === "true";
 

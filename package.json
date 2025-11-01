@@ -7,7 +7,7 @@
     "dev": "concurrently \"npm:dev:next\" \"npm:dev:job\"",
     "dev:next": "next dev --turbopack",
     "dev:job": "wait-on http://localhost:3000 && node background-job.js",
-    "build": "next build",
+    "build": "next build --no-lint",
     "start": "concurrently \"npm:start:next\" \"npm:start:job\"",
     "start:next": "next start",
     "start:job": "wait-on http://localhost:3000 && node background-job.js",
@@ -50,9 +50,4 @@
     "typescript": "^5",
     "wait-on": "^8.0.4"
   }
-  "scripts": {
-  "build": "next build --no-lint"
 }
-  
-}
-

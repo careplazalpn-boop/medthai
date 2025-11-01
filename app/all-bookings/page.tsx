@@ -11,6 +11,7 @@ import { ImSpinner2 } from "react-icons/im";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import { useAuth } from "@/context/AuthContext";
+import BookingSummary from "@/app/BookingSummary/BookingSummary";
 
 interface Booking {
   id: number;
@@ -36,75 +37,12 @@ const getStatusColor = (b: Booking) => {
   switch (getStatusLabel(b)) {
     case "ยกเลิก": return "border-red-500";
     case "อยู่ในคิว": return "border-orange-500";
-    case "สำเร็จ": return "border-emerald-500";
+    case "สำเร็จ": return "border-emerald-500";    
     default: return "border-gray-500";
   }
 };
 
-
-interface BookingSummaryProps {
-  bookings?: Booking[]; // ให้ optional
-}
-
-function BookingSummary({ bookings = [] }: BookingSummaryProps) {
-  // คำนวณสถิติจาก bookings (ใช้ default เป็น array ว่าง)
-  const totalAttended = bookings.filter(b => b.status === "สำเร็จ").length;
-  const totalCancelled = bookings.filter(b => b.status === "ยกเลิก").length;
-  const total = totalAttended + totalCancelled;
-  const attendedPercent = total ? Math.round((totalAttended / total) * 100) : 0;
-  const cancelledPercent = total ? 100 - attendedPercent : 0;
-
-  return (
-    <div className="flex flex-col sm:flex-row gap-4 sm:gap-3">
-      {/* สำเร็จ */}
-      <div className="flex items-center gap-4 bg-emerald-50 text-emerald-900 rounded-xl p-4 shadow-sm border-2 border-emerald-200 w-full sm:min-w-[396px]">
-        <Smile className="w-12 h-10 text-emerald-500 flex-shrink-0" />
-        <div className="flex flex-col flex-grow justify-center">
-          <div className="flex justify-center items-baseline gap-2">
-            <span className="text-lg text-emerald-700">สำเร็จ :</span>
-            <span className="text-lg font-bold">{totalAttended} คน</span>
-          </div>
-          <div className="w-full h-4 bg-emerald-200 rounded-full mt-2 relative overflow-hidden">
-            <motion.div
-              className="h-full bg-emerald-600 rounded-full"
-              initial={{ width: 0 }}
-              animate={{ width: `${attendedPercent}%` }}
-              transition={{ duration: 1 }}
-            />
-            <div className="absolute inset-0 flex justify-center items-center text-white font-semibold text-xs">
-              {attendedPercent}%
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ยกเลิก */}
-      <div className="flex items-center gap-4 bg-red-50 text-red-900 rounded-xl p-4 shadow-sm border-2 border-red-200 w-full sm:min-w-[397px]">
-        <Frown className="w-12 h-10 text-red-500 flex-shrink-0" />
-        <div className="flex flex-col flex-grow justify-center">
-          <div className="flex justify-center items-baseline gap-2">
-            <span className="text-lg text-red-700">ยกเลิก :</span>
-            <span className="text-lg font-bold">{totalCancelled} คน</span>
-          </div>
-          <div className="w-full h-4 bg-red-200 rounded-full mt-2 relative overflow-hidden">
-            <motion.div
-              className="h-full bg-red-600 rounded-full"
-              initial={{ width: 0 }}
-              animate={{ width: `${cancelledPercent}%` }}
-              transition={{ duration: 1 }}
-            />
-            <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-white font-semibold text-xs">
-              {cancelledPercent}%
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-
-export default function AllBookingsPage() {
+  export default function AllBookingsPage() {
   const router = useRouter();
   const { user, logout } = useAuth();
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -137,7 +75,18 @@ export default function AllBookingsPage() {
   const [contactOpen, setContactOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [limit] = useState(20);
-  const [totalPages, setTotalPages] = useState(1);  const [summary, setSummary] = useState<{ totalAttended: number; totalCancelled: number }>({  totalAttended: 0,  totalCancelled: 0, });
+  const [totalPages, setTotalPages] = useState(1);  
+  const [summary, setSummary] = useState<{ 
+        totalAttended: number; 
+        totalCancelled: number; 
+        totalPending: number; 
+        totalInQueue: number; 
+    }>({ 
+        totalAttended: 0, 
+        totalCancelled: 0, 
+        totalPending: 0,
+        totalInQueue: 0,
+    });
 
   
     useEffect(() => {
@@ -167,19 +116,12 @@ export default function AllBookingsPage() {
     }
   }, [user, router]);
 
-
-  useEffect(() => {
-    setPage(1);
-  }, [filterDate, filterProvider, filterTherapist, filterTimeSlot, filterStatus]);
-
-
-  useEffect(() => {
-  //if (!filterDate) { setBookings([]); return; }
-  if (!filterDate) {
-  setBookings([]);
-  setSummary({ totalAttended: 0, totalCancelled: 0 });
-  return;
-  }
+  useEffect(() => {  
+    if (!filterDate) {
+    setBookings([]);
+    setSummary({ totalAttended: 0, totalCancelled: 0 ,totalPending: 0,totalInQueue:0 });
+    return;
+    }
 
   setLoading(true);
   (async () => {
@@ -194,11 +136,14 @@ export default function AllBookingsPage() {
       setTotalPages(data.pagination.totalPages || 1);
 
       if (data.summary) {
-        setSummary({
-          totalAttended: data.summary.totalAttended,
-          totalCancelled: data.summary.totalCancelled,
-        });
-      }
+          setSummary({
+           totalAttended: data.summary.totalAttended ||0 ,
+           totalCancelled: data.summary.totalCancelled || 0,
+           totalPending: data.summary.totalPending || 0,
+           totalInQueue: data.summary.totalInQueue || 0,
+          });
+         }
+
     } catch (e: any) {
       setError(e.message || "เกิดข้อผิดพลาดไม่ทราบสาเหตุ");
     } finally {
@@ -207,9 +152,6 @@ export default function AllBookingsPage() {
   })();
 }, [filterDate, filterProvider, filterTherapist, filterTimeSlot, filterStatus, page, limit]);
     
-   //////////
-    
-
     const handleNext = () => {
     if (page < totalPages) setPage((p) => p + 1);
   };
@@ -248,60 +190,92 @@ export default function AllBookingsPage() {
     return <p>กำลังตรวจสอบสิทธิ์...</p>; // render ชั่วคราว
   }
 
-const exportToExcel = () => {
-  // กรองเฉพาะวันที่ที่เลือก
-  const filteredData = bookings
-    .filter(b => formatDate(b.date) === filterDate)
-    // sort: time_slot จากน้อยไปมาก + create_at ใหม่สุดล่าง
-    .sort((a, b) => {
-      const [aStart] = a.time_slot.split("-");
-      const [bStart] = b.time_slot.split("-");
-      const timeDiff = parseTime(aStart) - parseTime(bStart);
-      if (timeDiff !== 0) return timeDiff;
-      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-    });
 
-  if (filteredData.length === 0) return alert("ไม่มีข้อมูลให้ export สำหรับวันที่นี้");
+  const exportToExcel = async () => { // 💡 ต้องเป็น async
+    // 1. ตรวจสอบ Filter พื้นฐาน
+    if (!filterDate) return alert("กรุณาเลือกวันที่ (Date Filter) ก่อนทำการ Export");
+    
+    setLoading(true);
 
-  // แปลงข้อมูล
-  const data = filteredData.map(b => ({
-    "ผู้ให้บริการ": b.provider,
-    "ผู้มารับบริการ": b.name,
-    "เบอร์โทร": b.phone,
-    "หมอนวด": b.therapist,
-    "วันที่": new Date(b.date).toLocaleDateString("th-TH",{year:"numeric",month:"2-digit",day:"2-digit",timeZone:"Asia/Bangkok"}),
-    "ช่วงเวลา": b.time_slot,
-    "สถานะ": getStatusLabel(b),
-    "การชำระเงิน": b.payment_status === "paid" ? "ชำระเงิน" : "เบิกได้",
-  }));
+    try {
+        // 🎯 2. เรียก API เพื่อดึงข้อมูลทั้งหมด (Export Mode: isExport=true)
+        const exportUrl = `/api/all-bookings?export=true&date=${filterDate || ""}&provider=${filterProvider || ""}&therapist=${filterTherapist || ""}&timeSlots=${filterTimeSlot || ""}&status=${filterStatus || ""}`;
 
-  const ws = XLSX.utils.json_to_sheet(data);
+        const exportRes = await fetch(exportUrl);
+        const exportData = await exportRes.json();
+        
+        if (!exportData.success) throw new Error(exportData.error || "เกิดข้อผิดพลาดในการดึงข้อมูล Export");
 
-  const columnWidths = Object.keys(data[0]).map(key => {
-    const maxLength = Math.max(
-      key.length,
-      ...data.map((d: Record<string, any>) => (d[key] ? d[key].toString().length : 0))
-    );
+        const allBookings = exportData.bookings as Booking[];
+        
+        if (allBookings.length === 0) {
+            alert("ไม่มีข้อมูลให้ export สำหรับเงื่อนไขที่เลือก");
+            return;
+        }
 
-    const maxWidths: Record<string, number> = {
-      "ผู้ให้บริการ": 30,
-      "ผู้มารับบริการ": 30,
-      "หมอนวด": 30,
-      "ช่วงเวลา": 15,
-      "สถานะ" : 15,
-      "สถานะการชำระเงิน": 15,
-    };
+        // 3. เรียงลำดับข้อมูลทั้งหมดที่ได้มา (ถ้าต้องการ)
+        // ใช้ allBookings แทน bookings
+        const finalExportData = allBookings
+            // ไม่ต้อง filter ตามวันที่อีก เพราะ URL API กรองมาแล้ว
+            .sort((a, b) => {
+                // Logic การเรียงลำดับเดิม
+                const [aStart] = a.time_slot.split("-");
+                const [bStart] = b.time_slot.split("-");
+                const timeDiff = parseTime(aStart) - parseTime(bStart);
+                if (timeDiff !== 0) return timeDiff;
+                return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+            });
 
-    return { wch: Math.min(maxLength + 2, maxWidths[key] || maxLength + 2) };
-  });
 
-  ws['!cols'] = columnWidths;
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Bookings");
+        // 4. แปลงข้อมูล
+        const data = finalExportData.map(b => ({
+            "ผู้ให้บริการ": b.provider,
+            "ผู้มารับบริการ": b.name,
+            "เบอร์โทร": b.phone,
+            "หมอนวด": b.therapist,
+            // ตรวจสอบชื่อคอลัมน์ใน maxWidths
+            "วันที่": new Date(b.date).toLocaleDateString("th-TH",{year:"numeric",month:"2-digit",day:"2-digit",timeZone:"Asia/Bangkok"}),
+            "ช่วงเวลา": b.time_slot,
+            "สถานะ": getStatusLabel(b),
+            "การชำระเงิน": b.payment_status === "paid" ? "ชำระเงิน" : "เบิกได้",
+        }));
 
-  const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-  const file = new Blob([buf], { type: "application/octet-stream" });
-  saveAs(file, `BookingHistory-${filterDate}.xlsx`);
+
+        // 5. สร้าง Excel File (Logic เดิม)
+        const ws = XLSX.utils.json_to_sheet(data);
+
+        const columnWidths = Object.keys(data[0]).map(key => {
+            const maxLength = Math.max(
+              key.length,
+              ...data.map((d: Record<string, any>) => (d[key] ? d[key].toString().length : 0))
+            );
+        
+            const maxWidths: Record<string, number> = {
+              "ผู้ให้บริการ": 30,
+              "ผู้มารับบริการ": 30,
+              "หมอนวด": 30,
+              "ช่วงเวลา": 15,
+              "สถานะ" : 15,
+              "การชำระเงิน": 15, // ชื่อคอลัมน์นี้ต้องตรงกับคีย์ใน object 'data'
+            };
+        
+            return { wch: Math.min(maxLength + 2, maxWidths[key] || maxLength + 2) };
+          });
+        
+        ws['!cols'] = columnWidths;
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Bookings");
+
+        const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+        const file = new Blob([buf], { type: "application/octet-stream" });
+        saveAs(file, `BookingHistory-${filterDate}.xlsx`);
+
+    } catch (e) {
+        console.error("Export Error:", e);
+        alert("เกิดข้อผิดพลาดในการ Export ข้อมูล");
+    } finally {
+        setLoading(false);
+    }
 };
 
 // ฟังก์ชันช่วยแปลง "HH:MM" เป็นนาที
@@ -321,7 +295,6 @@ const parseTime = (timeStr: string) => {
     const therapistMatch = filterTherapist === "all" || b.therapist === filterTherapist;
     const providerMatch = filterProvider === "all" || b.provider === filterProvider;
     const dateMatch = !filterDate || formatDate(b.date) === filterDate;
-    //const timeMatch = filterTimeSlot === "all" || b.time_slot === filterTimeSlot;
     const timeMatch = filterTimeSlot === "all" || normalizeTimeSlot(b.time_slot) === normalizeTimeSlot(filterTimeSlot);
     
     const statusLabel = getStatusLabel(b);
@@ -334,9 +307,9 @@ const parseTime = (timeStr: string) => {
       default: return nameMatch && therapistMatch && providerMatch && dateMatch && timeMatch;
     }
   });
+  
   const totalAttended = filteredBookings.filter(b => b.status === "สำเร็จ").length;
   const totalCancelled = filteredBookings.filter(b => b.status === "ยกเลิก").length;
-
   const attendedKeys = new Set<string>();
   const cancelledKeys = new Set<string>();
 
@@ -569,12 +542,11 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
       {/* ฟิลเตอร์ */}
       <div className="max-w-6xl mx-auto mb-4 flex flex-wrap gap-4 items-end">
         <div className="w-full sm:w-[356px]">
-          <label className="block text-emerald-700 font-semibold mb-2 text-lg">ผู้มารับบริการ:</label>
-          <input 
+          <label className="block text-emerald-700 font-semibold mb-2 text-lg">ผู้มารับบริการ:</label>         <input 
             type="text" 
             placeholder="พิมพ์ชื่อเพื่อกรอง..." 
             value={filterName} 
-            onChange={e => setFilterName(e.target.value)}
+            onChange={e => {setFilterName(e.target.value);setPage(1);}}
             className="w-full px-4 h-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900 placeholder-gray-400"
           />
         </div>
@@ -583,7 +555,7 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
           <label className="block text-emerald-700 font-semibold mb-2 text-lg">ผู้ให้บริการ:</label>
           <select 
             value={filterProvider} 
-            onChange={e => setFilterProvider(e.target.value)}
+            onChange={e => {setFilterProvider(e.target.value);setPage(1);}}
             className="w-full px-4 h-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900 placeholder-gray-400"
           >
             <option value="all">ทั้งหมด</option>
@@ -595,7 +567,7 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
           <label className="block text-emerald-700 font-semibold mb-2 text-lg">หมอนวด:</label>
           <select 
             value={filterTherapist} 
-            onChange={e => setFilterTherapist(e.target.value)}
+            onChange={e => {setFilterTherapist(e.target.value);setPage(1);}}
             className="w-full px-4 h-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900 placeholder-gray-400"
           >
             <option value="all">ทั้งหมด</option>
@@ -607,7 +579,7 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
           <label className="block text-emerald-700 font-semibold mb-2 text-lg">สถานะ:</label>
           <select 
             value={filterStatus} 
-            onChange={e => setFilterStatus(e.target.value)}
+            onChange={e => {setFilterStatus(e.target.value);setPage(1);}}
             className="w-full px-4 h-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900 placeholder-gray-400"
           >
             <option value="all">ทั้งหมด</option>
@@ -642,7 +614,7 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
           <input 
             type="date" 
             value={filterDate} 
-            onChange={e => setFilterDate(e.target.value)}
+            onChange={e => {setFilterDate(e.target.value);setPage(1);}}
             className={`w-full px-4 h-10 border rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500
               ${filterDate 
                 ? "border-gray-300 text-gray-900" 
@@ -655,16 +627,15 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
           <label className="block text-emerald-700 font-semibold mb-2 text-lg">ช่วงเวลา:</label>
           <select 
             value={filterTimeSlot} 
-            onChange={e => setFilterTimeSlot(e.target.value)}
+            onChange={e => {setFilterTimeSlot(e.target.value);setPage(1);}}
             className="w-full px-4 h-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900 placeholder-gray-400"
           >
             <option value="all">ทั้งหมด</option>
             {timeSlots.map((slot,i)=><option key={i} value={slot}>{slot}</option>)}
           </select>
         </div>
-        <div className="w-full sm:flex-1">          
-          
-          <BookingSummary bookings={bookings} />
+        <div className="w-full sm:flex-1">                       
+          <BookingSummary summary={summary} />
         </div>
       </div>      
         <div className="flex justify-center items-center gap-4 mt-6">

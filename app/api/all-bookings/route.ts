@@ -13,6 +13,7 @@ export async function GET(req: Request) {
     // --- Pagination ---
     let page = parseInt(url.searchParams.get("page") || "1"); // 👈 ใช้ let แทน const
     const limit = parseInt(url.searchParams.get("limit") || "20");
+    const isExport = url.searchParams.get("export") === "true";
 
     // --- Filters ---
     const filterDate = url.searchParams.get("date") || "";
@@ -27,15 +28,6 @@ export async function GET(req: Request) {
     const filterStatus = url.searchParams.get("status") || "";
 
     // ✅ ถ้ามีการกรองค่าใด ๆ ให้รีเซ็ต page = 1
-    if (
-      (filterDate && filterDate !== "all") ||
-      (filterTimeSlot && filterTimeSlot !== "all") ||
-      (filterProvider && filterProvider !== "all") ||
-      (filterTherapist && filterTherapist !== "all") ||
-      (filterStatus && filterStatus !== "")
-    ) {
-      page = 1;
-    }
 
     const offset = (page - 1) * limit;
     // --- Auto-update สถานะ ---
@@ -131,14 +123,24 @@ export async function GET(req: Request) {
       countParams.push(dbStatus);
     }
 
-    query += `
-      ORDER BY 
-        date ASC,
-        STR_TO_DATE(SUBSTRING_INDEX(time_slot, '-', 1), '%H:%i') ASC,
-        name ASC
-      LIMIT ? OFFSET ?
-    `;
-    queryParams.push(limit, offset);
+    if (!isExport) { // 🎯 ใช้ LIMIT และ OFFSET เมื่อ 'ไม่ใช่' โหมด Export เท่านั้น
+        query += `
+            ORDER BY 
+              date ASC,
+              STR_TO_DATE(SUBSTRING_INDEX(time_slot, '-', 1), '%H:%i') ASC,
+              name ASC
+            LIMIT ? OFFSET ?
+        `;
+        queryParams.push(limit, offset);
+    } else {
+        query += `
+            ORDER BY 
+              date ASC,
+              STR_TO_DATE(SUBSTRING_INDEX(time_slot, '-', 1), '%H:%i') ASC,
+              name ASC
+        `;
+    }
+
 
     // --- ดึงข้อมูล ---
     const [rows]: any = await pool.execute(query, queryParams);
@@ -146,21 +148,46 @@ export async function GET(req: Request) {
 
     const total = countRows[0]?.total || 0;
     const totalPages = Math.ceil(total / limit);
-// 1. Query สำหรับนับ "สำเร็จ" (Attended)
-    const attendedQuery = `
-      SELECT COUNT(*) AS totalAttended FROM bookings 
-      WHERE 1=1 AND status = 'สำเร็จ' ${countQuery.replace('SELECT COUNT(*) AS total FROM bookings WHERE 1=1', '').replace('WHERE 1=1', '')}
-    `;
+    
+ // --- Summary (รวมทุกหน้า ตาม filter เดียวกัน) ---
+      let summaryCondition = "";
+      const summaryParams: any[] = [];
 
-    // 2. Query สำหรับนับ "ยกเลิก" (Cancelled)
-    const cancelledQuery = `
-      SELECT COUNT(*) AS totalCancelled FROM bookings 
-      WHERE 1=1 AND status = 'ยกเลิก' ${countQuery.replace('SELECT COUNT(*) AS total FROM bookings WHERE 1=1', '').replace('WHERE 1=1', '')}
-    `;
-    // --- Summary ---
-    const [allRows]: any = await pool.execute("SELECT status FROM bookings");
-    const totalAttended = allRows.filter((b: any) => b.status === "สำเร็จ").length;
-    const totalCancelled = allRows.filter((b: any) => b.status === "ยกเลิก").length;
+      // สร้างเงื่อนไขเหมือน countQuery แต่ไม่เอา LIMIT/OFFSET
+      if (filterDate && filterDate !== "all") {
+        summaryCondition += " AND date = ?";
+        summaryParams.push(filterDate);
+      }
+      if (filterTimeSlot && filterTimeSlot !== "all") {
+        summaryCondition += " AND REPLACE(REPLACE(TRIM(time_slot), '–', '-'), ' ', '') = REPLACE(?, ' ', '')";
+        summaryParams.push(filterTimeSlot.trim());
+      }
+      if (filterProvider && filterProvider !== "all") {
+        summaryCondition += " AND provider = ?";
+        summaryParams.push(filterProvider);
+      }
+      if (filterTherapist && filterTherapist !== "all") {
+        summaryCondition += " AND therapist = ?";
+        summaryParams.push(filterTherapist);
+      }           
+
+      
+      // --- Query summary ครบ 4 สถานะ ---
+      const attendedQuery = `SELECT COUNT(*) AS totalAttended FROM bookings WHERE status = 'สำเร็จ' ${summaryCondition}`;
+      const cancelledQuery = `SELECT COUNT(*) AS totalCancelled FROM bookings WHERE status = 'ยกเลิก' ${summaryCondition}`;
+      const pendingQuery = `SELECT COUNT(*) AS totalPending FROM bookings WHERE status = 'รอดำเนินการ' ${summaryCondition}`;
+      const inQueueQuery = `SELECT COUNT(*) AS totalInQueue FROM bookings WHERE status = 'อยู่ในคิว' ${summaryCondition}`;
+
+
+      const [attendedRows]: any = await pool.execute(attendedQuery, summaryParams.slice());
+      const [cancelledRows]: any = await pool.execute(cancelledQuery, summaryParams.slice());
+      const [pendingRows]: any = await pool.execute(pendingQuery, summaryParams.slice());
+      const [inQueueRows]: any = await pool.execute(inQueueQuery, summaryParams.slice());
+
+      const totalAttended = Number(attendedRows?.[0]?.totalAttended) || 0;
+      const totalCancelled = Number(cancelledRows?.[0]?.totalCancelled) || 0;
+      const totalPending = Number(pendingRows?.[0]?.totalPending) || 0;
+      const totalInQueue = Number(inQueueRows?.[0]?.totalInQueue) || 0;
 
     // --- Average per month ---
     const now = new Date();
@@ -178,7 +205,7 @@ export async function GET(req: Request) {
       updatedStatus,
       avgPerMonth,
       pagination: { page, limit, total, totalPages },
-      summary: { totalAttended, totalCancelled },
+      summary: { totalAttended, totalCancelled, totalPending, totalInQueue },
     });
   } catch (error) {
     console.error("Error fetching bookings:", error);

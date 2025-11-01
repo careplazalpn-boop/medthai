@@ -23,7 +23,7 @@ export async function POST(request: Request) {
 
     // ดึงข้อมูล user โดย query จาก username
     const [rows] = await conn.query(
-      "SELECT id, username, name, role, password FROM users WHERE username = ?",
+      "SELECT id, username, name, role, password, role_id  FROM users WHERE username = ?",
       [username]
     );
 

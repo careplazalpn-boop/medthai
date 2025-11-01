@@ -29,6 +29,11 @@ interface Booking {
   payment_status?: string;
 }
 
+interface Therapist {
+  id: number;
+  name: string;
+}
+
 const getStatusLabel = (b: Booking) => {
   return b.status || "รอดำเนินการ";
 };
@@ -48,7 +53,8 @@ const getStatusColor = (b: Booking) => {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [providers, setProviders] = useState<string[]>([]);
-  const [therapists, setTherapists] = useState<string[]>([]);
+  //const [therapists, setTherapists] = useState<string[]>([]);
+  const [therapists, setTherapists] = useState<Therapist[]>([]);
   const [timeSlots, setTimeSlots] = useState<string[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [showCancelSuccess, setShowCancelSuccess] = useState(false);
@@ -559,7 +565,7 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
             className="w-full px-4 h-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900 placeholder-gray-400"
           >
             <option value="all">ทั้งหมด</option>
-            {providers.map((t,i)=><option key={i} value={t}>{t}</option>)}
+            {providers.map((t,i)=><option key={i} value={t}>{t}</option>)}            
           </select>
         </div>
 
@@ -571,7 +577,7 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
             className="w-full px-4 h-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900 placeholder-gray-400"
           >
             <option value="all">ทั้งหมด</option>
-            {therapists.map((t,i)=><option key={i} value={t}>{t}</option>)}
+            {therapists.map((t,i)=><option key={i} value={t.name}>{t.name}</option>)}
           </select>
         </div>
 

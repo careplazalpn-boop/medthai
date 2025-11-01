@@ -23,6 +23,11 @@ interface BookingInfo {
   bookedbyrole?: string;
 }
 
+interface Therapist {
+  id: number;
+  name: string;
+}
+
 export default function BookingPage() {
   const router = useRouter();
   const { user, logout } = useContext(AuthContext);
@@ -30,7 +35,7 @@ export default function BookingPage() {
   const isGuest = !user;
   const [menuOpen, setMenuOpen] = useState(false); // state สำหรับ hamburger
   const [idCardNumber, setIdCardNumber] = useState("");
-  const [therapists, setTherapists] = useState<string[]>([]);
+  const [therapists, setTherapists] = useState<Therapist[]>([]);
   const [medStaff, setMedStaff] = useState<string[]>([]);
   const [timeSlots, setTimeSlots] = useState<string[]>([]);
   const [date, setDate] = useState("");
@@ -84,11 +89,6 @@ export default function BookingPage() {
     return () => clearTimeout(timer);
   }, [showAlert]);
 
-  // ❌ ตัด redirect ออก
-  // useEffect(() => {
-  //   if (!user) router.push("/login");
-  // }, [user, router]);
-
   useEffect(() => {
     const savedDate = localStorage.getItem("selectedDate");
     if (savedDate) {
@@ -114,11 +114,14 @@ export default function BookingPage() {
   }, []);
 
   useEffect(() => {
-    fetch("/api/therapists")
+      fetch("/api/therapists")
       .then(res => res.json())
-      .then(data => data.success && setTherapists(data.therapists))
-      .catch(() => setTherapists([]));
-    fetch("/api/time-slots")
+      .then(data => {
+        console.log("Fetched therapists:", data.therapists);
+        if (data.success) setTherapists(data.therapists);
+      })
+      .catch(() => setTherapists([]));          
+      fetch("/api/time-slots")
       .then(res => res.json())
       .then(data => data.success && setTimeSlots(data.timeSlots))
       .catch(() => setTimeSlots([]));
@@ -367,7 +370,16 @@ const handleSubmit = () => {
       setLoading(false);
     }
   };
+
   
+ const filteredTherapists = user
+  ? user.role_id === 909
+    ? therapists // role_id 909 -> แสดงทั้งหมด
+    : therapists.filter(t => t.id === user.role_id) // แสดงเฉพาะที่ตรง role_id
+  : therapists; // guest หรือ null
+
+  
+    
   return (
     <div className="min-h-screen bg-gradient-to-br from-white to-emerald-100 relative overflow-hidden">
       {loading && (
@@ -595,7 +607,7 @@ const handleSubmit = () => {
               {contactOpen && (
                 <div className="flex flex-col bg-black/50 text-white text-sm sm:text-base">
                   <a
-                    href="https://www.facebook.com/profile.php?id=100070719421986"
+                    href="https://m.me/100070719421986"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="py-2 px-6 hover:bg-white/20 flex items-center justify-center gap-2"
@@ -648,20 +660,20 @@ const handleSubmit = () => {
 
         {/* Therapist & slots rendering */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {therapists.map(t => {
-            const isSelected = selectedTherapist === t;
-            const isOff = offTherapists.includes(t);
-            const disabled = disabledSlots[t] || [];
+          {filteredTherapists.map(t => {
+            const isSelected = selectedTherapist === t.name;
+            const isOff = offTherapists.includes(t.name);
+            const disabled = disabledSlots[t.name] || [];
 
             return (
-              <div key={t} className={`border p-5 rounded-2xl shadow-lg ${isOff ? "bg-gray-200" : "bg-white"} ${isSelected ? "ring-4 ring-emerald-300" : ""}`}>
+              <div key={t.name} className={`border p-5 rounded-2xl shadow-lg ${isOff ? "bg-gray-200" : "bg-white"} ${isSelected ? "ring-4 ring-emerald-300" : ""}`}>
                 <div className="flex items-center gap-2 mb-3">
                   <UserIcon className={`w-5 h-5 ${isOff ? "text-gray-500" : "text-emerald-600"}`} />
-                  <h2 className={`text-lg font-semibold ${isOff ? "text-gray-500" : "text-emerald-700"}`}>{t}</h2>
+                  <h2 className={`text-lg font-semibold ${isOff ? "text-gray-500" : "text-emerald-700"}`}>{t.id}.{t.name}</h2>
                   <div className="ml-auto flex items-center gap-2">
                     {date && !isGuest && (
                     <button
-                      onClick={() => toggleOffTherapist(t)}
+                      onClick={() => toggleOffTherapist(t.name)}
                       className={`px-3 py-1.5 text-sm rounded flex items-center gap-2 font-semibold text-white hover:brightness-90 ${
                         isOff
                           ? "bg-red-500 hover:bg-red-600"
@@ -676,7 +688,7 @@ const handleSubmit = () => {
 
                 <div className="grid grid-cols-2 gap-2">
                 {timeSlots.map(slot => {
-                  const slotInfo = bookedSlots[t]?.find(b => b.time_slot === slot);
+                  const slotInfo = bookedSlots[t.name]?.find(b => b.time_slot === slot);
                   const isBooked = !!slotInfo;
                   const isActive = isSelected && selectedTime === slot;
                   const isSlotDisabled = disabled.includes(slot);
@@ -691,7 +703,7 @@ const handleSubmit = () => {
                     <div key={slot} className="flex gap-1 items-center">
                       <button
                         disabled={isBooked || isOff || isSlotDisabled || isGuest}
-                        onClick={() => handleSelect(t, slot)}
+                        onClick={() => handleSelect(t.name, slot)}
                         className={`text-sm px-3 py-2 rounded-lg font-medium border flex-1 flex flex-col items-center justify-center gap-1 transition shadow-sm
                           ${
                             isSlotDisabled || isOff
@@ -715,7 +727,7 @@ const handleSubmit = () => {
                       {/* ปุ่ม admin toggle slot */}
                       {date && !isGuest && (
                         <button
-                          onClick={() => toggleSlot(t, slot)}
+                          onClick={() => toggleSlot(t.name, slot)}
                           className={`px-2 py-1 rounded text-white ${
                             isOff
                               ? "bg-gray-400 cursor-not-allowed"

@@ -15,11 +15,18 @@ type Booking = {
   date: string;
 };
 
+interface Therapist {
+  id: number;
+  name: string;
+}
+
+
 export default function SummaryHistoryPage() {
   const router = useRouter();
   const { user, logout } = useAuth();
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [therapists, setTherapists] = useState<string[]>([]);
+  //const [therapists, setTherapists] = useState<string[]>([]);
+  const [therapists, setTherapists] = useState<Therapist[]>([]);
   const [filtered, setFiltered] = useState<Booking[]>([]);
   const [, setYears] = useState<number[]>([]);
   const [year, setYear] = useState<number | null>(null);
@@ -203,9 +210,10 @@ useEffect(() => {
   
   // Summary ตามหมอนวด
   const therapistSummary: Record<string, { success: number; pending: number; cancelled: number }> = {};
-  therapists.forEach(name => therapistSummary[name] = { success: 0, pending: 0, cancelled: 0 });
+  therapists.forEach(t => {
+  therapistSummary[t.name] = { success: 0, pending: 0, cancelled: 0 };});
   filtered.forEach(b => {
-    if (!therapists.includes(b.therapist)) return;
+    if (!therapists.some(t => t.name === b.therapist)) return;
     if (!therapistSummary[b.therapist]) therapistSummary[b.therapist] = { success: 0, pending: 0, cancelled: 0 };
     if (b.status === "สำเร็จ") therapistSummary[b.therapist].success += 1;
     if (b.status === "รอดำเนินการ") therapistSummary[b.therapist].pending += 1;

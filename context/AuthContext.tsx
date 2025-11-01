@@ -7,7 +7,8 @@ interface User {
   name: string;
   phone: string;
   email: string;
-  role: string; // เพิ่ม role
+  role: string; 
+  role_id?: number;
 }
 
 interface AuthContextType {

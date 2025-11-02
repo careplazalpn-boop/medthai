@@ -68,17 +68,18 @@ export default function HomePage() {
     />
     {/* Mobile แนวตั้ง */}
     <Image
-      src="/แผนไทยมือถือแนวตั้ง.png"
+      src="/mthai_mb.jpg"
       alt="พื้นหลังแนวตั้ง"
       fill
-      className="block sm:hidden object-cover object-top -z-20 portrait:block landscape:hidden"
+      className="block sm:hidden object-contain object-center -z-20 portrait:block landscape:hidden"      
     />
-    {/* Mobile แนวนอน */}
+
+    {/* Mobile แนวนอน - เปลี่ยนเป็น object-contain เพื่อไม่ให้ภาพตกขอบ */}
     <Image
       src="/แผนไทยมือถือแนวนอน.png"
       alt="พื้นหลัแนวนอน"
       fill
-      className="block sm:hidden object-cover object-bottom -z-20 portrait:hidden landscape:block"
+      className="block sm:hidden object-contain object-center -z-20 portrait:hidden landscape:block"      
     />
       {/* Header */}
       <div className="fixed top-0 left-0 w-full z-50 bg-gray-700 shadow-md flex justify-between items-center px-2 sm:px-4 py-2 sm:py-2">
@@ -189,7 +190,7 @@ export default function HomePage() {
               {contactOpen && (
                 <div className="flex flex-col bg-black/50 text-white text-sm sm:text-base">
                   <a
-                    href="https://www.facebook.com/profile.php?id=100070719421986"
+                    href="https://m.me/100070719421986"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="py-2 px-6 hover:bg-white/20 flex items-center justify-center gap-2"

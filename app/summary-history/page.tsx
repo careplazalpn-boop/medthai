@@ -273,6 +273,9 @@ useEffect(() => {
               <div className="flex items-center gap-3 sm:gap-3 text-xs sm:text-sm">
                 {user ? (
                   <>
+                    <span className="text-white font-semibold text-xs sm:text-sm">
+                    คุณคือ {user.name || "ผู้ใช้"}
+                    </span>
                     <button
                       onClick={handleLogout}
                       className="flex items-center gap-1 px-2 py-3 sm:px-4 sm:py-3 bg-red-600 text-white rounded-lg shadow font-semibold transition hover:bg-red-700 text-xs sm:text-sm"

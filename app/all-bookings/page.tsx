@@ -979,46 +979,52 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
                   </Dialog.Root>
                 )}
 
-{(getStatusLabel(b) === "รอดำเนินการ" || getStatusLabel(b) === "อยู่ในคิว") && (
-  <>
-    {/* ยืนยัน */}
-    {getStatusLabel(b) === "รอดำเนินการ" && (
-      <Dialog.Root>
-        <Dialog.Trigger asChild>
-          <button
-            onClick={() => setSelectedId(b.id)}
-            className="flex items-center justify-center w-15 h-10 bg-emerald-600 rounded-md shadow hover:bg-emerald-700 transition"
-          >
-            <FaCheck className="text-white w-5 h-5" />
-          </button>
-        </Dialog.Trigger>
-        <BookingDialog
-          title="ต้องการยืนยันรายการนี้หรือไม่?"
-          color="emerald"
-          booking={b}
-          onConfirm={() => handleBookingAction("confirm")}
-        />
-      </Dialog.Root>
-    )}
-    {/* ยกเลิก */}
-    <Dialog.Root>
-      <Dialog.Trigger asChild>
-        <button
-          onClick={() => setSelectedId(b.id)}
-          className="flex items-center justify-center w-15 h-10 bg-red-500 rounded-md shadow hover:bg-red-600 transition"
-        >
-          <FaTimes className="text-white w-5 h-5" />
-        </button>
-      </Dialog.Trigger>
-      <BookingDialog
-        title="ต้องการยกเลิกรายการนี้หรือไม่?"
-        color="red"
-        booking={b}
-        onConfirm={() => handleBookingAction("cancel")}
-      />
-    </Dialog.Root>
-  </>
-)}
+      {(getStatusLabel(b) === "รอดำเนินการ" || getStatusLabel(b) === "อยู่ในคิว") && (
+            <>
+              {/* แสดงเฉพาะเมื่อ role_id == 909 */}
+              {user?.role_id === 909 && (
+                <>
+                  {/* ✅ ปุ่มยืนยัน */}
+                  {getStatusLabel(b) === "รอดำเนินการ" && (
+                    <Dialog.Root>
+                      <Dialog.Trigger asChild>
+                        <button
+                          onClick={() => setSelectedId(b.id)}
+                          className="flex items-center justify-center w-15 h-10 bg-emerald-600 rounded-md shadow hover:bg-emerald-700 transition"
+                        >
+                          <FaCheck className="text-white w-5 h-5" />
+                        </button>
+                      </Dialog.Trigger>
+                      <BookingDialog
+                        title="ต้องการยืนยันรายการนี้หรือไม่?"
+                        color="emerald"
+                        booking={b}
+                        onConfirm={() => handleBookingAction("confirm")}
+                      />
+                    </Dialog.Root>
+                  )}
+
+                  {/* ✅ ปุ่มยกเลิก */}
+                  <Dialog.Root>
+                    <Dialog.Trigger asChild>
+                      <button
+                        onClick={() => setSelectedId(b.id)}
+                        className="flex items-center justify-center w-15 h-10 bg-red-500 rounded-md shadow hover:bg-red-600 transition"
+                      >
+                        <FaTimes className="text-white w-5 h-5" />
+                      </button>
+                    </Dialog.Trigger>
+                    <BookingDialog
+                      title="ต้องการยกเลิกรายการนี้หรือไม่?"
+                      color="red"
+                      booking={b}
+                      onConfirm={() => handleBookingAction("cancel")}
+                    />
+                  </Dialog.Root>
+                </>
+              )}
+            </>
+      )}
 
                 {getStatusLabel(b) === "สำเร็จ" && (
                   <button

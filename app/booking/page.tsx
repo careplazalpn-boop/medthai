@@ -27,6 +27,11 @@ interface Therapist {
   id: number;
   name: string;
 }
+interface MedStaff {
+  id: number;
+  name: string;
+  role_id: number;
+}
 
 export default function BookingPage() {
   const router = useRouter();
@@ -36,7 +41,7 @@ export default function BookingPage() {
   const [menuOpen, setMenuOpen] = useState(false); // state สำหรับ hamburger
   const [idCardNumber, setIdCardNumber] = useState("");
   const [therapists, setTherapists] = useState<Therapist[]>([]);
-  const [medStaff, setMedStaff] = useState<string[]>([]);
+  const [medStaff, setMedStaff] = useState<MedStaff[]>([]);
   const [timeSlots, setTimeSlots] = useState<string[]>([]);
   const [date, setDate] = useState("");
   const [selectedTherapist, setSelectedTherapist] = useState("");
@@ -50,7 +55,7 @@ export default function BookingPage() {
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
   const [searchResults, setSearchResults] = useState<UserInfo[]>([]);
-  const [dialogTherapist, setDialogTherapist] = useState("");
+  const [dialogTherapist, setDialogTherapist] = useState<string>("");
   const [offTherapists, setOffTherapists] = useState<string[]>([]);
   const [addPatientDialog, setAddPatientDialog] = useState(false);
   const [noHN, setNoHN] = useState(false);
@@ -107,11 +112,34 @@ export default function BookingPage() {
   }, []);
 
   useEffect(() => {
-    fetch("/api/med-staff")
-      .then(res => res.json())
-      .then(data => data.success && setMedStaff(data.staff.map((s: any) => s.name)))
-      .catch(() => setMedStaff([]));
-  }, []);
+    if (user) {
+      setDialogTherapist(user.name); // ใช้ชื่อ user เป็น provider/therapist
+    }
+  }, [user]);
+
+  useEffect(() => {
+  fetch("/api/med-staff")
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        // data.staff ต้องเป็น MedStaff[]
+        setMedStaff(data.staff);
+      } else {
+        setMedStaff([]);
+      }
+    })
+    .catch(() => setMedStaff([]));
+}, []);
+
+ // ✅ ตั้งค่าเริ่มต้นให้ dialogTherapist เมื่อ user และ medStaff พร้อมแล้ว
+    useEffect(() => {
+      if (user && medStaff.length > 0) {
+        const matched = medStaff.find(
+          s => s.role_id !== 0 && Number(s.role_id) === Number(user.role_id)
+        );
+      setDialogTherapist(matched ? matched.name : "");
+      }
+    }, [user, medStaff]);
 
   useEffect(() => {
       fetch("/api/therapists")
@@ -184,47 +212,56 @@ export default function BookingPage() {
     logout();
     router.push("/login");
   };
-  
+      
 const handleSubmit = () => {
   if (isGuest) {
     alert("โหมดดูอย่างเดียว ไม่สามารถบันทึกการจองได้");
     return;
   }
-  if (!clientName || !clientPhone || !date || !selectedTherapist || !selectedTime || !dialogTherapist) {
+  if (!clientName || !clientPhone || !date || !selectedTherapist || !selectedTime) {
     alert("กรุณากรอกข้อมูลให้ครบถ้วน");
     return;
   }
-  if (noHN) {
-    // ไม่มี HN → ใช้บัตรประชาชนแทน
-  } else {
-    if (!clientHN || clientHN.length !== 9) {
-      alert("กรุณากรอก HN ให้ครบ 9 ตัว");
-      return;
-    }
+  if (!clientHN && !noHN) {
+    alert("กรุณากรอก HN ให้ครบ 9 ตัว");
+    return;
   }
 
+  // บันทึก therapist.name ทั้งใน booking.therapist และ booking.provider
   router.push(`/confirm?${new URLSearchParams({
     hn: clientHN,
     name: clientName,
     phone: clientPhone,
     idCard: idCardNumber,
     date,
-    therapist: selectedTherapist,
+    therapist: selectedTherapist, // ← therapist.name
+    provider: selectedTherapist,  // ← ใช้ค่าเดียวกัน
     time: selectedTime,
-    provider: dialogTherapist,
-    bookedbyrole: user?.role || "user" // เพิ่มตรงนี้
+    bookedbyrole: user?.role || "user"
   }).toString()}`);
 };
 
-  const handleOpenDialog = () => {
-    if (isGuest) {
-      alert("โหมดดูอย่างเดียว ไม่สามารถเปิดการจองได้");
-      return;
-    }
-    if (!selectedTherapist || !selectedTime || !date) return setShowAlert(true);
-    setClientHN(""); setClientName(""); setClientPhone(""); setDialogTherapist(""); setSearchResults([]); setIdCardNumber(""); setNoHN(false);
-    setDialogOpen(true);
-  };
+
+const handleOpenDialog = () => {
+  if (isGuest) {
+    alert("โหมดดูอย่างเดียว ไม่สามารถเปิดการจองได้");
+    return;
+  }
+  if (!selectedTime || !date) {
+    setShowAlert(true);
+    return;
+  }
+
+  // reset dialog fields
+  setClientHN("");
+  setClientName("");
+  setClientPhone("");
+  setSearchResults([]);
+  setIdCardNumber("");
+  setNoHN(false);
+
+  setDialogOpen(true); // ✅ เปิด popup
+};
 
   const handleSearchHN = async () => {
     if (!clientHN.trim()) return;
@@ -704,23 +741,23 @@ const handleSubmit = () => {
                   }
                   return (
                     <div key={slot} className="flex gap-1 items-center">
-                      <button
-                        disabled={isBooked || isOff || isSlotDisabled || isGuest}
-                        onClick={() => handleSelect(t.name, slot)}
-                        className={`text-sm px-3 py-2 rounded-lg font-medium border flex-1 flex flex-col items-center justify-center gap-1 transition shadow-sm
-                          ${
-                            isSlotDisabled || isOff
-                              ? "bg-gray-300 text-gray-500 border-gray-400 cursor-not-allowed"
-                              : isBooked
-                              ? bookedBg
-                              : isActive
-                              ? "bg-emerald-600 text-white border-emerald-600"
-                              : "bg-white hover:bg-gray-200 text-emerald-800 border-gray-400"
-                          }`}
+                    <button
+                      disabled={isBooked || isOff || isSlotDisabled || isGuest}
+                      onClick={() => handleSelect(t.name, slot)}
+                      className={`text-sm px-3 py-2 rounded-lg font-medium border flex-1 flex flex-col items-center justify-center gap-1 transition shadow-sm
+                        ${
+                          isSlotDisabled || isOff
+                            ? "bg-gray-300 text-gray-500 border-gray-400 cursor-not-allowed"
+                            : isBooked
+                            ? bookedBg
+                            : isActive
+                            ? "bg-emerald-600 text-white border-emerald-600"
+                            : "bg-white hover:bg-gray-200 text-emerald-800 border-gray-400"
+                        }`}
                       >
-                        <div className="flex items-center gap-1">
-                          <Clock className="w-4 h-4" /> {slot}
-                        </div>
+                          <div className="flex items-center gap-1">
+                            <Clock className="w-4 h-4" /> {slot}
+                          </div>
                         {isBooked && (
                           <div className="text-xs">
                             {!isGuest ? `(${slotInfo?.name || "ไม่ระบุ"})` : "(ไม่ว่าง)"}
@@ -785,22 +822,7 @@ const handleSubmit = () => {
                 >
                   {noHN ? "กลับ" : "คนไข้ใหม่"}
                 </button>
-              </Dialog.Title>
-
-              <label className="block mb-3">
-                <span className="text-sm font-medium text-emerald-800">ผู้ให้บริการ</span>
-                <select
-                  value={dialogTherapist}
-                  onChange={e => setDialogTherapist(e.target.value)}
-                  className={`mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 ${dialogTherapist === "" ? "text-gray-400" : "text-gray-900"}`}
-                >
-                  <option value="" disabled>-- เลือก --</option>
-                  {medStaff.map(name => (
-                    <option key={name} value={name} className="text-gray-900">{name}</option>
-                  ))}
-                </select>
-              </label>
-
+              </Dialog.Title>             
               {["hn", "name", "phone"].map((field) => {
                 if (field === "hn" && noHN) return null; // ซ่อน HN ถ้าเลือก "ไม่มี HN"
 

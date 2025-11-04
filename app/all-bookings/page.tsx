@@ -984,10 +984,11 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
 
       {(getStatusLabel(b) === "รอดำเนินการ" || getStatusLabel(b) === "อยู่ในคิว") && (
             <>
-              {/* แสดงเฉพาะเมื่อ role_id == 909 */}
-              {user?.role_id === 909 && (
+              {/* ✅ แสดงปุ่มเฉพาะแอดมิน (909) หรือหมอนวดที่เป็นเจ้าของ booking */}
+              {(user?.role_id === 909 ||
+                (b?.therapist && b?.therapist === user?.name)) && (
                 <>
-                  {/* ✅ ปุ่มยืนยัน */}
+                  {/* ปุ่มยืนยัน */}
                   {getStatusLabel(b) === "รอดำเนินการ" && (
                     <Dialog.Root>
                       <Dialog.Trigger asChild>
@@ -1007,7 +1008,7 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
                     </Dialog.Root>
                   )}
 
-                  {/* ✅ ปุ่มยกเลิก */}
+                  {/* ปุ่มยกเลิก */}
                   <Dialog.Root>
                     <Dialog.Trigger asChild>
                       <button

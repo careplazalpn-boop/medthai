@@ -11,62 +11,67 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const logPath = join(__dirname, "sync.log");
 
-// 🔹 ฟังก์ชัน log พร้อมระบุ pid และระดับ log
+// ===== Logger =====
 const log = (level, msg, err) => {
   const t = new Date().toISOString();
-  const text = `[${t}] [${level}] [PID: ${process.pid}] ${msg}${err ? `\n${err.stack || err}` : ""}\n`;
-  fs.appendFileSync(logPath, text);
-  console.log(text);
+  const line = `[${t}] [${level}] [PID:${process.pid}] ${msg}${
+    err ? "\n" + (err.stack || err.message || err) : ""
+  }\n`;
+  fs.appendFileSync(logPath, line);
+  console.log(line);
 };
 
-// 🔹 สร้าง connection pool
+// ===== Database Pools =====
 let db1, db2;
-async function initPools() {
-  try {
-    db1 = mysql.createPool({
-      host: process.env.DB1_HOST,
-      user: process.env.DB1_USER,
-      password: process.env.DB1_PASSWORD,
-      database: process.env.DB1_NAME,
-      waitForConnections: true,
-      connectionLimit: 10,
-      queueLimit: 0,
-    });
 
-    db2 = mysql.createPool({
-      host: process.env.DB2_HOST,
-      user: process.env.DB2_USER,
-      password: process.env.DB2_PASSWORD,
-      database: process.env.DB2_NAME,
-      waitForConnections: true,
-      connectionLimit: 10,
-      queueLimit: 0,
-    });
+async function createPools() {
+  db1 = mysql.createPool({
+    host: process.env.DB1_HOST,
+    user: process.env.DB1_USER,
+    password: process.env.DB1_PASSWORD,
+    database: process.env.DB1_NAME,
+    waitForConnections: true,
+    connectionLimit: 10,
+    connectTimeout: 10000,
+    idleTimeout: 60000, // 1 นาที
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 10000,
+  });
 
-    log("INFO", "✅ Connection pools created for both databases.");
+  db2 = mysql.createPool({
+    host: process.env.DB2_HOST,
+    user: process.env.DB2_USER,
+    password: process.env.DB2_PASSWORD,
+    database: process.env.DB2_NAME,
+    waitForConnections: true,
+    connectionLimit: 10,
+    connectTimeout: 10000,
+    idleTimeout: 60000,
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 10000,
+  });
 
-    // ตรวจสอบ connection ทันที
-    await db1.query("SELECT 1");
-    await db2.query("SELECT 1");
-
-    log("INFO", "✅ Connected to both databases successfully.");
-  } catch (err) {
-    log("ERROR", "❌ Failed to initialize DB pools", err);
-    process.exit(1);
-  }
+  await db1.query("SELECT 1");
+  await db2.query("SELECT 1");
+  log("INFO", "✅ Connection pools created & tested for both databases");
 }
 
-// 🔹 ฟังก์ชันตรวจสอบสถานะ connection ก่อนใช้
+// ===== ตรวจ connection ก่อนใช้ =====
 async function ensureConnection(pool, name) {
   try {
     await pool.query("SELECT 1");
   } catch (err) {
-    log("WARN", `⚠️ Connection lost for ${name}, reconnecting...`, err);
-    await initPools();
+    if (err.message.includes("closed") || err.message.includes("lost")) {
+      log("WARN", `⚠️ ${name} connection appears closed. Recreating pool...`);
+      await createPools();
+    } else {
+      log("ERROR", `❌ ${name} connection test failed`, err);
+      throw err;
+    }
   }
 }
 
-// 🔹 อ่านค่า HN ล่าสุด
+// ===== ดึง HN ล่าสุด =====
 async function getLastHN() {
   try {
     await ensureConnection(db2, "DB2");
@@ -77,15 +82,15 @@ async function getLastHN() {
     log("INFO", `🧮 HN ล่าสุดใน med_user (ไม่รวม test) = ${lastHN}`);
     return lastHN;
   } catch (err) {
-    log("ERROR", "❌ Error in getLastHN()", err);
+    log("ERROR", "getLastHN()", err);
     throw err;
   }
 }
 
-// 🔹 ฟังก์ชันหลัก sync
+// ===== ฟังก์ชัน Sync =====
 async function syncPatients() {
   try {
-    log("INFO", `🚀 เริ่ม sync ข้อมูล (เวลา: ${new Date().toISOString()})`);
+    log("INFO", `🚀 เริ่ม sync ข้อมูล (${new Date().toISOString()})`);
 
     await ensureConnection(db1, "DB1");
     await ensureConnection(db2, "DB2");
@@ -100,7 +105,7 @@ async function syncPatients() {
       [lastHN]
     );
 
-    if (patients.length === 0) {
+    if (!patients.length) {
       log("INFO", "✅ ไม่มีข้อมูลใหม่");
       return;
     }
@@ -111,7 +116,7 @@ async function syncPatients() {
       const name = `${p.pname}${p.fname} ${p.lname}`;
       await db2.query(
         `INSERT INTO med_user
-          (hn, name, pname, fname, lname, deathday, hometel, informname, worktel, last_update, death, mobile_phone_number)
+         (hn, name, pname, fname, lname, deathday, hometel, informname, worktel, last_update, death, mobile_phone_number)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE
           name=VALUES(name),
@@ -145,26 +150,28 @@ async function syncPatients() {
 
     log("INFO", `✅ Sync ข้อมูลใหม่เรียบร้อย (${patients.length} รายการ)`);
   } catch (err) {
-    log("ERROR", "❌ Error in syncPatients()", err);
+    log("ERROR", "syncPatients()", err);
   }
 }
 
-// 🔹 เริ่มต้นระบบ
-await initPools();
+// ===== Init =====
+await createPools();
 await syncPatients();
 
-// 🔹 ตั้ง cron job (ทุก 30 นาที)
+// ===== Schedule Cron =====
 cron.schedule("*/30 * * * *", async () => {
   try {
     await syncPatients();
   } catch (err) {
-    log("ERROR", "❌ Error in cron job", err);
+    log("ERROR", "Cron job error", err);
   }
 });
 
-// 🔹 cleanup
-process.on("exit", async () => {
+// ===== Graceful Shutdown =====
+process.on("SIGINT", async () => {
+  log("INFO", "🛑 Received SIGINT, closing pools...");
   await db1.end();
   await db2.end();
   log("INFO", "🔒 ปิดการเชื่อมต่อเรียบร้อย");
+  process.exit(0);
 });

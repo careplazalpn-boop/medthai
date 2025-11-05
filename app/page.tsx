@@ -8,6 +8,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useState, useRef, useEffect } from "react";
 import { AlertCircle } from "lucide-react";
 import Image from "next/image";
+import { FaClipboardList } from "react-icons/fa";
+
 
 export default function HomePage() {
   const router = useRouter();
@@ -148,8 +150,14 @@ export default function HomePage() {
               className="w-full py-3 sm:py-4 px-4 sm:px-6 border-b-1 border-gray-400 cursor-pointer hover:bg-white/20 flex items-center justify-center gap-2 text-sm sm:text-lg font-semibold text-white"
             >
               <FaCalendarAlt /> {user ? "จองคิวนวดแผนไทย" : "ดูคิวจองนวดแผนไทย"}
-            </div>
-
+            </div> 
+            {/* ✅ ดูคิวนวดทั้งหมด */}
+            <div
+              onClick={() => router.push("/booking-audit")}
+              className="w-full py-3 sm:py-4 px-4 sm:px-6 border-b-1 border-gray-400 cursor-pointer hover:bg-white/20 flex items-center justify-center gap-2 text-sm sm:text-lg font-semibold text-white"
+            >
+              <FaClipboardList /> ดูคิวนวดทั้งหมด
+            </div>           
             {user && (
               <>
                 <div

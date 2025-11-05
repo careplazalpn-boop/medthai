@@ -13,6 +13,7 @@ import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import { useAuth } from "@/context/AuthContext";
 import BookingSummary from "@/app/BookingSummary/BookingSummary";
+import { FaClipboardList } from "react-icons/fa";
 
 interface Booking {
   id: number;
@@ -483,6 +484,13 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
             >
               <FaCalendarAlt /> {user ? "จองคิวนวดแผนไทย" : "ดูคิวจองนวดแผนไทย"}
             </div>
+            {/* ✅ ดูคิวนวดทั้งหมด */}
+            <div
+              onClick={() => router.push("/booking-audit")}
+              className="w-full py-3 sm:py-4 px-4 sm:px-6 border-b-1 border-gray-400 cursor-pointer hover:bg-white/20 flex items-center justify-center gap-2 text-sm sm:text-lg font-semibold text-white"
+            >
+              <FaClipboardList /> ดูคิวนวดทั้งหมด
+            </div>   
             {user && (
               <>
                 <div

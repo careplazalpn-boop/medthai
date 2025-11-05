@@ -37,6 +37,7 @@ interface MedStaff {
 export default function BookingPage() {
   const router = useRouter();
   const { user, logout } = useContext(AuthContext);
+  const isReadOnly = true;
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isGuest = !user;
   const [menuOpen, setMenuOpen] = useState(false); // state สำหรับ hamburger
@@ -166,7 +167,7 @@ export default function BookingPage() {
       return;
     }
 
-  fetchWithLoading(`/api/bookings?date=${encodeURIComponent(date)}`, data => {
+  fetchWithLoading(`/api/bookings-audit?date=${encodeURIComponent(date)}`, data => {
     if (data?.success) {
       const grouped: Record<string, BookingInfo[]> = {};
       data.bookings.forEach((b: any) => {
@@ -215,6 +216,10 @@ export default function BookingPage() {
   };
       
 const handleSubmit = () => {
+   if (isReadOnly) {
+    alert("โหมดดูอย่างเดียว ไม่สามารถบันทึกการจองได้");
+    return;
+    }
   if (isGuest) {
     alert("โหมดดูอย่างเดียว ไม่สามารถบันทึกการจองได้");
     return;
@@ -244,6 +249,10 @@ const handleSubmit = () => {
 
 
 const handleOpenDialog = () => {
+   if (isReadOnly) {
+    alert("โหมดดูอย่างเดียว ไม่สามารถเปิดการจองได้");
+    return;
+  }
   if (isGuest) {
     alert("โหมดดูอย่างเดียว ไม่สามารถเปิดการจองได้");
     return;
@@ -295,6 +304,10 @@ const handleOpenDialog = () => {
   };
 
   const handleAddPatient = async () => {
+    if (isReadOnly) {
+    alert("โหมดดูอย่างเดียว ไม่สามารถเพิ่มคนไข้ได้");
+    return;
+    }
     if (isGuest) {
       alert("โหมดดูอย่างเดียว ไม่สามารถเพิ่มคนไข้ได้");
       return;
@@ -354,6 +367,10 @@ const handleOpenDialog = () => {
   };
 
   const toggleOffTherapist = async (therapist: string) => {
+    if (isReadOnly) {
+    alert("โหมดดูอย่างเดียว ไม่สามารถอัปเดตหมอไม่มาได้");
+    return;
+    }
     if (isGuest) {
       alert("โหมดดูอย่างเดียว ไม่สามารถอัปเดตหมอไม่มาได้");
       return;
@@ -373,6 +390,10 @@ const handleOpenDialog = () => {
   };
 
   const toggleSlot = async (therapist: string, slot: string) => {
+    if (isReadOnly) {
+    alert("โหมดดูอย่างเดียว ไม่สามารถอัปเดตช่องเวลาได้");
+    return;
+    }
     if (isGuest) {
       alert("โหมดดูอย่างเดียว ไม่สามารถอัปเดต slot ได้");
       return;
@@ -410,12 +431,7 @@ const handleOpenDialog = () => {
   };
 
   
- const filteredTherapists = user
-  ? user.role_id === 909
-    ? therapists // role_id 909 -> แสดงทั้งหมด
-    : therapists.filter(t => t.id === user.role_id) // แสดงเฉพาะที่ตรง role_id
-  : therapists; // guest หรือ null
-
+const filteredTherapists = therapists;
   
     
   return (
@@ -608,12 +624,13 @@ const handleOpenDialog = () => {
               <FaCalendarAlt /> {user ? "จองคิวนวดแผนไทย" : "ดูคิวจองนวดแผนไทย"}
             </div>
             {/* ✅ ดูคิวนวดทั้งหมด */}
-            <div
-              onClick={() => router.push("/booking-audit")}
-              className="w-full py-3 sm:py-4 px-4 sm:px-6 border-b-1 border-gray-400 cursor-pointer hover:bg-white/20 flex items-center justify-center gap-2 text-sm sm:text-lg font-semibold text-white"
-            >
-              <FaClipboardList /> ดูคิวนวดทั้งหมด
-            </div> 
+                        <div
+                          onClick={() => router.push("/booking-audit")}
+                          className="w-full py-3 sm:py-4 px-4 sm:px-6 border-b-1 border-gray-400 cursor-pointer hover:bg-white/20 flex items-center justify-center gap-2 text-sm sm:text-lg font-semibold text-white"
+                        >
+                          <FaClipboardList /> ดูคิวนวดทั้งหมด
+                        </div>   
+
             {user && (
               <>
                 <div
@@ -708,104 +725,110 @@ const handleOpenDialog = () => {
         {/* Therapist & slots rendering */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {filteredTherapists.map(t => {
-            const isSelected = selectedTherapist === t.name;
-            const isOff = offTherapists.includes(t.name);
-            const disabled = disabledSlots[t.name] || [];
+  const isSelected = selectedTherapist === t.name;
+  const isOff = offTherapists.includes(t.name);
+  const disabled = disabledSlots[t.name] || [];
 
-            return (
-              <div key={t.name} className={`border p-5 rounded-2xl shadow-lg ${isOff ? "bg-gray-200" : "bg-white"} ${isSelected ? "ring-4 ring-emerald-300" : ""}`}>
-                <div className="flex items-center gap-2 mb-3">
-                  <UserIcon className={`w-5 h-5 ${isOff ? "text-gray-500" : "text-emerald-600"}`} />
-                  <h2 className={`text-lg font-semibold ${isOff ? "text-gray-500" : "text-emerald-700"}`}>{t.id}.{t.name}</h2>
-                  <div className="ml-auto flex items-center gap-2">
-                    {date && !isGuest && (
-                    <button
-                      onClick={() => toggleOffTherapist(t.name)}
-                      className={`px-3 py-1.5 text-sm rounded flex items-center gap-2 font-semibold text-white hover:brightness-90 ${
-                        isOff
-                          ? "bg-red-500 hover:bg-red-600"
-                          : "bg-emerald-500 hover:bg-emerald-600"
-                      }`}
-                    >
-                      {isOff ? "ไม่มา" : "มา"}{isOff ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
-                    </button>
-                  )}
+  // ✅ เพิ่มบรรทัดนี้
+  const isAdminLike = !isGuest && (user.role_id === 909 || user.role_id === t.id);
+
+  return (
+    <div key={t.name} className={`border p-5 rounded-2xl shadow-lg ${isOff ? "bg-gray-200" : "bg-white"} ${isSelected ? "ring-4 ring-emerald-300" : ""}`}>
+      <div className="flex items-center gap-2 mb-3">
+        <UserIcon className={`w-5 h-5 ${isOff ? "text-gray-500" : "text-emerald-600"}`} />
+        <h2 className={`text-lg font-semibold ${isOff ? "text-gray-500" : "text-emerald-700"}`}>{t.id}.{t.name}</h2>
+        <div className="ml-auto flex items-center gap-2">
+
+          {/* ✅ ใช้ isAdminLike แทน !isGuest */}
+          {date && isAdminLike && (
+            <button
+              disabled={isReadOnly}
+              onClick={() => toggleOffTherapist(t.name)}
+              className={`px-3 py-1.5 text-sm rounded ${
+                isReadOnly ? "bg-gray-300 text-gray-500 cursor-not-allowed" : "bg-emerald-500 hover:bg-emerald-600"
+              }`}
+            >
+              {isOff ? "ไม่มา" : "มา"}
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        {timeSlots.map(slot => {
+          const slotInfo = bookedSlots[t.name]?.find(b => b.time_slot === slot);
+          const isBooked = !!slotInfo;
+          const isActive = isSelected && selectedTime === slot;
+          const isSlotDisabled = disabled.includes(slot);
+
+          let bookedBg = "bg-red-100 text-red-600 border-red-400";
+          if (isAdminLike && slotInfo?.bookedbyrole === "admin") {
+            bookedBg = "bg-purple-100 text-purple-700 border-purple-400";
+          }
+
+          return (
+            <div key={slot} className="flex gap-1 items-center">
+              <button
+                disabled={isBooked || isOff || isSlotDisabled || isGuest}
+                onClick={() => handleSelect(t.name, slot)}
+                className={`text-sm px-3 py-2 rounded-lg font-medium border flex-1 flex flex-col items-center justify-center gap-1 transition shadow-sm
+                  ${
+                    isSlotDisabled || isOff
+                      ? "bg-gray-300 text-gray-500 border-gray-400 cursor-not-allowed"
+                      : isBooked
+                      ? bookedBg
+                      : isActive
+                      ? "bg-emerald-600 text-white border-emerald-600"
+                      : "bg-white hover:bg-gray-200 text-emerald-800 border-gray-400"
+                  }`}
+              >
+                <div className="flex items-center gap-1">
+                  <Clock className="w-4 h-4" /> {slot}
+                </div>
+                {isBooked && (
+                  <div className="text-xs">
+                    {!isGuest ? `(${slotInfo?.name || "ไม่ระบุ"})` : "(ไม่ว่าง)"}
                   </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                {timeSlots.map(slot => {
-                  const slotInfo = bookedSlots[t.name]?.find(b => b.time_slot === slot);
-                  const isBooked = !!slotInfo;
-                  const isActive = isSelected && selectedTime === slot;
-                  const isSlotDisabled = disabled.includes(slot);
-
-                  // กำหนดสีตาม bookedbyrole
-                  let bookedBg = "bg-red-100 text-red-600 border-red-400"; // default user
-
-                  if (!isGuest && slotInfo?.bookedbyrole === "admin") {
-                    bookedBg = "bg-purple-100 text-purple-700 border-purple-400";
-                  }
-                  return (
-                    <div key={slot} className="flex gap-1 items-center">
-                    <button
-                      disabled={isBooked || isOff || isSlotDisabled || isGuest}
-                      onClick={() => handleSelect(t.name, slot)}
-                      className={`text-sm px-3 py-2 rounded-lg font-medium border flex-1 flex flex-col items-center justify-center gap-1 transition shadow-sm
-                        ${
-                          isSlotDisabled || isOff
-                            ? "bg-gray-300 text-gray-500 border-gray-400 cursor-not-allowed"
-                            : isBooked
-                            ? bookedBg
-                            : isActive
-                            ? "bg-emerald-600 text-white border-emerald-600"
-                            : "bg-white hover:bg-gray-200 text-emerald-800 border-gray-400"
-                        }`}
-                      >
-                          <div className="flex items-center gap-1">
-                            <Clock className="w-4 h-4" /> {slot}
-                          </div>
-                        {isBooked && (
-                          <div className="text-xs">
-                            {!isGuest ? `(${slotInfo?.name || "ไม่ระบุ"})` : "(ไม่ว่าง)"}
-                          </div>
-                        )}
-                      </button>
-                      {/* ปุ่ม admin toggle slot */}
-                      {date && !isGuest && (
-                        <button
-                          onClick={() => toggleSlot(t.name, slot)}
-                          className={`px-2 py-1 rounded text-white ${
-                            isOff
-                              ? "bg-gray-400 cursor-not-allowed"
-                              : isSlotDisabled
-                              ? "bg-red-500 hover:bg-red-600"
-                              : "bg-emerald-500 hover:bg-emerald-600"
-                          }`}
-                        >
-                          {isSlotDisabled ? <FaTimes /> : <FaCheck />}
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-                </div>
-                {!isGuest && (
-                  <button
-                    onClick={handleOpenDialog}
-                    disabled={!(isSelected && selectedTime && date) || isOff}
-                    className={`mt-5 w-full py-2 rounded-xl font-bold shadow transition text-center ${
-                      isSelected && selectedTime && date && !isOff
-                        ? "bg-emerald-600 text-white hover:bg-emerald-700"
-                        : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                    }`}
-                  >
-                    เลือก
-                  </button>
                 )}
-              </div>
-            );
-          })}
+              </button>
+
+              {/* ✅ ใช้ isAdminLike แทน !isGuest */}
+              {date && isAdminLike && (
+                <button
+                  onClick={() => toggleSlot(t.name, slot)}
+                  className={`px-2 py-1 rounded text-white ${
+                    isOff
+                      ? "bg-gray-400 cursor-not-allowed"
+                      : isSlotDisabled
+                      ? "bg-red-500 hover:bg-red-600"
+                      : "bg-emerald-500 hover:bg-emerald-600"
+                  }`}
+                >
+                  {isSlotDisabled ? <FaTimes /> : <FaCheck />}
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ✅ ใช้ isAdminLike */}
+      {isAdminLike && (
+        <button
+          onClick={handleOpenDialog}
+          disabled={!(isSelected && selectedTime && date) || isOff}
+          className={`mt-5 w-full py-2 rounded-xl font-bold shadow transition text-center ${
+            isSelected && selectedTime && date && !isOff
+              ? "bg-emerald-600 text-white hover:bg-emerald-700"
+              : "bg-gray-300 text-gray-500 cursor-not-allowed"
+          }`}
+        >
+          เลือก
+        </button>
+      )}
+    </div>
+  );
+})}
         </div>
 
         {/* Dialog */}

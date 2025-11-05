@@ -20,10 +20,10 @@ const log = (msg) => {
 
 // 🔹 เชื่อมต่อฐานข้อมูล
 const db1 = await mysql.createConnection({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
+  host: process.env.DB1_HOST,
+  user: process.env.DB1_USER,
+  password: process.env.DB1_PASSWORD,
+  database: process.env.DB1_NAME,
 });
 
 const db2 = await mysql.createConnection({

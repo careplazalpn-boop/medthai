@@ -698,7 +698,7 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
               <div className="grid grid-cols-1 sm:grid-cols-[200px_211px_130px_200px_120px_120px_120px] gap-y-2 sm:gap-x-6 text-gray-700 flex-grow">
                 {/* ผู้ให้บริการ */}
                 <div className="flex flex-col sm:flex-col gap-1">
-                  <Label icon={<UserCheck className="w-4 h-4" />} text="ผู้ให้บริการ" />
+                  <Label icon={<UserCheck className="w-4 h-4" />} text="ผู้จองคิว" />
                   <span className="font-normal text-base">{b.provider}</span>
                 </div>
                 {/* ผู้มารับบริการ */}
@@ -910,7 +910,7 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
                 </div>
                 {/* หมอนวด */}
                 <div className="flex flex-col sm:flex-col gap-1">
-                  <Label icon={<UserCheck className="w-4 h-4" />} text="หมอนวด" />
+                  <Label icon={<UserCheck className="w-4 h-4" />} text="พนักงานนวด" />
                   <span className="font-normal text-base">{b.therapist}</span>
                 </div>
 

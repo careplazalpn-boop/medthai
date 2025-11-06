@@ -81,9 +81,10 @@ export default function BookingSummary({
         <StatusBox label="อยู่ในคิว" count={totalInQueue} percent={inQueuePercent} colorKey="orange" Icon={Clock} />
       </div>
 
-      <div className="mt-2 text-sm text-gray-700 font-semibold text-center">
+      <div className="mt-2 text-sm text-gray-700 font-semibold">
         รวมทั้งหมด: {total} คน
       </div>
+      
     </div>
   );
 }

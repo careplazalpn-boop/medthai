@@ -681,7 +681,7 @@ const handleOpenDialog = () => {
         <h1
           className="text-3xl sm:text-4xl font-extrabold text-emerald-700 mb-12 sm:mb-12 text-center drop-shadow-sm"
         >
-          {isGuest ? "ดูคิวจองนวดแผนไทย" : "เลือกแพทย์แผนไทยและช่วงเวลา"}
+          {isGuest ? "ดูคิวจองนวดแผนไทย" : "เลือกพนักงานนวดแพทย์แผนไทยและช่วงเวลา"}
         </h1>
 
         <div className="mb-8 max-w-sm mx-auto">

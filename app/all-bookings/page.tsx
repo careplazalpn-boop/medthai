@@ -582,7 +582,7 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
         </div>
 
         <div className="w-full sm:w-[256px]">
-          <label className="block text-emerald-700 font-semibold mb-2 text-lg">แพทย์แผนไทย:</label>
+          <label className="block text-emerald-700 font-semibold mb-2 text-lg">พนักงานแพทย์แผนไทย:</label>
           <select 
             value={filterTherapist} 
             onChange={e => {setFilterTherapist(e.target.value);setPage(1);}}
@@ -914,14 +914,29 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
                   <span className="font-normal text-base">{b.therapist}</span>
                 </div>
 
-                {/* วันที่ */}
+                {/* วันที่ + เวลาที่บันทึก */}
                 <div className="flex flex-col sm:flex-col gap-1">
                   <Label icon={<CalendarDays className="w-4 h-4" />} text="วันที่" />
+                  
+                  {/* วันที่นัดหมาย */}
                   <span className="font-normal text-base">
                     {new Date(b.date).toLocaleDateString("th-TH", {
                       year: "numeric",
                       month: "2-digit",
                       day: "2-digit",
+                      timeZone: "Asia/Bangkok",
+                    })}
+                  </span>
+
+                  {/* วันที่บันทึกข้อมูล */}
+                  <span className="text-sm text-gray-500">
+                    บันทึกเมื่อ:{" "}
+                    {new Date(b.created_at).toLocaleString("th-TH", {
+                      year: "numeric",
+                      month: "2-digit",
+                      day: "2-digit",
+                      hour: "2-digit",
+                      minute: "2-digit",
                       timeZone: "Asia/Bangkok",
                     })}
                   </span>

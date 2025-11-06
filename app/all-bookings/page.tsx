@@ -570,7 +570,7 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
         </div>
 
         <div className="w-full sm:w-[256px]">
-          <label className="block text-emerald-700 font-semibold mb-2 text-lg">ผู้ให้บริการ:</label>
+          <label className="block text-emerald-700 font-semibold mb-2 text-lg">ผู้จองคิว</label>
           <select 
             value={filterProvider} 
             onChange={e => {setFilterProvider(e.target.value);setPage(1);}}
@@ -582,7 +582,7 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
         </div>
 
         <div className="w-full sm:w-[256px]">
-          <label className="block text-emerald-700 font-semibold mb-2 text-lg">หมอนวด:</label>
+          <label className="block text-emerald-700 font-semibold mb-2 text-lg">แพทย์แผนไทย:</label>
           <select 
             value={filterTherapist} 
             onChange={e => {setFilterTherapist(e.target.value);setPage(1);}}

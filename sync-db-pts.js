@@ -110,7 +110,7 @@ async function main() {
        AND p.amppart = ta.amppart
       WHERE p.hn > ? 
         AND p.hn NOT LIKE '9999%'
-      ORDER BY p.hn ASC LIMIT 2000
+      ORDER BY p.hn ASC
       `,
       [currentMaxHN]
     );

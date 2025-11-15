@@ -73,7 +73,7 @@ async function main() {
       `SELECT hn, image_name, image, width, height, capture_date, hos_guid, hos_guid_ext
        FROM patient_image
        WHERE (hn > ? OR (hn = ? AND image_name > ?))
-       ORDER BY hn ASC, image_name ASC LIMIT 200`,
+       ORDER BY hn ASC, image_name ASC`,
       [lastHN, lastHN, lastImageName]
     );
 

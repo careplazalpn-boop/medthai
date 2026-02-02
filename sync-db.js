@@ -15,136 +15,183 @@ const logPath = join(__dirname, "sync.log");
 const log = (msg, level = "INFO") => {
   const t = new Date().toISOString();
   const line = `[${t}] [${level}] ${msg}\n`;
-  fs.appendFileSync(logPath, line);
+  // fs.appendFileSync(logPath, line); // เปิดถ้าต้องการเก็บ log ลงไฟล์
   console.log(line.trim());
 };
 
-// ❌ ลบ const db1Pool และ db2Pool ที่อยู่ใน Global Scope ออก
-// ❌ ลบ await testConnections(); ออก
+// 🔹 Pool DB1
+const db1Pool = mysql.createPool({
+  host: process.env.DB1_HOST,
+  user: process.env.DB1_USER,
+  password: process.env.DB1_PASSWORD,
+  database: process.env.DB1_NAME,
+  connectionLimit: 5,
+  charset: "TIS620",
+  connectTimeout: 20000,
+  enableKeepAlive: true
+});
 
-// 🔹 Query helper (ใช้ Connection ที่มาจาก Pool)
+// 🔹 Pool DB2
+const db2Pool = mysql.createPool({
+  host: process.env.DB2_HOST,
+  user: process.env.DB2_USER,
+  password: process.env.DB2_PASSWORD,
+  database: process.env.DB2_NAME,
+  connectionLimit: 5,
+  charset: "TIS620",
+  connectTimeout: 20000,
+  enableKeepAlive: true
+});
+
+// 🔹 Helper: format datetime
+function formatDateTime(dateInput) {
+  if (!dateInput) return "2000-01-01 00:00:00";
+  const d = new Date(dateInput);
+  if (isNaN(d.getTime())) return "2000-01-01 00:00:00";
+
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+  const ss = String(d.getSeconds()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss}`;
+}
+
+// 🔹 Query helper
 async function safeQuery(pool, sql, params, dbName = "DB") {
-  let conn; // ประกาศตัวแปร Connection
+  let conn;
   try {
-    conn = await pool.getConnection(); // 💡 ดึง Connection ใหม่ทุกครั้ง
-    const [rows] = await conn.execute(sql, params); // ใช้ execute แทน query
+    conn = await pool.getConnection();
+    const [rows] = await conn.execute(sql, params);
     return rows;
   } catch (err) {
-    log(`[ERROR] ⚠️ Query failed on ${dbName}: ${err.message}`, "ERROR");
-    // ไม่ต้องพยายาม reconnect เพราะ Pool จะจัดการเอง เราแค่ throw error ออกไป
+    log(`⚠️ Query failed on ${dbName}: ${err.message}`, "ERROR");
     throw err;
   } finally {
-    if (conn) conn.release(); // 💡 คืน Connection สู่ Pool เสมอ
+    if (conn) conn.release();
   }
 }
 
-// 🔹 อ่านค่า HN สูงสุด
-async function getLastHN(db2Pool) { // รับ Pool เข้ามาเป็น Argument
+// 🔹 อ่าน Last Update
+async function getLastUpdate(db2Pool) {
   const rows = await safeQuery(
     db2Pool,
-    "SELECT MAX(CAST(hn AS UNSIGNED)) AS lastHN FROM med_user WHERE hn NOT LIKE '999%'",
+    "SELECT MAX(last_update) AS last_sync FROM med_user",
     [],
     "DB2"
   );
-  const lastHN = rows[0]?.lastHN || 0;
-  log(`🧮 HN ล่าสุดใน med_user (ไม่รวม test) = ${lastHN}`);
-  return lastHN;
+
+  const lastSync = rows[0]?.last_sync;
+  const isStandardFormat = /^\d{4}-\d{2}-\d{2}/.test(lastSync);
+
+  if (!lastSync || !isStandardFormat) {
+    log(`⚠️ พบ format วันที่ผิดปกติหรือไม่มีข้อมูล (${lastSync})`);
+    return "2000-01-01 00:00:00";
+  }
+
+  log(`✅ Checkpoint ล่าสุด: ${lastSync}`);
+  return lastSync;
 }
 
-// 🔹 Sync ข้อมูล
+// 🔹 Sync Logic (เดิมทั้งหมด)
 async function syncPatients() {
-  let db1Pool, db2Pool; // ประกาศตัวแปร Pool
-
   try {
-    // 💡 สร้าง Pool ภายในฟังก์ชัน เพื่อป้องกัน Connection Closed State
-    db1Pool = mysql.createPool({
-      host: process.env.DB1_HOST,
-      user: process.env.DB1_USER,
-      password: process.env.DB1_PASSWORD,
-      database: process.env.DB1_NAME,
-      connectionLimit: 5,
-    });
-    
-    db2Pool = mysql.createPool({
-      host: process.env.DB2_HOST,
-      user: process.env.DB2_USER,
-      password: process.env.DB2_PASSWORD, // ใช้ DB2_PASSWORD ที่คุณระบุ
-      database: process.env.DB2_NAME,
-      connectionLimit: 5,
-    });
+    log("🚀 เริ่ม sync ข้อมูล (patient -> med_user)");
 
-    log(`🚀 เริ่ม sync ข้อมูล (เวลา: ${new Date().toISOString()})`);
-    
-    // ตรวจสอบการเชื่อมต่อ (ไม่จำเป็นต้องทำ testConnections แยก)
-    await db1Pool.query("SELECT 1"); 
-    await db2Pool.query("SELECT 1"); 
-    log(`✅ Connected to both databases successfully.`);
-
-
-    const lastHN = await getLastHN(db2Pool);
+    const lastSyncTime = await getLastUpdate(db2Pool);
+    log(`🔍 ค้นหาข้อมูลที่มีการแก้ไขหลังเวลา: ${lastSyncTime}`);
 
     const patients = await safeQuery(
-      db1Pool, // 💡 ใช้ Pool ที่สร้างใหม่
-      `SELECT hn, pname, fname, lname, deathday, hometel, informname, worktel, last_update, death, mobile_phone_number
-        FROM patient
-        WHERE CAST(hn AS UNSIGNED) > ?
-          AND hn NOT LIKE '999%'
-        ORDER BY CAST(hn AS UNSIGNED) ASC`,
-      [lastHN],
+      db1Pool,
+      `
+      SELECT hn, pname, fname, lname, deathday, hometel, informname,
+             worktel, last_update, death, mobile_phone_number
+      FROM patient
+      WHERE last_update > ?
+        AND hn NOT LIKE '999%'
+      ORDER BY last_update ASC
+      LIMIT 1000
+      `,
+      [lastSyncTime],
       "DB1"
     );
 
     if (patients.length === 0) {
-      log("✅ ไม่มีข้อมูลใหม่");
+      log("✅ ข้อมูลเป็นปัจจุบันแล้ว");
       return;
     }
 
-    log(`📦 พบข้อมูลใหม่ ${patients.length} รายการ (ตั้งแต่ HN > ${lastHN})`);
+    log(`📦 พบข้อมูลใหม่/แก้ไข ${patients.length} รายการ`);
 
-    // ... (Loop Insert ใช้ db2Pool) ...
-    for (const p of patients) {
-      const name = `${p.pname || ''}${p.fname || ''} ${p.lname || ''}`.trim();
+    const db2Conn = await db2Pool.getConnection();
+    try {
+      await db2Conn.beginTransaction();
 
-      await safeQuery(
-        db2Pool,
-        `INSERT INTO med_user
-          (hn, name, pname, fname, lname, deathday, hometel, informname, worktel, last_update, death, mobile_phone_number)
+      for (const p of patients) {
+        const name = `${p.pname || ""}${p.fname || ""} ${p.lname || ""}`.trim();
+        const pLastUpdate = formatDateTime(p.last_update);
+        const pDeathDay = p.deathday
+          ? formatDateTime(p.deathday).split(" ")[0]
+          : null;
+
+        await db2Conn.execute(
+          `
+          INSERT INTO med_user
+          (hn, name, pname, fname, lname, deathday, hometel,
+           informname, worktel, last_update, death, mobile_phone_number)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON DUPLICATE KEY UPDATE
-           name=VALUES(name),
-           pname=VALUES(pname),
-           fname=VALUES(fname),
-           lname=VALUES(lname),
-           deathday=VALUES(deathday),
-           hometel=VALUES(hometel),
-           informname=VALUES(informname),
-           worktel=VALUES(worktel),
-           last_update=VALUES(last_update),
-           death=VALUES(death),
-           mobile_phone_number=VALUES(mobile_phone_number)`,
-        [
-          p.hn, name, p.pname, p.fname, p.lname, p.deathday, p.hometel,
-          p.informname, p.worktel, p.last_update, p.death, p.mobile_phone_number,
-        ],
-        "DB2"
-      );
-    }
+            name=VALUES(name),
+            pname=VALUES(pname),
+            fname=VALUES(fname),
+            lname=VALUES(lname),
+            deathday=VALUES(deathday),
+            hometel=VALUES(hometel),
+            informname=VALUES(informname),
+            worktel=VALUES(worktel),
+            last_update=VALUES(last_update),
+            death=VALUES(death),
+            mobile_phone_number=VALUES(mobile_phone_number)
+          `,
+          [
+            p.hn,
+            name,
+            p.pname,
+            p.fname,
+            p.lname,
+            pDeathDay,
+            p.hometel,
+            p.informname,
+            p.worktel,
+            pLastUpdate,
+            p.death,
+            p.mobile_phone_number
+          ]
+        );
+      }
 
-    log(`✅ Sync ข้อมูลใหม่เรียบร้อย (${patients.length} รายการ)`);
+      await db2Conn.commit();
+      log(`✅ Sync สำเร็จ ${patients.length} รายการ`);
+    } catch (err) {
+      await db2Conn.rollback();
+      throw err;
+    } finally {
+      db2Conn.release();
+    }
   } catch (err) {
-    log(`[ERROR] ❌ เกิดข้อผิดพลาดใน syncPatients(): ${err.message}`, "ERROR");
-  } finally {
-    // 💡 ปิด Pool ทั้งสองเมื่อจบงาน
-    if (db1Pool) await db1Pool.end().catch(e => log(`Error closing DB1: ${e.message}`, "WARN"));
-    if (db2Pool) await db2Pool.end().catch(e => log(`Error closing DB2: ${e.message}`, "WARN"));
-    log("🔒 ปิดการเชื่อมต่อเรียบร้อย");
+    log(`❌ syncPatients error: ${err.message}`, "ERROR");
   }
 }
 
-// 🔹 เริ่มทำงานและตั้งเวลา
-// 💡 เราเรียก syncPatients() โดยตรงแทน
-syncPatients(); 
-cron.schedule("*/30 * * * *", syncPatients);
+// 🔹 เริ่ม Service
+console.log("Service Started: sync-db.js (Native TIS620 + Smart Date)");
 
-// ❌ ลบ process.on("SIGINT", ...) ออกไป เพราะ Pool ถูกปิดแล้วใน Finally Block
-// การจัดการ SIGINT อาจขัดแย้งกับการสร้าง/ทำลาย Pool ในทุก ๆ รอบ
+// ▶️ รันทันทีเมื่อ start
+syncPatients();
+
+// ⏰ รันทุก ๆ 2 ชั่วโมง (นาทีที่ 0)
+cron.schedule("0 */2 * * *", syncPatients);
+
+// กัน process exit
+setInterval(() => {}, 1 << 30);

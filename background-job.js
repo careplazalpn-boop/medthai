@@ -165,9 +165,19 @@ async function checkTime() {
 
 // ----------------- Run -----------------
 (async () => {
-  await checkTime();
-  await cleanOldDates();
-  await cleanOldDisabledSlots();
+  console.log("⏳ Waiting 15s for Server stability before starting heavy jobs...");
+  setTimeout(async () => {
+    try {
+      await checkTime();
+      await cleanOldDates();
+      await cleanOldDisabledSlots();
+      console.log("🚀 Initial background jobs completed.");
+    } catch (err) {
+      console.error("❌ Error during initial jobs:", err);
+    }
+  }, 15000); 
 })();
 
 setInterval(checkTime, 5000);
+
+

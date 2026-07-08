@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
-import pool from '../dbconnection/db';
+import pool from "../dbconnection/db";
 
 export async function GET(request: Request) {
-  const date = new URL(request.url).searchParams.get("date");
+  const url = new URL(request.url);
+  const date = url.searchParams.get("date");
   if (!date)
     return NextResponse.json(
       { success: false, error: "กรุณาระบุวันที่" },
@@ -11,11 +12,47 @@ export async function GET(request: Request) {
 
   try {
     const conn = await pool.getConnection();
-    // ดึง name และ bookedbyrole ของผู้จองมาด้วย
-    const [rows] = await conn.query(
-      "SELECT therapist, time_slot, name, status, bookedbyrole FROM bookings WHERE date = ? AND status != 'ยกเลิก'",
-      [date]
-    );
+
+    // ดึงค่า role/userId เพื่อตรวจสอบสิทธิ์
+    const roleParam = url.searchParams.get("role") || url.searchParams.get("role_id") || "";
+    const userIdParam = url.searchParams.get("userId") || url.searchParams.get("user_id") || "";
+    
+    let isAdmin = false;
+    const normalizedRole = String(roleParam).toLowerCase().trim();
+    
+    if (normalizedRole === "909" || normalizedRole === "admin") {
+      isAdmin = true;
+    } else if (userIdParam) {
+      const [userRows]: any = await conn.query("SELECT role, role_id FROM users WHERE id = ?", [userIdParam]);
+      if (userRows && userRows.length > 0) {
+        const rId = String(userRows[0].role_id);
+        const rName = String(userRows[0].role || "").toLowerCase();
+        if (rId === "909" || rId === "admin" || rName === "909" || rName === "admin") isAdmin = true;
+      }
+    }
+
+    let query = "";
+    const queryParams = [date];
+
+    if (isAdmin) {
+      // Admin: แสดงทั้งหมดตาม status ของ therapist
+      query = `
+        SELECT b.therapist, b.time_slot, b.name, b.status, b.bookedbyrole 
+        FROM bookings b
+        INNER JOIN therapist t ON (b.therapist = t.name OR b.therapist = t.fname)
+        WHERE b.date = ? AND b.status != 'ยกเลิก' AND t.status = 0
+      `;
+    } else {
+      // Guest / User ทั่วไป: กรองเฉพาะ therapist_type = 0 และ status = 0
+      query = `
+        SELECT b.therapist, b.time_slot, b.name, b.status, b.bookedbyrole 
+        FROM bookings b
+        INNER JOIN therapist t ON (b.therapist = t.name OR b.therapist = t.fname)
+        WHERE b.date = ? AND b.status != 'ยกเลิก' AND t.status = 0 AND t.therapist_type = 0
+      `;
+    }
+
+    const [rows] = await conn.query(query, queryParams);
     conn.release();
     return NextResponse.json({ success: true, bookings: rows });
   } catch (error) {
@@ -32,7 +69,6 @@ export async function POST(request: Request) {
     const { provider, hn, name, phone, therapist, time, date, bookedbyrole } =
       await request.json();
 
-    // ตรวจ field จำเป็น
     const missingFields = [];
     if (!provider) missingFields.push("provider");
     if (!name) missingFields.push("name");
@@ -50,7 +86,6 @@ export async function POST(request: Request) {
 
     const conn = await pool.getConnection();
     try {
-      // เช็ค booking ซ้ำเฉพาะ HN + therapist + time_slot + date
       const [existing] = await conn.query(
         "SELECT * FROM bookings WHERE hn = ? AND therapist = ? AND time_slot = ? AND date = ? AND status != 'ยกเลิก'",
         [hn || null, therapist, time, date]
@@ -63,7 +98,6 @@ export async function POST(request: Request) {
         );
       }
 
-      // Insert ข้อมูลใหม่
       await conn.query(
         "INSERT INTO bookings (hn, name, phone, date, therapist, time_slot, provider, bookedbyrole, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'รอดำเนินการ')",
         [hn || null, name, phone, date, therapist, time, provider, bookedbyrole || 'user']

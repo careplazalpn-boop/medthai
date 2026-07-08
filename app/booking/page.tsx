@@ -27,6 +27,7 @@ interface BookingInfo {
 interface Therapist {
   id: number;
   name: string;
+  therapist_type?: number; // เพิ่มฟิลด์รองรับประเภทพนักงานนวด
 }
 interface MedStaff {
   id: number;
@@ -67,6 +68,7 @@ export default function BookingPage() {
   const [patientPhone, setPatientPhone] = useState("");
   const [contactOpen, setContactOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  
   
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -132,7 +134,7 @@ export default function BookingPage() {
     .catch(() => setMedStaff([]));
 }, []);
 
- // ✅ ตั้งค่าเริ่มต้นให้ dialogTherapist เมื่อ user และ medStaff พร้อมแล้ว
+  // ✅ ตั้งค่าเริ่มต้นให้ dialogTherapist เมื่อ user และ medStaff พร้อมแล้ว
     useEffect(() => {
       if (user && medStaff.length > 0) {
         const matched = medStaff.find(
@@ -143,7 +145,9 @@ export default function BookingPage() {
     }, [user, medStaff]);
 
   useEffect(() => {
-      fetch("/api/therapists")
+      const roleQuery = user ? `?role=${encodeURIComponent(user.role || "")}&role_id=${encodeURIComponent(user.role_id || "")}` : "";
+
+      fetch(`/api/therapists${roleQuery}`)
       .then(res => res.json())
       .then(data => {
         console.log("Fetched therapists:", data.therapists);
@@ -154,7 +158,7 @@ export default function BookingPage() {
       .then(res => res.json())
       .then(data => data.success && setTimeSlots(data.timeSlots))
       .catch(() => setTimeSlots([]));
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     if (!date) {
@@ -166,7 +170,9 @@ export default function BookingPage() {
       return;
     }
 
-  fetchWithLoading(`/api/bookings?date=${encodeURIComponent(date)}`, data => {
+  const roleQuery = user ? `&role=${encodeURIComponent(user.role || "")}&role_id=${encodeURIComponent(user.role_id || "")}` : "";
+
+  fetchWithLoading(`/api/bookings?date=${encodeURIComponent(date)}${roleQuery}`, data => {
     if (data?.success) {
       const grouped: Record<string, BookingInfo[]> = {};
       data.bookings.forEach((b: any) => {
@@ -181,7 +187,7 @@ export default function BookingPage() {
     setOffTherapists(data?.success ? data.offTherapists || [] : []);
     setDisabledSlots(data?.success ? data.disabledSlotsByTherapist || {} : {});
   });
-}, [date]);
+}, [date, user]);
 
   const formatPhone = (value: string) => {
     const digits = value.replace(/\D/g, "");
@@ -711,12 +717,15 @@ const handleOpenDialog = () => {
             const isSelected = selectedTherapist === t.name;
             const isOff = offTherapists.includes(t.name);
             const disabled = disabledSlots[t.name] || [];
+            const isSpecialType = t.therapist_type === 1;
 
             return (
-              <div key={t.name} className={`border p-5 rounded-2xl shadow-lg ${isOff ? "bg-gray-200" : "bg-white"} ${isSelected ? "ring-4 ring-emerald-300" : ""}`}>
+              <div key={t.name} className={`border p-5 rounded-2xl shadow-lg transition-all duration-300 ${isOff ? "bg-gray-200 border-gray-300" : isSpecialType ? "bg-yellow-50 border-yellow-200" : "bg-white border-gray-200"} ${isSelected ? "ring-4 ring-emerald-300 border-emerald-500" : ""}`}>
                 <div className="flex items-center gap-2 mb-3">
-                  <UserIcon className={`w-5 h-5 ${isOff ? "text-gray-500" : "text-emerald-600"}`} />
-                  <h2 className={`text-lg font-semibold ${isOff ? "text-gray-500" : "text-emerald-700"}`}>{t.id}.{t.name}</h2>
+                  <UserIcon className={`w-5 h-5 ${isOff ? "text-gray-500" : isSpecialType ? "text-yellow-600" : "text-emerald-600"}`} />
+                  <h2 className={`text-lg font-semibold ${isOff ? "text-gray-500" : isSpecialType ? "text-yellow-700" : "text-emerald-700"}`}>
+                    {t.id}.{t.name} {isSpecialType && <span className="text-xs bg-yellow-200 text-yellow-800 px-2 py-0.5 rounded ml-2">แพทย์พิเศษ</span>}
+                  </h2>
                   <div className="ml-auto flex items-center gap-2">
                     {date && !isGuest && (
                     <button
@@ -759,12 +768,14 @@ const handleOpenDialog = () => {
                             ? bookedBg
                             : isActive
                             ? "bg-emerald-600 text-white border-emerald-600"
+                            : isSpecialType
+                            ? "bg-white hover:bg-yellow-100 text-yellow-800 border-yellow-300" // แสดงสีปุ่มสอดคล้องกับพนักงานพิเศษเมื่อว่างอยู่
                             : "bg-white hover:bg-gray-200 text-emerald-800 border-gray-400"
                         }`}
                       >
-                          <div className="flex items-center gap-1">
-                            <Clock className="w-4 h-4" /> {slot}
-                          </div>
+                        <div className="flex items-center gap-1">
+                          <Clock className="w-4 h-4" /> {slot}
+                        </div>
                         {isBooked && (
                           <div className="text-xs">
                             {!isGuest ? `(${slotInfo?.name || "ไม่ระบุ"})` : "(ไม่ว่าง)"}
@@ -819,7 +830,7 @@ const handleOpenDialog = () => {
                   type="button"
                   onClick={() => {
                     setNoHN(prev => !prev);       // สลับโหมด HN / บัตรประชาชน
-                    setClientHN("");               // รีเซ็ต HN
+                    setClientHN("");              // รีเซ็ต HN
                     setClientName("");             // รีเซ็ตชื่อ
                     setClientPhone("");            // รีเซ็ตเบอร์
                     setIdCardNumber("");           // รีเซ็ตหมายเลขบัตร

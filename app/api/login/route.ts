@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import pool from '../dbconnection/db';
-import bcrypt from "bcryptjs"; // เปลี่ยนมาใช้ bcrypt
+import pool from "../dbconnection/db";
+import bcrypt from "bcryptjs";
 import crypto from "crypto";
 
-// ฟังก์ชันสร้าง token ง่าย ๆ
+// ฟังก์ชันสร้าง Session Token
 function generateToken() {
   return crypto.randomBytes(32).toString("hex");
 }
@@ -14,67 +14,130 @@ export async function POST(request: Request) {
 
     if (!username || !password) {
       return NextResponse.json(
-        { success: false, error: "กรุณากรอกชื่อผู้ใช้และรหัสผ่าน" },
+        {
+          success: false,
+          error: "กรุณากรอกชื่อผู้ใช้และรหัสผ่าน",
+        },
         { status: 400 }
       );
     }
 
     const conn = await pool.getConnection();
 
-    // ดึงข้อมูล user โดย query จาก username
-    const [rows] = await conn.query(
-      "SELECT id, username, name, role, password, role_id  FROM users WHERE username = ?",
-      [username]
-    );
-
-    conn.release();
-
-    if ((rows as any).length === 0) {
-      return NextResponse.json(
-        { success: false, error: "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง" },
-        { status: 401 }
+    try {
+      // ดึงข้อมูลผู้ใช้
+      const [rows] = await conn.query(
+        `SELECT
+            id,
+            username,
+            name,
+            role,
+            password,
+            role_id
+         FROM users
+         WHERE username = ?`,
+        [username]
       );
+
+      if ((rows as any).length === 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง",
+          },
+          { status: 401 }
+        );
+      }
+
+      const user = (rows as any)[0];
+
+      // ตรวจสอบรหัสผ่าน
+      const isMatch = await bcrypt.compare(password, user.password);
+
+      if (!isMatch) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง",
+          },
+          { status: 401 }
+        );
+      }
+
+      // ลบ Password ก่อนส่งกลับ
+      delete user.password;
+
+      // ============================
+      // ตรวจสอบสิทธิ์ Admin
+      // role_id = 909 คือ Admin
+      // ============================
+      user.isAdmin = Number(user.role_id) === 909;
+
+      // สร้าง Session Token
+      const token = generateToken();
+
+      // TODO:
+      // หากในอนาคตต้องการระบบ Session จริง
+      // ให้บันทึก token ลงฐานข้อมูลที่นี่
+
+      const response = NextResponse.json({
+        success: true,
+        user,
+      });
+
+      // ============================
+      // Cookie เดิม
+      // ============================
+      response.cookies.set({
+        name: "session_token",
+        value: token,
+        httpOnly: true,
+        path: "/",
+        maxAge: 60 * 60 * 24 * 7,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+      });
+
+      // ============================
+      // Cookie สำหรับตรวจสอบสิทธิ์
+      // ============================
+      response.cookies.set({
+        name: "role_id",
+        value: String(user.role_id),
+        httpOnly: true,
+        path: "/",
+        maxAge: 60 * 60 * 24 * 7,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+      });
+
+      response.cookies.set({
+        name: "is_admin",
+        value: user.isAdmin ? "true" : "false",
+        httpOnly: true,
+        path: "/",
+        maxAge: 60 * 60 * 24 * 7,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+      });
+
+      return response;
+
+    } finally {
+      conn.release();
     }
-
-    const user = (rows as any)[0];
-
-    // ตรวจสอบ password ด้วย bcrypt
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return NextResponse.json(
-        { success: false, error: "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง" },
-        { status: 401 }
-      );
-    }
-
-    // ลบ password ออกจาก user object ก่อนส่งกลับ
-    delete user.password;
-
-    // สร้าง token session
-    const token = generateToken();
-
-    // TODO: บันทึก token ลง DB หรือ cache เพื่อใช้ตรวจสอบ session
-
-    // สร้าง response พร้อมตั้ง cookie httpOnly สำหรับเก็บ token
-    const response = NextResponse.json({ success: true, user });
-
-    response.cookies.set({
-      name: "session_token",
-      value: token,
-      httpOnly: true,
-      path: "/",
-      maxAge: 60 * 60 * 24 * 7, // 7 วัน
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-    });
-
-    return response;
 
   } catch (error) {
     console.error("Login API error:", error);
+
     return NextResponse.json(
-      { success: false, error: "เกิดข้อผิดพลาดจากระบบ" },
-      { status: 500 }
+      {
+        success: false,
+        error: "เกิดข้อผิดพลาดจากระบบ",
+      },
+      {
+        status: 500,
+      }
     );
   }
 }

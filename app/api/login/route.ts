@@ -95,7 +95,8 @@ export async function POST(request: Request) {
         path: "/",
         maxAge: 60 * 60 * 24 * 7,
         sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
+        //secure: process.env.NODE_ENV === "production",
+        secure: process.env.COOKIE_SECURE === "true",
       });
 
       // ============================
@@ -108,7 +109,8 @@ export async function POST(request: Request) {
         path: "/",
         maxAge: 60 * 60 * 24 * 7,
         sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
+        //secure: process.env.NODE_ENV === "production",
+        secure: process.env.COOKIE_SECURE === "true",
       });
 
       response.cookies.set({
@@ -118,7 +120,8 @@ export async function POST(request: Request) {
         path: "/",
         maxAge: 60 * 60 * 24 * 7,
         sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
+        //secure: process.env.NODE_ENV === "production",
+        secure: process.env.COOKIE_SECURE === "true",
       });
 
       return response;

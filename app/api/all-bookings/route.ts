@@ -239,11 +239,15 @@ export async function DELETE(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { id } = body;
-    if (!id)
-      return NextResponse.json({ success: false, error: "ไม่พบ id" }, { status: 400 });
+    const { id, status } = body; // รับ status เข้ามาด้วย
+    
+    if (!id || !status) {
+      return NextResponse.json({ success: false, error: "ข้อมูลไม่ครบถ้วน" }, { status: 400 });
+    }
 
-    await pool.execute("UPDATE bookings SET payment_status = 'paid' WHERE id = ?", [id]);
+    // อัปเดตสถานะตามที่ได้รับมา
+    await pool.execute("UPDATE bookings SET payment_status = ? WHERE id = ?", [status, id]);
+    
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error updating payment status:", error);
@@ -253,3 +257,5 @@ export async function POST(req: Request) {
     );
   }
 }
+
+

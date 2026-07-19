@@ -234,7 +234,11 @@ const getStatusColor = (b: Booking) => {
                 return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
             });
 
-
+        const paymentLabels = {
+            unpaid: "เบิกได้",
+            paid: "ชำระเงิน",
+            UC: "สิทธิ UC"
+        };
         // 4. แปลงข้อมูล
         const data = finalExportData.map(b => ({
             "ผู้ให้บริการ": b.provider,
@@ -244,8 +248,9 @@ const getStatusColor = (b: Booking) => {
             // ตรวจสอบชื่อคอลัมน์ใน maxWidths
             "วันที่": new Date(b.date).toLocaleDateString("th-TH",{year:"numeric",month:"2-digit",day:"2-digit",timeZone:"Asia/Bangkok"}),
             "ช่วงเวลา": b.time_slot,
-            "สถานะ": getStatusLabel(b),
-            "การชำระเงิน": b.payment_status === "paid" ? "ชำระเงิน" : "เบิกได้",
+            "สถานะ": getStatusLabel(b),           
+            "การชำระเงิน": paymentLabels[b.payment_status as keyof typeof paymentLabels] || "ไม่ระบุ",
+          
         }));
 
 
@@ -809,7 +814,10 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
                   {/* ปุ่ม toggle การจ่ายเงิน */}
                   <button
                     onClick={async () => {
-                      const newStatus = b.payment_status === "paid" ? "unpaid" : "paid";
+                      // 1. กำหนด Logic การวนค่าใหม่: unpaid -> paid -> UC -> unpaid
+                      const current = b.payment_status;
+                      const newStatus = current === "paid" ? "UC" : current === "UC" ? "unpaid" : "paid";
+                      
                       try {
                         const res = await fetch("/api/update-payment-status", {
                           method: "POST",
@@ -830,15 +838,24 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
                         alert("เกิดข้อผิดพลาด: " + err);
                       }
                     }}
-                    className={`mt-1 px-2 py-1 text-xs rounded transition w-28 ${
+                    className={`mt-1 px-2 py-1 text-xs rounded transition w-28 text-white font-bold ${
                       b.payment_status === "paid"
-                        ? "bg-emerald-600 text-white font-bold hover:bg-emerald-700"
-                        : "bg-yellow-600 text-white font-bold hover:bg-yellow-700"
+                        ? "bg-emerald-600 hover:bg-emerald-700"
+                        : b.payment_status === "UC"
+                        ? "bg-blue-600 hover:bg-blue-700"
+                        : "bg-yellow-600 hover:bg-yellow-700"
                     }`}
                   >
-                    {b.payment_status === "paid" ? "ชำระเงิน" : "เบิกได้"}
+                    {b.payment_status === "paid" ? "ชำระเงิน" : b.payment_status === "UC" ? "สิทธิ UC" : "เบิกได้"}
                   </button>
 
+                  {/* สัญลักษณ์แสดงสถานะ */}
+                  {(b.payment_status === "paid" || b.payment_status === "UC") && (
+                    <span className="absolute top-0 right-0 font-bold text-lg">
+                      {b.payment_status === "paid" ? "💰" : "🏥"}
+                    </span>
+                  )}
+                 
                   {/* สัญลักษณ์ 💰 */}
                   {b.payment_status === "paid" && (
                     <span className="absolute top-0 right-0 text-emerald-600 font-bold text-lg">💰</span>

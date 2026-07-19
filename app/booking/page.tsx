@@ -215,11 +215,11 @@ export default function BookingPage() {
     router.push("/booking");
   };
   
-  const handleLogout = () => {
-    logout();
-    router.push("/login");
-  };
-      
+const handleLogout = async () => {
+  await logout();
+  router.push("/login");
+  router.refresh();
+};
 const handleSubmit = () => {
   if (isGuest) {
     alert("โหมดดูอย่างเดียว ไม่สามารถบันทึกการจองได้");

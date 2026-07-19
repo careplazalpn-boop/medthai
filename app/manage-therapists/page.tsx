@@ -162,6 +162,8 @@ export default function ManageTherapistsPage() {
     router.push("/booking");
   };
 
+  
+//--------------------------------------
   const renderAddForm = () => (
     <div className="mb-8">
       <h2 className="text-2xl font-bold mb-4 flex items-center gap-2 text-emerald-700">

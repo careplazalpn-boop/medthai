@@ -4,7 +4,7 @@ import { useState, useEffect, useContext, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { AuthContext } from "@/context/AuthContext";
-import { CalendarIcon, UserIcon, Clock, AlertCircle, UserCheck, UserX, Search } from "lucide-react";
+import { CalendarIcon, UserIcon, Clock, AlertCircle, UserCheck, UserX, BedDouble, Search } from "lucide-react";
 import { ImSpinner2 } from "react-icons/im";
 import { FaCheck, FaSpa, FaTimes, FaBars, FaSignOutAlt, FaSignInAlt, FaCalendarAlt, FaHistory, FaChartBar, FaUsersCog, FaFacebook, FaHospital} from "react-icons/fa";
 import { HiChevronDown, HiChevronUp } from "react-icons/hi";
@@ -209,6 +209,19 @@ export default function BookingPage() {
     }
     router.push("/booking");
   };
+
+  const handleBedsClick = () => {
+    if (!user) {
+      setShowAlert(true);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(() => {
+        setShowAlert(false);
+        timeoutRef.current = null;
+      }, 5000);
+      return;
+    }
+    router.push("/beds-special");
+  };  
   
   const handleLogout = () => {
     logout();
@@ -652,7 +665,15 @@ const filteredTherapists = therapists;
                 <FaClipboardList />
                 <span>ดูคิวนวดทั้งหมด</span>
               </div>
-
+              <div
+                  onClick={user ? handleBedsClick : () => router.push("/beds-special")}
+                  className="flex items-center gap-3 px-5 py-3 text-white hover:bg-emerald-600 transition cursor-pointer"
+                >
+                  <BedDouble />
+                  <span>
+                    {user ? "การจองเตียงพิเศษ" : "การจองเตียงพิเศษ"}
+                  </span>
+              </div>
             </div>
 
             {/* ===================== เจ้าหน้าที่ ===================== */}

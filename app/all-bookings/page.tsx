@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 //import { User, Phone, UserCheck, Clock, CalendarDays, CheckCircle2, Smile, Frown } from "lucide-react";
-import { User, Phone, UserCheck, Clock, CalendarDays, CheckCircle2 } from "lucide-react";
+import { User, Phone, UserCheck, Clock, CalendarDays, BedDouble, CheckCircle2 } from "lucide-react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
@@ -198,6 +198,18 @@ const getStatusColor = (b: Booking) => {
     return <p>กำลังตรวจสอบสิทธิ์...</p>; // render ชั่วคราว
   }
 
+  const handleBedsClick = () => {
+    if (!user) {
+      setShowAlert(true);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(() => {
+        setShowAlert(false);
+        timeoutRef.current = null;
+      }, 5000);
+      return;
+    }
+    router.push("/beds-special");
+  };  
 
   const exportToExcel = async () => { // 💡 ต้องเป็น async
     // 1. ตรวจสอบ Filter พื้นฐาน
@@ -518,6 +530,15 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
               >
                 <FaClipboardList />
                 <span>ดูคิวนวดทั้งหมด</span>
+              </div>
+              <div
+                  onClick={user ? handleBedsClick : () => router.push("/beds-special")}
+                  className="flex items-center gap-3 px-5 py-3 text-white hover:bg-emerald-600 transition cursor-pointer"
+                >
+                  <BedDouble />
+                  <span>
+                    {user ? "การจองเตียงพิเศษ" : "การจองเตียงพิเศษ"}
+                  </span>
               </div>
 
             </div>

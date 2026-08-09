@@ -9,7 +9,36 @@ import { useState, useRef, useEffect } from "react";
 import { AlertCircle } from "lucide-react";
 import Image from "next/image";
 import { FaClipboardList } from "react-icons/fa";
-
+import {
+  BedDouble,
+  Calendar,
+  Clock,
+  User,
+  Phone,
+  CheckCircle2,
+  XCircle,
+  Plus,
+  Search,
+  Menu,
+  X,
+  Sparkles,
+  LogOut,
+  LogIn,
+  Users,
+  ClipboardList,
+  Building2,
+  Trash2,
+  Loader2,
+  ShieldAlert,
+  ChevronDown,
+  ChevronUp,
+  Info,
+  UserCheck,
+  FileCheck,
+  History,
+  BarChart3,
+  Facebook
+} from "lucide-react";
 
 export default function HomePage() {
   const router = useRouter();
@@ -53,6 +82,18 @@ export default function HomePage() {
     }
     router.push("/booking");
   };
+  const handleBedsClick = () => {
+    if (!user) {
+      setShowAlert(true);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(() => {
+        setShowAlert(false);
+        timeoutRef.current = null;
+      }, 5000);
+      return;
+    }
+    router.push("/beds-special");
+  };  
 
   const handleLogout = () => {
     logout();
@@ -171,8 +212,7 @@ export default function HomePage() {
                 <span>
                   {user ? "จองคิวนวดแผนไทย" : "ดูคิวจองนวดแผนไทย"}
                 </span>
-              </div>
-
+              </div>              
               <div
                 onClick={() => router.push("/booking-audit")}
                 className="flex items-center gap-3 px-5 py-3 text-white hover:bg-emerald-600 transition cursor-pointer"
@@ -180,7 +220,15 @@ export default function HomePage() {
                 <FaClipboardList />
                 <span>ดูคิวนวดทั้งหมด</span>
               </div>
-
+              <div
+                  onClick={user ? handleBedsClick : () => router.push("/beds-special")}
+                  className="flex items-center gap-3 px-5 py-3 text-white hover:bg-emerald-600 transition cursor-pointer"
+                >
+                  <BedDouble />
+                  <span>
+                    {user ? "การจองเตียงพิเศษ" : "การจองเตียงพิเศษ"}
+                  </span>
+              </div>
             </div>
 
             {/* ===================== เจ้าหน้าที่ ===================== */}
@@ -192,7 +240,6 @@ export default function HomePage() {
                 <div className="px-5 py-2 text-xs font-semibold uppercase tracking-widest text-slate-400">
                   สำหรับเจ้าหน้าที่
                 </div>
-
                 <div
                   onClick={() => router.push("/all-bookings")}
                   className="flex items-center gap-3 px-5 py-3 text-white hover:bg-blue-600 transition cursor-pointer"

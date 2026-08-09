@@ -9,7 +9,41 @@ import { ImSpinner2 } from "react-icons/im";
 import { FaCheck, FaSpa, FaTimes, FaBars, FaSignOutAlt, FaSignInAlt, FaCalendarAlt, FaHistory, FaChartBar, FaUsersCog, FaFacebook, FaHospital} from "react-icons/fa";
 import { HiChevronDown, HiChevronUp } from "react-icons/hi";
 import * as Dialog from "@radix-ui/react-dialog";
-import { FaClipboardList } from "react-icons/fa";
+import { FaClipboardList ,FaUserCircle,FaChevronRight} from "react-icons/fa";
+import {
+  BedDouble,
+  Calendar,
+  User,
+  Phone,
+  CheckCircle2,
+  XCircle,
+  Plus,
+  Menu,
+  X,
+  Sparkles,
+  LogOut,
+  LogIn,
+  Users,
+  ClipboardList,
+  Building2,
+  Trash2,
+  Loader2,
+  ShieldAlert,
+  ChevronDown,
+  ChevronUp,
+  Info,
+  FileCheck,
+  History,
+  BarChart3,
+  Facebook
+} from "lucide-react";
+
+import {
+  FaUserCog,
+  FaCogs,
+  FaPhoneAlt,
+} from "react-icons/fa";
+
 
 interface UserInfo {
   hn?: string;
@@ -214,6 +248,19 @@ export default function BookingPage() {
     }
     router.push("/booking");
   };
+
+   const handleBedsClick = () => {
+    if (!user) {
+      setShowAlert(true);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(() => {
+        setShowAlert(false);
+        timeoutRef.current = null;
+      }, 5000);
+      return;
+    }
+    router.push("/beds-special");
+  };  
   
 const handleLogout = async () => {
   await logout();
@@ -642,7 +689,15 @@ const handleOpenDialog = () => {
                 <FaClipboardList />
                 <span>ดูคิวนวดทั้งหมด</span>
               </div>
-
+              <div
+                onClick={user ? handleBedsClick : () => router.push("/beds-special")}
+                className="flex items-center gap-3 px-5 py-3 text-white hover:bg-emerald-600 transition cursor-pointer"
+              >
+                <BedDouble />
+                <span>
+                  {user ? "การจองเตียงพิเศษ" : "การจองเตียงพิเศษ"}
+                </span>
+              </div>
             </div>
 
             {/* ===================== เจ้าหน้าที่ ===================== */}
@@ -744,6 +799,7 @@ const handleOpenDialog = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
       <div className="max-w-6xl mx-auto p-6 pt-27 relative z-10">
         <h1
           className="text-3xl sm:text-4xl font-extrabold text-emerald-700 mb-12 sm:mb-12 text-center drop-shadow-sm"

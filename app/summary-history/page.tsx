@@ -8,6 +8,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, Cart
 import { FaHistory, FaCalendarAlt, FaFacebook, FaHospital, FaChartBar, FaUsersCog, FaSignOutAlt, FaSignInAlt, FaTimes, FaBars, FaCheckCircle, FaClock, FaSpa, FaTimesCircle } from "react-icons/fa";
 import { HiChevronDown, HiChevronUp } from "react-icons/hi";
 import { FaClipboardList } from "react-icons/fa";
+import { User, Phone, UserCheck, Clock, CalendarDays, BedDouble, CheckCircle2 } from "lucide-react";
 
 
 
@@ -248,6 +249,19 @@ useEffect(() => {
     router.push("/booking");
   };
 
+    const handleBedsClick = () => {
+    if (!user) {
+      setShowAlert(true);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(() => {
+        setShowAlert(false);
+        timeoutRef.current = null;
+      }, 5000);
+      return;
+    }
+    router.push("/beds-special");
+    }; 
+
   return (
     <div className="min-h-screen bg-gray-50 pt-28">
       {/* Header */}
@@ -347,7 +361,15 @@ useEffect(() => {
                 <FaClipboardList />
                 <span>ดูคิวนวดทั้งหมด</span>
               </div>
-
+              <div
+                  onClick={user ? handleBedsClick : () => router.push("/beds-special")}
+                  className="flex items-center gap-3 px-5 py-3 text-white hover:bg-emerald-600 transition cursor-pointer"
+                >
+                  <BedDouble />
+                  <span>
+                    {user ? "การจองเตียงพิเศษ" : "การจองเตียงพิเศษ"}
+                  </span>
+              </div>
             </div>
 
             {/* ===================== เจ้าหน้าที่ ===================== */}

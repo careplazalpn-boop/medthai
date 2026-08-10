@@ -174,6 +174,42 @@ export async function POST(request: Request) {
   }
 }
 
+// 📌 PUT: อัปเดตสถานะการจองเตียงพิเศษ (เช่น ปรับเป็น status = 1 เมื่อบริการสำเร็จ)
+export async function PUT(request: Request) {
+  try {
+    const { id, status } = await request.json();
+
+    if (!id || status === undefined) {
+      return NextResponse.json(
+        { success: false, error: "กรุณาระบุ ID และสถานะที่ต้องการอัปเดต" },
+        { status: 400 }
+      );
+    }
+
+    const conn = await pool.getConnection();
+
+    try {
+      await conn.query(
+        "UPDATE special_bed_bookings SET status = ? WHERE id = ?",
+        [status, id]
+      );
+
+      return NextResponse.json({
+        success: true,
+        message: "อัปเดตสถานะการจองเตียงพิเศษสำเร็จ",
+      });
+    } finally {
+      conn.release();
+    }
+  } catch (error: any) {
+    console.error("PUT /api/beds-special-bookings error:", error);
+    return NextResponse.json(
+      { success: false, error: "เกิดข้อผิดพลาดในการอัปเดตสถานะการจองเตียงพิเศษ" },
+      { status: 500 }
+    );
+  }
+}
+
 // 📌 DELETE: ยกเลิกการจองเตียงพิเศษ
 export async function DELETE(request: Request) {
   try {

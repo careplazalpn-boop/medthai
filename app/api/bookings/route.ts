@@ -13,7 +13,6 @@ export async function GET(request: Request) {
   try {
     const conn = await pool.getConnection();
 
-    // ดึงค่า role/userId เพื่อตรวจสอบสิทธิ์
     const roleParam = url.searchParams.get("role") || url.searchParams.get("role_id") || "";
     const userIdParam = url.searchParams.get("userId") || url.searchParams.get("user_id") || "";
     
@@ -34,20 +33,41 @@ export async function GET(request: Request) {
     let query = "";
     const queryParams = [date];
 
+    // ดึงข้อมูลการจองหลักพร้อม LEFT JOIN ตาราง special_bed_bookings และ special_beds
     if (isAdmin) {
-      // Admin: แสดงทั้งหมดตาม status ของ therapist
       query = `
-        SELECT b.therapist, b.time_slot, b.name, b.status, b.bookedbyrole 
+        SELECT 
+          b.id, 
+          b.therapist, 
+          b.time_slot, 
+          b.name, 
+          b.status, 
+          b.bookedbyrole,
+          (CASE WHEN sbb.id IS NOT NULL THEN 1 ELSE 0 END) AS has_special_bed,
+          sb.bed_name,
+          sb.room_name
         FROM bookings b
         INNER JOIN therapist t ON (b.therapist = t.name OR b.therapist = t.fname)
+        LEFT JOIN special_bed_bookings sbb ON b.id = sbb.booking_id
+        LEFT JOIN special_beds sb ON sbb.bed_id = sb.id
         WHERE b.date = ? AND b.status != 'ยกเลิก' AND t.status = 0
       `;
     } else {
-      // Guest / User ทั่วไป: กรองเฉพาะ therapist_type = 0 และ status = 0
       query = `
-        SELECT b.therapist, b.time_slot, b.name, b.status, b.bookedbyrole 
+        SELECT 
+          b.id, 
+          b.therapist, 
+          b.time_slot, 
+          b.name, 
+          b.status, 
+          b.bookedbyrole,
+          (CASE WHEN sbb.id IS NOT NULL THEN 1 ELSE 0 END) AS has_special_bed,
+          sb.bed_name,
+          sb.room_name
         FROM bookings b
         INNER JOIN therapist t ON (b.therapist = t.name OR b.therapist = t.fname)
+        LEFT JOIN special_bed_bookings sbb ON b.id = sbb.booking_id
+        LEFT JOIN special_beds sb ON sbb.bed_id = sb.id
         WHERE b.date = ? AND b.status != 'ยกเลิก' AND t.status = 0 AND t.therapist_type = 0
       `;
     }
@@ -58,7 +78,7 @@ export async function GET(request: Request) {
   } catch (error) {
     console.error("GET bookings error:", error);
     return NextResponse.json(
-      { success: false, error: "เกิดข้อผิดพลาด" },
+      { success: false, error: "เกิดข้อผิดพลาดในการดึงข้อมูลการจอง" },
       { status: 500 }
     );
   }

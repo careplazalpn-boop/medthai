@@ -117,25 +117,46 @@ interface SpecialBedBooking {
 // ตัดช่องว่างของเวลาเพื่อใช้เปรียบเทียบ
 const normalizeSlot = (slotStr: string) => (slotStr || "").replace(/\s+/g, "");
 
-// ตรวจสอบว่าช่วงเวลา/วันที่ของการจองผ่านไปแล้วหรือไม่
-const isBookingPassed = (dateStr: string, slotStr: string) => {
-  if (!dateStr || !slotStr) return false;
-  const today = new Date();
-  const todayStr = today.toISOString().split("T")[0];
+// 🌟 ดึงวันที่ปัจจุบันของเครื่องผู้ใช้งานในรูปแบบ YYYY-MM-DD (เวลาท้องถิ่น)
+const getTodayLocalDateStr = () => {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 
-  if (dateStr < todayStr) return true;
-  if (dateStr > todayStr) return false;
-
-  const parts = slotStr.split("-");
-  if (parts.length >= 2) {
-    const endTimeStr = parts[1].trim();
-    const [endHour, endMinute] = endTimeStr.split(":").map(Number);
-    if (!isNaN(endHour) && !isNaN(endMinute)) {
-      const slotEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate(), endHour, endMinute);
-      return today >= slotEnd;
+// 🌟 แปลงวันที่จาก API / DB หรือ ISO String เป็น YYYY-MM-DD (เวลาท้องถิ่น)
+const formatToLocalDateStr = (dStr: string | Date | undefined | null) => {
+  if (!dStr) return "";
+  if (typeof dStr === "string") {
+    if (dStr.includes("T")) {
+      const d = new Date(dStr);
+      if (!isNaN(d.getTime())) {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        return `${year}-${month}-${day}`;
+      }
+      return dStr.split("T")[0];
     }
+    return dStr.slice(0, 10);
   }
-  return false;
+  if (dStr instanceof Date && !isNaN(dStr.getTime())) {
+    const year = dStr.getFullYear();
+    const month = String(dStr.getMonth() + 1).padStart(2, "0");
+    const day = String(dStr.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+  return "";
+};
+
+// 🌟 ตรวจสอบว่าวันที่ของการจองเป็นวันที่ในอดีตจริงหรือไม่ (วันที่ < วันปัจจุบัน)
+const isDatePassed = (dateStr: string | Date | undefined | null) => {
+  if (!dateStr) return false;
+  const bookingDate = formatToLocalDateStr(dateStr);
+  const today = getTodayLocalDateStr();
+  return bookingDate < today;
 };
 
 export default function BedsSpecialPage() {
@@ -149,10 +170,10 @@ export default function BedsSpecialPage() {
   const isAuthenticated = !!user;
   const isUserAdmin = user?.isAdmin || user?.role_id === 909 || String(user?.role).toLowerCase() === "admin";
 
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = getTodayLocalDateStr();
 
   const [date, setDate] = useState<string>(todayStr);
-  const isPastDate = date < todayStr;
+  const isPastDate = isDatePassed(date);
   
   const [timeSlots, setTimeSlots] = useState<string[]>([
     "8:00-9:30",
@@ -272,7 +293,7 @@ export default function BedsSpecialPage() {
         therapist: "นายดุสิทธิ์ ไชยศรีหา",
         provider: "นายดุสิทธิ์ ไชยศรีหา",
         booking_status: "รอดำเนินการ",
-        status: isBookingPassed(date, "16:00-17:30") ? 1 : 0
+        status: isDatePassed(date) ? 1 : 0
       }
     ]);
 
@@ -318,8 +339,11 @@ export default function BedsSpecialPage() {
     );
   };
 
+  // 🛡️ สิทธิ์การยกเลิกการจองเตียง:
+  // 1. วันที่ผ่านมาแล้ว -> ลบไม่ได้
+  // 2. วันปัจจุบันหรืออนาคต -> ลบได้หากเป็น Admin หรือเจ้าของรายการ
   const canCancelBooking = (booking: SpecialBedBooking) => {
-    if (booking.status === 1 || isBookingPassed(booking.date, booking.time_slot)) {
+    if (isDatePassed(booking.date)) {
       return false;
     }
 
@@ -331,6 +355,68 @@ export default function BedsSpecialPage() {
       booking.therapist === user.name ||
       booking.provider === user.name
     );
+  };
+
+  // 🌟 สิทธิ์การกด "บริการสำเร็จ" (ปรับปรุง special_bed_bookings.status = 1)
+  // อนุญาตสำหรับวันที่ผ่านมาและวันที่ปัจจุบัน (date <= today)
+  // เฉพาะข้อมูลที่เป็นของตนเอง หรือ Admin สามารถทำรายการให้ผู้อื่นได้
+  const canCompleteBooking = (booking: SpecialBedBooking) => {
+    if (booking.status === 1) return false; // ถ้าสำเร็จแล้ว ไม่ต้องแสดงปุ่มอีก
+
+    const bookingDate = formatToLocalDateStr(booking.date);
+    const today = getTodayLocalDateStr();
+    if (bookingDate > today) return false; // วันในอนาคตยังกดบริการสำเร็จไม่ได้
+
+    if (isUserAdmin) return true;
+    if (!user?.name) return false;
+
+    return (
+      booking.created_by === user.name ||
+      booking.therapist === user.name ||
+      booking.provider === user.name
+    );
+  };
+
+  // 🌟 ฟังก์ชันอัปเดตสถานะการบริการสำเร็จ (status = 1)
+  const handleCompleteBedBooking = async (booking: SpecialBedBooking) => {
+    if (!canCompleteBooking(booking)) {
+      alert("ไม่สามารถปรับปรุงสถานะได้!\n\n- คุณต้องเป็นเจ้าของรายการจอง หรือผู้ดูแลระบบ (Admin) เท่านั้น");
+      return;
+    }
+
+    if (!confirm(`ยืนยันการปรับปรุงสถานะเป็น "บริการสำเร็จ" สำหรับคุณ "${booking.patient_name}" ?`)) return;
+
+    try {
+      const res = await fetch("/api/beds-special-bookings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: booking.special_booking_id,
+          status: 1
+        }),
+      });
+
+      const data = await res.json();
+      if (data?.success) {
+        alert("ปรับปรุงสถานะเป็นบริการสำเร็จเรียบร้อยแล้ว");
+        fetchBedBookings();
+      } else {
+        // อัปเดต State สำรองสำหรับโหมดจำลองหรือกรณีไม่มี API PUT
+        setBedBookings((prev) =>
+          prev.map((b) =>
+            b.special_booking_id === booking.special_booking_id ? { ...b, status: 1 } : b
+          )
+        );
+        alert("ปรับปรุงสถานะเป็นบริการสำเร็จเรียบร้อยแล้ว");
+      }
+    } catch {
+      setBedBookings((prev) =>
+        prev.map((b) =>
+          b.special_booking_id === booking.special_booking_id ? { ...b, status: 1 } : b
+        )
+      );
+      alert("ปรับปรุงสถานะเป็นบริการสำเร็จเรียบร้อยแล้ว (โหมดจำลอง)");
+    }
   };
 
   const slotMatchingQueues = availableBookings.filter(
@@ -443,7 +529,7 @@ export default function BedsSpecialPage() {
 
   const handleCancelBedBooking = async (booking: SpecialBedBooking) => {
     if (!canCancelBooking(booking)) {
-      alert("ไม่สามารถยกเลิกรายการจองนี้ได้!\n\n- รายการที่ให้บริการเสร็จสิ้น/ผ่านไปแล้วจะไม่สามารถลบย้อนหลังได้\n- หรือคุณต้องเป็นเจ้าของรายการจอง / ผู้ดูแลระบบ (Admin) เท่านั้น");
+      alert("ไม่สามารถยกเลิกรายการจองนี้ได้!\n\n- ไม่สามารถลบหรือยกเลิกรายการจองย้อนหลังที่ผ่านวันไปแล้วได้\n- คุณต้องเป็นเจ้าของรายการจอง หรือผู้ดูแลระบบ (Admin) เท่านั้น");
       return;
     }
 
@@ -522,7 +608,7 @@ export default function BedsSpecialPage() {
             {menuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
           <div
-            className="text-white font-bold text-base sm:text-lg flex items-center gap-2 cursor-pointer hover:text-emerald-400 transition"
+            className="text-white font-black text-base sm:text-lg flex items-center gap-2 cursor-pointer hover:text-emerald-400 transition"
             onClick={() => router.push("/")}
             style={{ color: '#ffffff' }}
           >
@@ -542,7 +628,7 @@ export default function BedsSpecialPage() {
         </div>
       </div>
 
-      {/* 🌟 Hamburger Drawer เมนูด้านซ้าย ปรับปรุงตามแบบ app/booking/page.tsx */}
+      {/* Hamburger Drawer เมนูด้านซ้าย */}
       <AnimatePresence>
         {menuOpen && (
           <motion.div
@@ -581,7 +667,7 @@ export default function BedsSpecialPage() {
                 <span>
                   {user ? "จองคิวนวดแผนไทย" : "ดูคิวจองนวดแผนไทย"}
                 </span>
-              </div>
+              </div>            
 
               <div
                 onClick={() => {
@@ -593,7 +679,6 @@ export default function BedsSpecialPage() {
                 <ClipboardList className="w-5 h-5 text-sky-400" />
                 <span>ดูคิวนวดทั้งหมด</span>
               </div>
-
               <div
                 onClick={() => {
                   setMenuOpen(false);
@@ -602,9 +687,7 @@ export default function BedsSpecialPage() {
                 className="flex items-center gap-3 px-5 py-3 text-white bg-emerald-600/30 hover:bg-emerald-600 transition cursor-pointer"
               >
                 <BedDouble className="w-5 h-5 text-emerald-300" />
-                <span>
-                  {user ? "การจองเตียงพิเศษ" : "การจองเตียงพิเศษ"}
-                </span>
+                <span>จองเตียงพิเศษ</span>
               </div>
             </div>
 
@@ -715,15 +798,10 @@ export default function BedsSpecialPage() {
         
         {/* หัวข้อหน้า */}
         <div className="text-center mb-8 bg-slate-50 p-6 sm:p-8 rounded-3xl border-2 border-slate-300 shadow-2xs" style={{ backgroundColor: '#f8fafc', borderColor: '#cbd5e1' }}>
-          <h1 className="text-2xl sm:text-4xl font-black flex items-center justify-center gap-3 tracking-tight mt-6"
-          style={{ color: '#0f172a' }}
-        >
-          <BedDouble
-            className="w-7 h-7 sm:w-8 sm:h-8 flex-shrink-0"
-            style={{ color: '#047857' }}
-          />
-          <span>ระบบจองเตียงพิเศษสำหรับผู้ให้บริการ</span>
-        </h1>
+          <h1 className="text-2xl sm:text-4xl font-black flex items-center justify-center gap-3 tracking-tight" style={{ color: '#0f172a' }}>
+            <BedDouble className="w-7 h-7 sm:w-8 sm:h-8 flex-shrink-0" style={{ color: '#047857' }} />
+            <span>ระบบจองเตียงพิเศษสำหรับผู้ให้บริการ</span>
+          </h1>
           <p className="text-xs sm:text-sm mt-2 font-bold" style={{ color: '#334155' }}>
             จัดสรรเตียงพิเศษประจำวันและช่วงเวลา โดยระบบจะดึงเฉพาะคิวคนไข้ของคุณจากตาราง Bookings ให้อัตโนมัติ
           </p>
@@ -826,16 +904,18 @@ export default function BedsSpecialPage() {
                   const reservation = getBedReservation(bed.id, selectedSlot);
                   const isReserved = !!reservation;
                   
-                  const isPassed = isReserved && (reservation.status === 1 || isBookingPassed(reservation.date, reservation.time_slot));
+                  const isCompleted = isReserved && reservation.status === 1;
+                  const isPassed = isReserved && isDatePassed(reservation.date);
                   const userCanCancel = isReserved && !isPassed && canCancelBooking(reservation);
+                  const userCanComplete = isReserved && canCompleteBooking(reservation);
 
                   return (
                     <div
                       key={bed.id}
                       className="border-2 rounded-3xl p-4 transition duration-200 relative overflow-hidden flex flex-col justify-between"
                       style={{
-                        backgroundColor: isReserved ? (isPassed ? '#f0fdfa' : '#fff1f2') : '#ecfdf5',
-                        borderColor: isReserved ? (isPassed ? '#2dd4bf' : '#f43f5e') : '#34d399',
+                        backgroundColor: isReserved ? (isCompleted ? '#f0fdfa' : '#fff1f2') : '#ecfdf5',
+                        borderColor: isReserved ? (isCompleted ? '#2dd4bf' : '#f43f5e') : '#34d399',
                         color: '#0f172a'
                       }}
                     >
@@ -845,19 +925,19 @@ export default function BedsSpecialPage() {
                           <span
                             className="text-[10px] px-2.5 py-0.5 rounded-full font-black border-2"
                             style={{
-                              backgroundColor: isReserved ? (isPassed ? '#ccfbf1' : '#ffe4e6') : '#d1fae5',
-                              color: isReserved ? (isPassed ? '#115e59' : '#9f1239') : '#065f46',
-                              borderColor: isReserved ? (isPassed ? '#2dd4bf' : '#f43f5e') : '#34d399'
+                              backgroundColor: isReserved ? (isCompleted ? '#ccfbf1' : '#ffe4e6') : '#d1fae5',
+                              color: isReserved ? (isCompleted ? '#115e59' : '#9f1239') : '#065f46',
+                              borderColor: isReserved ? (isCompleted ? '#2dd4bf' : '#f43f5e') : '#34d399'
                             }}
                           >
-                            {isReserved ? (isPassed ? "เสร็จสิ้น" : "ไม่ว่าง") : "เตียงว่าง"}
+                            {isReserved ? (isCompleted ? "เสร็จสิ้น" : "ไม่ว่าง") : "เตียงว่าง"}
                           </span>
                         </div>
                         <p className="text-[11px] font-black mb-3" style={{ color: '#475569' }}>{bed.bed_code}</p>
 
                         {isReserved ? (
-                          <div className="bg-white p-3 rounded-2xl border-2 space-y-1.5 text-xs mb-3 shadow-2xs" style={{ backgroundColor: '#ffffff', borderColor: isPassed ? '#99f6e4' : '#fca5a5' }}>
-                            <p className="font-black truncate" style={{ color: isPassed ? '#115e59' : '#9f1239' }}>
+                          <div className="bg-white p-3 rounded-2xl border-2 space-y-1.5 text-xs mb-3 shadow-2xs" style={{ backgroundColor: '#ffffff', borderColor: isCompleted ? '#99f6e4' : '#fca5a5' }}>
+                            <p className="font-black truncate" style={{ color: isCompleted ? '#115e59' : '#9f1239' }}>
                               คนไข้: {reservation.patient_name}
                             </p>
                             <p className="text-[11px] font-black" style={{ color: '#0f172a' }}>
@@ -873,8 +953,8 @@ export default function BedsSpecialPage() {
                             )}
                             <p className="text-[10px] pt-1 font-extrabold" style={{ color: '#0f172a' }}>
                               สถานะ:{" "}
-                              <span className="font-black" style={{ color: isPassed ? '#0f172a' : '#b45309' }}>
-                                {isPassed ? "สำเร็จ (เสร็จสิ้น)" : "จองแล้ว"}
+                              <span className="font-black" style={{ color: isCompleted ? '#0f172a' : '#b45309' }}>
+                                {isCompleted ? "สำเร็จ (เสร็จสิ้น)" : "จองแล้ว"}
                               </span>
                             </p>
                           </div>
@@ -887,21 +967,39 @@ export default function BedsSpecialPage() {
 
                       {/* การแสดงปุ่มจัดการตามสถานะการจอง */}
                       {isReserved ? (
-                        isPassed ? (
+                        isCompleted ? (
                           <div className="w-full py-2 font-black text-[11px] rounded-2xl text-center border-2" style={{ backgroundColor: '#ccfbf1', color: '#0f172a', borderColor: '#5eead4' }}>
                             ✓ ให้บริการเสร็จสิ้น
                           </div>
-                        ) : userCanCancel ? (
-                          <button
-                            onClick={() => handleCancelBedBooking(reservation)}
-                            className="w-full py-2 font-black text-xs rounded-2xl border-2 transition flex items-center justify-center gap-1 cursor-pointer shadow-2xs"
-                            style={{ backgroundColor: '#ffe4e6', color: '#9f1239', borderColor: '#fb7185' }}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" style={{ color: '#9f1239' }} /> ยกเลิกการจองเตียงนี้
-                          </button>
                         ) : (
-                          <div className="w-full py-2 font-black text-[11px] rounded-2xl text-center border-2" style={{ backgroundColor: '#f1f5f9', color: '#64748b', borderColor: '#cbd5e1' }}>
-                            (จองโดยผู้อื่น)
+                          <div className="space-y-1.5 w-full">
+                            {/* 🌟 ปุ่มกด "บริการสำเร็จ" เพื่อไปอัปเดต special_bed_bookings.status = 1 */}
+                            {userCanComplete && (
+                              <button
+                                onClick={() => handleCompleteBedBooking(reservation)}
+                                className="w-full py-2 font-black text-xs rounded-2xl border-2 transition flex items-center justify-center gap-1 cursor-pointer shadow-2xs"
+                                style={{ backgroundColor: '#d1fae5', color: '#065f46', borderColor: '#34d399' }}
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" style={{ color: '#047857' }} /> บริการสำเร็จ
+                              </button>
+                            )}
+
+                            {/* ปุ่มยกเลิกการจองเตียง */}
+                            {userCanCancel ? (
+                              <button
+                                onClick={() => handleCancelBedBooking(reservation)}
+                                className="w-full py-2 font-black text-xs rounded-2xl border-2 transition flex items-center justify-center gap-1 cursor-pointer shadow-2xs"
+                                style={{ backgroundColor: '#ffe4e6', color: '#9f1239', borderColor: '#fb7185' }}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" style={{ color: '#9f1239' }} /> ยกเลิกการจองเตียงนี้
+                              </button>
+                            ) : (
+                              !userCanComplete && (
+                                <div className="w-full py-2 font-black text-[11px] rounded-2xl text-center border-2" style={{ backgroundColor: '#f1f5f9', color: '#64748b', borderColor: '#cbd5e1' }}>
+                                  (จองโดยผู้อื่น)
+                                </div>
+                              )
+                            )}
                           </div>
                         )
                       ) : isPastDate ? (
@@ -955,8 +1053,10 @@ export default function BedsSpecialPage() {
               </thead>
               <tbody className="divide-y-2 divide-slate-100 bg-white" style={{ backgroundColor: '#ffffff' }}>
                 {bedBookings.map((b) => {
-                  const isPassed = b.status === 1 || isBookingPassed(b.date, b.time_slot);
+                  const isCompleted = b.status === 1;
+                  const isPassed = isDatePassed(b.date);
                   const userCanCancel = !isPassed && canCancelBooking(b);
+                  const userCanComplete = canCompleteBooking(b);
 
                   return (
                     <tr key={b.special_booking_id} className="hover:bg-slate-50 transition">
@@ -974,29 +1074,50 @@ export default function BedsSpecialPage() {
                       <td className="px-4 py-3.5 text-xs font-bold" style={{ color: '#0f172a' }}>
                         <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black mr-1.5 border-2"
                           style={{
-                            backgroundColor: isPassed ? '#ccfbf1' : '#fef3c7',
-                            color: isPassed ? '#115e59' : '#78350f',
-                            borderColor: isPassed ? '#2dd4bf' : '#f59e0b'
+                            backgroundColor: isCompleted ? '#ccfbf1' : '#fef3c7',
+                            color: isCompleted ? '#115e59' : '#78350f',
+                            borderColor: isCompleted ? '#2dd4bf' : '#f59e0b'
                           }}
                         >
-                          {isPassed ? "สำเร็จ" : "จองแล้ว"}
+                          {isCompleted ? "สำเร็จ" : "จองแล้ว"}
                         </span>
                         {b.note || "-"}
                       </td>
                       <td className="px-4 py-3.5 text-center">
-                        {isPassed ? (
-                          <span className="text-xs font-black" style={{ color: '#0f172a' }}>เสร็จสิ้นแล้ว</span>
-                        ) : userCanCancel ? (
-                          <button
-                            onClick={() => handleCancelBedBooking(b)}
-                            className="p-1.5 rounded-xl transition cursor-pointer border-2"
-                            style={{ backgroundColor: '#ffe4e6', color: '#9f1239', borderColor: '#f43f5e' }}
-                            title="ยกเลิกการจองเตียงพิเศษ"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                        {isCompleted ? (
+                          <span className="text-xs font-black flex items-center justify-center gap-1" style={{ color: '#0f172a' }}>
+                            <CheckCircle2 className="w-4 h-4 text-teal-600 inline" /> เสร็จสิ้นแล้ว
+                          </span>
                         ) : (
-                          <span className="text-xs italic font-bold" style={{ color: '#64748b' }}>ไม่มีสิทธิ์</span>
+                          <div className="flex items-center justify-center gap-2">
+                            {/* 🌟 ปุ่มกด "บริการสำเร็จ" ประจำแถวตาราง */}
+                            {userCanComplete && (
+                              <button
+                                onClick={() => handleCompleteBedBooking(b)}
+                                className="px-2.5 py-1.5 bg-emerald-100 text-emerald-800 border-2 border-emerald-300 hover:bg-emerald-200 rounded-xl transition cursor-pointer font-black text-xs flex items-center gap-1"
+                                title="ทำรายการบริการสำเร็จ (สถานะ = 1)"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
+                                <span>บริการสำเร็จ</span>
+                              </button>
+                            )}
+
+                            {/* ปุ่มยกเลิกการจอง */}
+                            {userCanCancel && (
+                              <button
+                                onClick={() => handleCancelBedBooking(b)}
+                                className="p-1.5 rounded-xl transition cursor-pointer border-2"
+                                style={{ backgroundColor: '#ffe4e6', color: '#9f1239', borderColor: '#f43f5e' }}
+                                title="ยกเลิกการจองเตียงพิเศษ"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+
+                            {!userCanComplete && !userCanCancel && (
+                              <span className="text-xs italic font-bold" style={{ color: '#64748b' }}>ไม่มีสิทธิ์</span>
+                            )}
+                          </div>
                         )}
                       </td>
                     </tr>

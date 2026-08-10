@@ -292,14 +292,17 @@ export default function SummaryHistoryPage() {
     ยกเลิก: counts.cancelled,
   }));
 
-  // 🌟 คำนวณสรุปสถิติสิทธิการรักษาพยาบาล (payment_status)
-  const unpaidCount = filtered.filter(
+  // 🌟 กรองเฉพาะรายการที่ไม่อยู่ในสถานะ "ยกเลิก" เพื่อนำไปคำนวณสถิติสิทธิการรักษาพยาบาลและเตียงพิเศษ
+  const activeFiltered = filtered.filter((b) => b.status !== "ยกเลิก");
+
+  // 🌟 คำนวณสรุปสถิติสิทธิการรักษาพยาบาล (payment_status) - ไม่นับรายการจองที่ยกเลิก
+  const unpaidCount = activeFiltered.filter(
     (b) => b.payment_status === "unpaid" || b.payment_status === "เบิกตรง" || !b.payment_status
   ).length;
-  const paidCount = filtered.filter((b) => b.payment_status === "paid" || b.payment_status === "ชำระเงิน").length;
-  const ucCount = filtered.filter((b) => b.payment_status === "UC" || b.payment_status === "บัตรทอง").length;
+  const paidCount = activeFiltered.filter((b) => b.payment_status === "paid" || b.payment_status === "ชำระเงิน").length;
+  const ucCount = activeFiltered.filter((b) => b.payment_status === "UC" || b.payment_status === "บัตรทอง").length;
 
-  // 🌟 คำนวณสรุปสถิติการใช้บริการเตียงพิเศษ (Special Bed Bookings)
+  // 🌟 คำนวณสรุปสถิติการใช้บริการเตียงพิเศษ (Special Bed Bookings) - ไม่นับรายการจองที่ยกเลิก
   const defaultBeds: SpecialBed[] = [
     { id: 1, bed_code: "BED-VIP-01", bed_name: "เตียงพิเศษ 1", room_name: "ห้องนวด VIP 1 (ชั้น 2)" },
     { id: 2, bed_code: "BED-VIP-02", bed_name: "เตียงพิเศษ 2", room_name: "ห้องนวด VIP 1 (ชั้น 2)" },
@@ -307,7 +310,7 @@ export default function SummaryHistoryPage() {
     { id: 4, bed_code: "BED-VIP-04", bed_name: "เตียงพิเศษ 4", room_name: "ห้องนวด VIP 2 (ชั้น 2)" },
   ];
 
-  const specialBedBookingsFiltered = filtered.filter(
+  const specialBedBookingsFiltered = activeFiltered.filter(
     (b) => b.special_booking_id || b.bed_id || b.bed_name
   );
 
@@ -603,6 +606,75 @@ export default function SummaryHistoryPage() {
               </div>
             </div>
           </div>
+          {/* 🌟 การ์ดรายงานสถิติสิทธิการรักษาพยาบาล (payment_status) */}
+          <div className="bg-white shadow rounded-lg p-5 max-w-6xl mx-auto mt-8 border border-emerald-100">
+            <h2 className="text-xl font-bold text-emerald-800 mb-2 flex items-center justify-center gap-2">
+              <Receipt className="w-6 h-6 text-emerald-600" />
+              รายงานสถิติการใช้สิทธิการรักษาพยาบาล
+            </h2>
+            <p className="text-center text-gray-500 text-xs sm:text-sm mb-6">
+              สรุปแยกตามสิทธิการจ่ายเงินประจำช่วงเวลาที่เลือก (ไม่นับรวมรายการจองที่ยกเลิก)
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* unpaid: เบิกตรง */}
+              <div className="bg-sky-50 border-2 border-sky-200 rounded-2xl p-4 flex flex-col justify-between shadow-xs">
+                <div className="flex justify-between items-start mb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 bg-sky-500 text-white rounded-xl">
+                      <ShieldCheck className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-extrabold text-sky-900 text-base">สิทธิเบิกตรง</h3>
+                      <p className="text-sky-700 text-[11px] font-semibold">unpaid</p>
+                    </div>
+                  </div>
+                  <span className="text-2xl font-black text-sky-700">{unpaidCount} <span className="text-xs font-bold text-sky-600">ราย</span></span>
+                </div>
+                <p className="text-xs text-sky-800 font-medium bg-white p-2.5 rounded-xl border border-sky-200 mt-2">
+                  คำอธิบาย: สิทธิเบิกได้สำหรับข้าราชการ / รัฐวิสาหกิจ / อปท. / การรถไฟฯ
+                </p>
+              </div>
+
+              {/* paid: ชำระเงินเอง */}
+              <div className="bg-emerald-50 border-2 border-emerald-200 rounded-2xl p-4 flex flex-col justify-between shadow-xs">
+                <div className="flex justify-between items-start mb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 bg-emerald-600 text-white rounded-xl">
+                      <Wallet className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-extrabold text-emerald-900 text-base">ชำระเงินเอง</h3>
+                      <p className="text-emerald-700 text-[11px] font-semibold">paid</p>
+                    </div>
+                  </div>
+                  <span className="text-2xl font-black text-emerald-700">{paidCount} <span className="text-xs font-bold text-emerald-600">ราย</span></span>
+                </div>
+                <p className="text-xs text-emerald-800 font-medium bg-white p-2.5 rounded-xl border border-emerald-200 mt-2">
+                  คำอธิบาย: ผู้รับบริการที่ชำระเงินสด / โอนชำระเงินด้วยตนเอง
+                </p>
+              </div>
+
+              {/* UC: บัตรทอง */}
+              <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-4 flex flex-col justify-between shadow-xs">
+                <div className="flex justify-between items-start mb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 bg-amber-500 text-white rounded-xl">
+                      <CreditCard className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-extrabold text-amber-900 text-base">สิทธิบัตรทอง</h3>
+                      <p className="text-amber-700 text-[11px] font-semibold">UC</p>
+                    </div>
+                  </div>
+                  <span className="text-2xl font-black text-amber-700">{ucCount} <span className="text-xs font-bold text-amber-600">ราย</span></span>
+                </div>
+                <p className="text-xs text-amber-800 font-medium bg-white p-2.5 rounded-xl border border-amber-200 mt-2">
+                  คำอธิบาย: ผู้รับบริการใช้สิทธิหลักประกันสุขภาพแห่งชาติ (บัตรทอง)
+                </p>
+              </div>
+            </div>
+          </div>
 
           {/* BarChart รายเดือน */}
           <div className="bg-white shadow rounded-lg p-4 mb-8 max-w-6xl mx-auto px-4">
@@ -698,77 +770,7 @@ export default function SummaryHistoryPage() {
                 ))}
               </div>
             </div>
-          </div>
-
-          {/* 🌟 การ์ดรายงานสถิติสิทธิการรักษาพยาบาล (payment_status) */}
-          <div className="bg-white shadow rounded-lg p-5 max-w-6xl mx-auto mt-8 border border-emerald-100">
-            <h2 className="text-xl font-bold text-emerald-800 mb-2 flex items-center justify-center gap-2">
-              <Receipt className="w-6 h-6 text-emerald-600" />
-              รายงานสถิติการใช้สิทธิการรักษาพยาบาล
-            </h2>
-            <p className="text-center text-gray-500 text-xs sm:text-sm mb-6">
-              สรุปแยกตามสิทธิการจ่ายเงินประจำช่วงเวลาที่เลือก
-            </p>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* unpaid: เบิกตรง */}
-              <div className="bg-sky-50 border-2 border-sky-200 rounded-2xl p-4 flex flex-col justify-between shadow-xs">
-                <div className="flex justify-between items-start mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="p-2 bg-sky-500 text-white rounded-xl">
-                      <ShieldCheck className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h3 className="font-extrabold text-sky-900 text-base">สิทธิเบิกตรง</h3>
-                      <p className="text-sky-700 text-[11px] font-semibold">unpaid</p>
-                    </div>
-                  </div>
-                  <span className="text-2xl font-black text-sky-700">{unpaidCount} <span className="text-xs font-bold text-sky-600">ราย</span></span>
-                </div>
-                <p className="text-xs text-sky-800 font-medium bg-white p-2.5 rounded-xl border border-sky-200 mt-2">
-                  คำอธิบาย: สิทธิเบิกได้สำหรับข้าราชการ / รัฐวิสาหกิจ / อปท. / การรถไฟฯ
-                </p>
-              </div>
-
-              {/* paid: ชำระเงินเอง */}
-              <div className="bg-emerald-50 border-2 border-emerald-200 rounded-2xl p-4 flex flex-col justify-between shadow-xs">
-                <div className="flex justify-between items-start mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="p-2 bg-emerald-600 text-white rounded-xl">
-                      <Wallet className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h3 className="font-extrabold text-emerald-900 text-base">ชำระเงินเอง</h3>
-                      <p className="text-emerald-700 text-[11px] font-semibold">paid</p>
-                    </div>
-                  </div>
-                  <span className="text-2xl font-black text-emerald-700">{paidCount} <span className="text-xs font-bold text-emerald-600">ราย</span></span>
-                </div>
-                <p className="text-xs text-emerald-800 font-medium bg-white p-2.5 rounded-xl border border-emerald-200 mt-2">
-                  คำอธิบาย: ผู้รับบริการที่ชำระเงินสด / โอนชำระเงินด้วยตนเอง
-                </p>
-              </div>
-
-              {/* UC: บัตรทอง */}
-              <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-4 flex flex-col justify-between shadow-xs">
-                <div className="flex justify-between items-start mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="p-2 bg-amber-500 text-white rounded-xl">
-                      <CreditCard className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h3 className="font-extrabold text-amber-900 text-base">สิทธิบัตรทอง</h3>
-                      <p className="text-amber-700 text-[11px] font-semibold">UC</p>
-                    </div>
-                  </div>
-                  <span className="text-2xl font-black text-amber-700">{ucCount} <span className="text-xs font-bold text-amber-600">ราย</span></span>
-                </div>
-                <p className="text-xs text-amber-800 font-medium bg-white p-2.5 rounded-xl border border-amber-200 mt-2">
-                  คำอธิบาย: ผู้รับบริการใช้สิทธิหลักประกันสุขภาพแห่งชาติ (บัตรทอง)
-                </p>
-              </div>
-            </div>
-          </div>
+          </div>          
 
           {/* 🌟 การ์ดรายงานสถิติการใช้บริการเตียงพิเศษ (Special Bed Usage Report Card) */}
           <div className="bg-white shadow rounded-lg p-5 max-w-6xl mx-auto mt-8 border border-emerald-100">
@@ -777,7 +779,7 @@ export default function SummaryHistoryPage() {
               รายงานสถิติการใช้บริการเตียงพิเศษ
             </h2>
             <p className="text-center text-gray-500 text-xs sm:text-sm mb-6">
-              สรุปจำนวนการเข้าใช้เตียงพิเศษและสถานะการให้บริการ ประจำช่วงเวลาที่เลือก
+              สรุปจำนวนการเข้าใช้เตียงพิเศษและสถานะการให้บริการ ประจำช่วงเวลาที่เลือก (ไม่นับรวมรายการจองที่ยกเลิก)
             </p>
 
             {/* สรุปสถิติมุมมองรวม */}

@@ -10,7 +10,6 @@ const LOG_FILE = "sync-db-ptsimage.log";
 const ERROR_LOG_FILE = "sync-db-ptsimage-error.log";
 let isSyncing = false;
 
-// 🔹 สร้าง Connection Pools (ย้ายออกด้านนอกเพื่อความเสถียรและลดสถานะ Sleep)
 const poolConfig = (dbPrefix, limit) => ({
   host: process.env[`${dbPrefix}_HOST`],
   user: process.env[`${dbPrefix}_USER`],
@@ -19,7 +18,7 @@ const poolConfig = (dbPrefix, limit) => ({
   connectionLimit: limit,
   charset: "BINARY",
   waitForConnections: true,
-  connectTimeout: 60000, // รูปภาพต้องการเวลาเชื่อมต่อนานกว่าปกติ
+  connectTimeout: 60000,
   enableKeepAlive: true
 });
 
@@ -55,59 +54,74 @@ async function runSync() {
   try {
     logPts("=== Start Sync DB1 → DB3 (patient_image) ===");
 
-    // 1. ดึง HN+Image ล่าสุดจากปลายทาง (Logic เดิม)
-    const [maxRow] = await db3Pool.execute(
-      `SELECT hn, image_name FROM patient_image ORDER BY hn DESC, image_name DESC LIMIT 1`
-    );
-    const lastHN = maxRow[0]?.hn || "0";
-    const lastImageName = maxRow[0]?.image_name || "";
+    // 1. ดึง Key (HN + image_name) ทั้งหมดจาก DB1
+    const [rows1] = await db1Pool.execute("SELECT hn, image_name FROM patient_image");
+    const set1 = new Set(rows1.map(r => `${tis620ToUtf8(r.hn)}|${tis620ToUtf8(r.image_name)}`));
 
-    logPts(`Last synced: HN=${lastHN}, image_name=${lastImageName}`);
+    // 2. ดึง Key ทั้งหมดจาก DB3
+    const [rows3] = await db3Pool.execute("SELECT hn, image_name FROM patient_image");
+    const set3 = new Set(rows3.map(r => `${r.hn}|${r.image_name}`));
 
-    // 2. ดึงข้อมูลใหม่จาก DB1 (คง LIMIT ไว้ที่ 200 ตามเดิม เพราะ RAM 50G รับไหวสบายมาก)
-    const [images] = await db1Pool.execute(
-      `SELECT hn, image_name, image, width, height, capture_date, hos_guid, hos_guid_ext
-       FROM patient_image
-       WHERE (hn > ? OR (hn = ? AND image_name > ?))
-       ORDER BY hn ASC, image_name ASC LIMIT 200`,
-      [lastHN, lastHN, lastImageName]
-    );
+    // 3. หาภาพที่ตกหล่น (ไม่ว่าจะอยู่ HN ไหนก็ตาม)
+    const missingKeys = [...set1].filter(key => !set3.has(key));
 
-    if (images.length === 0) {
-      logPts("✅ ไม่มีข้อมูลใหม่");
+    if (missingKeys.length === 0) {
+      logPts("✅ ไม่มีข้อมูลใหม่ (รูปภาพครบถ้วนตรงกัน)");
     } else {
-      logPts(`Found ${images.length} new images to sync`);
+      logPts(`⚠️ พบรูปภาพที่ตกหล่นจำนวน: ${missingKeys.length} รูป`);
 
-      // 3. Batch Processing (ใช้ batchSize 50 ตามของเดิมที่คุณตั้งไว้)
-      const batchSize = 50;
-      for (let i = 0; i < images.length; i += batchSize) {
-        const batch = images.slice(i, i + batchSize);
+      // 4. ทยอย Sync ทีละ Batch (จำกัดที่ 15 รูปต่อรอบป้องกัน Packet ล้น)
+      const BATCH_SIZE = 15;
+      let syncedCount = 0;
 
-        const valuesArray = batch.map((row) => [
-          tis620ToUtf8(row.hn),
-          tis620ToUtf8(row.image_name),
-          row.image, // BLOB รูปภาพ
-          row.width || null,
-          row.height || null,
-          row.capture_date || null,
-          tis620ToUtf8(row.hos_guid),
-          tis620ToUtf8(row.hos_guid_ext),
-        ]);
+      for (let i = 0; i < missingKeys.length; i += BATCH_SIZE) {
+        const batchKeys = missingKeys.slice(i, i + BATCH_SIZE);
 
-        const placeholders = batch.map(() => "(?,?,?,?,?,?,?,?)").join(",");
-        const insertQuery = `
-          INSERT INTO patient_image 
-          (hn, image_name, image, width, height, capture_date, hos_guid, hos_guid_ext)
-          VALUES ${placeholders}
-          ON DUPLICATE KEY UPDATE
-            image=VALUES(image),
-            width=VALUES(width),
-            height=VALUES(height),
-            capture_date=VALUES(capture_date),
-            hos_guid=VALUES(hos_guid),
-            hos_guid_ext=VALUES(hos_guid_ext)`;
+        const keyObjects = batchKeys.map(k => {
+          const [hn, imgName] = k.split('|');
+          return { hn, image_name: imgName };
+        });
 
-        await db3Pool.execute(insertQuery, valuesArray.flat());
+        const placeholders = keyObjects.map(() => "(?,?)").join(",");
+        const queryParams = keyObjects.flatMap(k => [k.hn, k.image_name]);
+
+        // ดึง BLOB จาก DB1
+        const [images] = await db1Pool.execute(
+          `SELECT hn, image_name, image, width, height, capture_date, hos_guid, hos_guid_ext
+           FROM patient_image
+           WHERE (hn, image_name) IN (${placeholders})`,
+          queryParams
+        );
+
+        if (images.length > 0) {
+          const valuesArray = images.map((row) => [
+            tis620ToUtf8(row.hn),
+            tis620ToUtf8(row.image_name),
+            row.image, // BLOB
+            row.width || null,
+            row.height || null,
+            row.capture_date || null,
+            tis620ToUtf8(row.hos_guid),
+            tis620ToUtf8(row.hos_guid_ext),
+          ]);
+
+          const insertPlaceholders = images.map(() => "(?,?,?,?,?,?,?,?)").join(",");
+          const insertQuery = `
+            INSERT INTO patient_image 
+            (hn, image_name, image, width, height, capture_date, hos_guid, hos_guid_ext)
+            VALUES ${insertPlaceholders}
+            ON DUPLICATE KEY UPDATE
+              image=VALUES(image),
+              width=VALUES(width),
+              height=VALUES(height),
+              capture_date=VALUES(capture_date),
+              hos_guid=VALUES(hos_guid),
+              hos_guid_ext=VALUES(hos_guid_ext)`;
+
+          await db3Pool.execute(insertQuery, valuesArray.flat());
+          syncedCount += images.length;
+          logPts(`⏳ Sync รูปภาพไปแล้ว: ${syncedCount} / ${missingKeys.length}`);
+        }
       }
       logPts("=== Sync Completed ===");
     }
@@ -121,7 +135,7 @@ async function runSync() {
 // ----------------------
 // Scheduler
 // ----------------------
-console.log("Service Started: sync-db-ptsimage.js (Optimized Pool Mode)");
+console.log("Service Started: sync-db-ptsimage.js (Full Diff Sync Mode)");
 runSync();
 cron.schedule("0 0,12 * * *", runSync);
 

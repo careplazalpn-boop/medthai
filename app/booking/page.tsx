@@ -442,12 +442,24 @@ export default function BookingPage() {
     } catch { alert("เกิดข้อผิดพลาดในการอัปเดตหมอไม่มา"); }
   };
 
+  // 🌟 ตรวจสอบว่าช่วงเวลานี้มีการจองเตียงพิเศษอยู่หรือไม่ ก่อนอนุญาตให้คลิกเปิด/ปิดช่วงเวลา
   const toggleSlot = async (therapist: string, slot: string) => {
     if (isGuest) {
       alert("โหมดดูอย่างเดียว ไม่สามารถอัปเดต slot ได้");
       return;
     }
     if (!date) return alert("กรุณาเลือกวันที่ก่อน");
+
+    const slotInfo = bookedSlots[therapist]?.find(b => b.time_slot === slot);
+    const hasSpecialBed = !!slotInfo?.has_special_bed;
+
+    // ถ้ามีการจองเตียงพิเศษอยู่ จะไม่อนุญาตให้ปิดหรือยกเลิกการให้บริการ
+    if (hasSpecialBed) {
+      const bedName = slotInfo?.bed_name ? ` (${slotInfo.bed_name})` : "";
+      alert(`ไม่สามารถยกเลิกการให้บริการในช่วงเวลา ${slot} ได้!\n\nเนื่องจากมีการจองเตียงพิเศษ${bedName} ของคุณ "${slotInfo?.name}" ในช่วงเวลานี้แล้ว`);
+      return;
+    }
+
     try {
       const res = await fetch("/api/toggle-off-therapist", {
         method: "POST",
@@ -658,9 +670,8 @@ export default function BookingPage() {
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: -300, opacity: 0 }}
             transition={{ duration: 0.3 }}
-            className="fixed top-0 left-0 w-72 h-full bg-slate-800/95 backdrop-blur-md z-40 flex flex-col pt-16 overflow-y-auto shadow-2xl"
+            className="fixed top-0 left-0 w-72 h-full bg-slate-800/95 backdrop-blur-md z-40 flex flex-col pt-16 overflow-y-auto shadow-2xl text-white"
           >
-
             {/* Header */}
             <div className="px-5 pb-4 border-b border-slate-600">
               <div className="flex items-center gap-2 text-xl font-bold text-white">
@@ -676,9 +687,7 @@ export default function BookingPage() {
             </div>
 
             {/* ===================== เมนูหลัก ===================== */}
-
             <div className="py-2">
-
               <div
                 onClick={user ? handleBookingClick : () => router.push("/booking")}
                 className="flex items-center gap-3 px-5 py-3 text-white hover:bg-emerald-600 transition cursor-pointer"
@@ -688,6 +697,7 @@ export default function BookingPage() {
                   {user ? "จองคิวนวดแผนไทย" : "ดูคิวจองนวดแผนไทย"}
                 </span>
               </div>
+
               <div
                 onClick={() => router.push("/booking-audit")}
                 className="flex items-center gap-3 px-5 py-3 text-white hover:bg-emerald-600 transition cursor-pointer"
@@ -695,7 +705,8 @@ export default function BookingPage() {
                 <ClipboardList className="w-4 h-4 text-blue-400" />
                 <span>ดูคิวนวดทั้งหมด</span>
               </div>
-              <div
+            </div>
+                          <div
                 onClick={() => router.push("/beds-special")}
                 className="flex items-center gap-3 px-5 py-3 text-white hover:bg-emerald-600 transition cursor-pointer"
               >
@@ -703,10 +714,7 @@ export default function BookingPage() {
                 <span>จองเตียงพิเศษ</span>
               </div>
 
-            </div>
-
             {/* ===================== เจ้าหน้าที่ ===================== */}
-
             {user && (
               <>
                 <div className="border-t border-slate-600 my-2" />
@@ -734,7 +742,6 @@ export default function BookingPage() {
             )}
 
             {/* ===================== Admin ===================== */}
-
             {user?.role === "admin" && (
               <>
                 <div className="border-t border-slate-600 my-2" />
@@ -750,12 +757,10 @@ export default function BookingPage() {
                   <Users className="w-4 h-4 text-rose-400" />
                   <span>จัดการบุคลากร</span>
                 </div>
-
               </>
             )}
 
             {/* ===================== ติดต่อ ===================== */}
-
             <div className="border-t border-slate-600 my-2" />
 
             <div
@@ -777,7 +782,6 @@ export default function BookingPage() {
 
             {contactOpen && (
               <div className="bg-slate-900">
-
                 <a
                   href="https://m.me/100070719421986"
                   target="_blank"
@@ -797,10 +801,8 @@ export default function BookingPage() {
                   <Building2 className="w-4 h-4 text-emerald-400" />
                   เว็บไซต์ศูนย์บริการ
                 </a>
-
               </div>
             )}
-
           </motion.div>
         )}
       </AnimatePresence>
@@ -901,7 +903,7 @@ export default function BookingPage() {
                         {isBooked && (
                           <div className="text-xs flex items-center justify-center gap-1 flex-wrap">
                             <span>{!isGuest ? `(${slotInfo?.name || "ไม่ระบุ"})` : "(ไม่ว่าง)"}</span>
-                            {/* 🌟 แสดงสัญลักษณ์ไอคอนเตียงพิเศษเมื่อมีการจองเตียงพิเศษ */}
+                            {/* แสดงสัญลักษณ์ไอคอนเตียงพิเศษ */}
                             {hasSpecialBed && (
                               <span
                                 className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-bold rounded bg-emerald-100 text-emerald-800 border border-emerald-300"
@@ -917,13 +919,14 @@ export default function BookingPage() {
                       {date && !isGuest && (
                         <button
                           onClick={() => toggleSlot(t.name, slot)}
-                          className={`px-2 py-1 rounded text-white cursor-pointer ${
+                          className={`px-2 py-1 rounded text-white cursor-pointer transition ${
                             isOff
                               ? "bg-gray-400 cursor-not-allowed"
                               : isSlotDisabled
                               ? "bg-red-500 hover:bg-red-600"
                               : "bg-emerald-500 hover:bg-emerald-600"
-                          }`}
+                          } ${hasSpecialBed ? "opacity-60 cursor-not-allowed" : ""}`}
+                          title={hasSpecialBed ? "ไม่สามารถปิดช่องเวลานี้ได้เนื่องจากมีการจองเตียงพิเศษแล้ว" : "เปิด/ปิด การให้บริการช่องเวลานี้"}
                         >
                           {isSlotDisabled ? <X className="w-3.5 h-3.5" /> : <Check className="w-3.5 h-3.5" />}
                         </button>

@@ -26,6 +26,8 @@ export async function GET(req: Request) {
     const filterProvider = url.searchParams.get("provider") || "";
     const filterTherapist = url.searchParams.get("therapist") || "";
     const filterStatus = url.searchParams.get("status") || "";
+    // ✅ ใหม่: กรองเฉพาะคิวที่มีการจองเตียงพิเศษ
+    const filterSpecialBed = url.searchParams.get("specialBed") === "true";
 
     // ✅ ถ้ามีการกรองค่าใด ๆ ให้รีเซ็ต page = 1
 
@@ -70,12 +72,25 @@ export async function GET(req: Request) {
     }
 
     // --- Query หลัก ---
+    // ✅ เพิ่ม LEFT JOIN กับ special_bed_bookings / special_beds เพื่อดึงข้อมูลเตียงพิเศษมาแสดงผล + ใช้กรอง
+    // (ใช้ LEFT JOIN เพราะความสัมพันธ์เป็น booking : special_bed_booking = 1 : 1 อยู่แล้ว
+    //  จึงไม่ทำให้จำนวนแถวของ bookings เปลี่ยนไป เมื่อไม่ได้เปิดใช้ filterSpecialBed)
     let query = `
-      SELECT id, provider, name, phone, therapist, time_slot, date, status, payment_status, created_at
-      FROM bookings
+      SELECT
+        b.id, b.provider, b.name, b.phone, b.therapist, b.time_slot, b.date, b.status, b.payment_status, b.created_at,
+        (sbb.id IS NOT NULL) AS has_special_bed,
+        sb.bed_name AS bed_name
+      FROM bookings b
+      LEFT JOIN special_bed_bookings sbb ON b.id = sbb.booking_id
+      LEFT JOIN special_beds sb ON sbb.bed_id = sb.id
       WHERE 1=1
     `;
-    let countQuery = `SELECT COUNT(*) AS total FROM bookings WHERE 1=1`;
+    let countQuery = `
+      SELECT COUNT(*) AS total
+      FROM bookings b
+      LEFT JOIN special_bed_bookings sbb ON b.id = sbb.booking_id
+      WHERE 1=1
+    `;
     const queryParams: any[] = [];
     const countParams: any[] = [];
 
@@ -90,54 +105,59 @@ export async function GET(req: Request) {
 
     // --- Apply filters ---
     if (filterDate && filterDate !== "all") {
-      query += ` AND date = ?`;
-      countQuery += ` AND date = ?`;
+      query += ` AND b.date = ?`;
+      countQuery += ` AND b.date = ?`;
       queryParams.push(filterDate);
       countParams.push(filterDate);
     }
     if (filterTimeSlot && filterTimeSlot !== "all") {
           query += `
-            AND REPLACE(REPLACE(TRIM(time_slot), '–', '-'), ' ', '') = REPLACE(?, ' ', '')`;
+            AND REPLACE(REPLACE(TRIM(b.time_slot), '–', '-'), ' ', '') = REPLACE(?, ' ', '')`;
           countQuery += `
-            AND REPLACE(REPLACE(TRIM(time_slot), '–', '-'), ' ', '') = REPLACE(?, ' ', '')`;
+            AND REPLACE(REPLACE(TRIM(b.time_slot), '–', '-'), ' ', '') = REPLACE(?, ' ', '')`;
           queryParams.push(filterTimeSlot.trim());
           countParams.push(filterTimeSlot.trim());
         }
    
     if (filterProvider && filterProvider !== "all") {
-      query += ` AND provider = ?`;
-      countQuery += ` AND provider = ?`;
+      query += ` AND b.provider = ?`;
+      countQuery += ` AND b.provider = ?`;
       queryParams.push(filterProvider);
       countParams.push(filterProvider);
     }
     if (filterTherapist && filterTherapist !== "all") {
-      query += ` AND therapist = ?`;
-      countQuery += ` AND therapist = ?`;
+      query += ` AND b.therapist = ?`;
+      countQuery += ` AND b.therapist = ?`;
       queryParams.push(filterTherapist);
       countParams.push(filterTherapist);
     }
     if (dbStatus && dbStatus !== "all") {
-      query += ` AND status = ?`;
-      countQuery += ` AND status = ?`;
+      query += ` AND b.status = ?`;
+      countQuery += ` AND b.status = ?`;
       queryParams.push(dbStatus);
       countParams.push(dbStatus);
+    }
+    // ✅ ใหม่: กรองเฉพาะคิวที่มีการจองเตียงพิเศษ (ไม่ต้องใช้ param)
+    if (filterSpecialBed) {
+      query += ` AND sbb.id IS NOT NULL`;
+      countQuery += ` AND sbb.id IS NOT NULL`;
     }
 
     if (!isExport) { // 🎯 ใช้ LIMIT และ OFFSET เมื่อ 'ไม่ใช่' โหมด Export เท่านั้น
         query += `
             ORDER BY 
-              date ASC,
-              STR_TO_DATE(SUBSTRING_INDEX(time_slot, '-', 1), '%H:%i') ASC,
-              name ASC
+              b.date ASC,
+              STR_TO_DATE(SUBSTRING_INDEX(b.time_slot, '-', 1), '%H:%i') ASC,
+              b.name ASC
             LIMIT ? OFFSET ?
         `;
         queryParams.push(limit, offset);
     } else {
         query += `
             ORDER BY 
-              date ASC,
-              STR_TO_DATE(SUBSTRING_INDEX(time_slot, '-', 1), '%H:%i') ASC,
-              name ASC
+              b.date ASC,
+              STR_TO_DATE(SUBSTRING_INDEX(b.time_slot, '-', 1), '%H:%i') ASC,
+              b.name ASC
         `;
     }
 
@@ -155,28 +175,37 @@ export async function GET(req: Request) {
 
       // สร้างเงื่อนไขเหมือน countQuery แต่ไม่เอา LIMIT/OFFSET
       if (filterDate && filterDate !== "all") {
-        summaryCondition += " AND date = ?";
+        summaryCondition += " AND b.date = ?";
         summaryParams.push(filterDate);
       }
       if (filterTimeSlot && filterTimeSlot !== "all") {
-        summaryCondition += " AND REPLACE(REPLACE(TRIM(time_slot), '–', '-'), ' ', '') = REPLACE(?, ' ', '')";
+        summaryCondition += " AND REPLACE(REPLACE(TRIM(b.time_slot), '–', '-'), ' ', '') = REPLACE(?, ' ', '')";
         summaryParams.push(filterTimeSlot.trim());
       }
       if (filterProvider && filterProvider !== "all") {
-        summaryCondition += " AND provider = ?";
+        summaryCondition += " AND b.provider = ?";
         summaryParams.push(filterProvider);
       }
       if (filterTherapist && filterTherapist !== "all") {
-        summaryCondition += " AND therapist = ?";
+        summaryCondition += " AND b.therapist = ?";
         summaryParams.push(filterTherapist);
-      }           
+      }
+      // ✅ ใหม่: ให้ summary สอดคล้องกับตัวกรองเตียงพิเศษด้วย
+      if (filterSpecialBed) {
+        summaryCondition += " AND sbb.id IS NOT NULL";
+      }
 
       
       // --- Query summary ครบ 4 สถานะ ---
-      const attendedQuery = `SELECT COUNT(*) AS totalAttended FROM bookings WHERE status = 'สำเร็จ' ${summaryCondition}`;
-      const cancelledQuery = `SELECT COUNT(*) AS totalCancelled FROM bookings WHERE status = 'ยกเลิก' ${summaryCondition}`;
-      const pendingQuery = `SELECT COUNT(*) AS totalPending FROM bookings WHERE status = 'รอดำเนินการ' ${summaryCondition}`;
-      const inQueueQuery = `SELECT COUNT(*) AS totalInQueue FROM bookings WHERE status = 'อยู่ในคิว' ${summaryCondition}`;
+      // ✅ เพิ่ม LEFT JOIN special_bed_bookings เข้ามาด้วย (1:1 กับ bookings จึงไม่กระทบจำนวนนับเดิม)
+      const summaryFrom = `
+        FROM bookings b
+        LEFT JOIN special_bed_bookings sbb ON b.id = sbb.booking_id
+      `;
+      const attendedQuery = `SELECT COUNT(*) AS totalAttended ${summaryFrom} WHERE b.status = 'สำเร็จ' ${summaryCondition}`;
+      const cancelledQuery = `SELECT COUNT(*) AS totalCancelled ${summaryFrom} WHERE b.status = 'ยกเลิก' ${summaryCondition}`;
+      const pendingQuery = `SELECT COUNT(*) AS totalPending ${summaryFrom} WHERE b.status = 'รอดำเนินการ' ${summaryCondition}`;
+      const inQueueQuery = `SELECT COUNT(*) AS totalInQueue ${summaryFrom} WHERE b.status = 'อยู่ในคิว' ${summaryCondition}`;
 
 
       const [attendedRows]: any = await pool.execute(attendedQuery, summaryParams.slice());
@@ -257,5 +286,3 @@ export async function POST(req: Request) {
     );
   }
 }
-
-

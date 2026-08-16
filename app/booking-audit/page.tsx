@@ -10,6 +10,24 @@ import { FaCheck, FaSpa, FaTimes, FaBars, FaSignOutAlt, FaSignInAlt, FaCalendarA
 import { HiChevronDown, HiChevronUp } from "react-icons/hi";
 import * as Dialog from "@radix-ui/react-dialog";
 import { FaClipboardList } from "react-icons/fa";
+import {
+   Loader2,
+  Check,
+  Sparkles,
+  X,
+  Menu,
+  LogOut,
+  LogIn,
+  Calendar,
+  History,
+  BarChart3,
+  Users,
+  Facebook,
+  Building2,
+  ChevronDown,
+  ChevronUp,
+  ClipboardList
+} from "lucide-react";
 
 interface UserInfo {
   hn?: string;
@@ -627,13 +645,12 @@ const filteredTherapists = therapists;
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: -300, opacity: 0 }}
             transition={{ duration: 0.3 }}
-            className="fixed top-0 left-0 w-72 h-full bg-slate-800/95 backdrop-blur-md z-40 flex flex-col pt-16 overflow-y-auto shadow-2xl"
+            className="fixed top-0 left-0 w-72 h-full bg-slate-800/95 backdrop-blur-md z-40 flex flex-col pt-16 overflow-y-auto shadow-2xl text-white"
           >
-
             {/* Header */}
             <div className="px-5 pb-4 border-b border-slate-600">
               <div className="flex items-center gap-2 text-xl font-bold text-white">
-                <FaSpa className="text-emerald-400" />
+                <Sparkles className="text-emerald-400 w-5 h-5" />
                 ระบบแพทย์แผนไทย
               </div>
 
@@ -645,14 +662,12 @@ const filteredTherapists = therapists;
             </div>
 
             {/* ===================== เมนูหลัก ===================== */}
-
             <div className="py-2">
-
               <div
                 onClick={user ? handleBookingClick : () => router.push("/booking")}
                 className="flex items-center gap-3 px-5 py-3 text-white hover:bg-emerald-600 transition cursor-pointer"
               >
-                <FaCalendarAlt />
+                <Calendar className="w-4 h-4 text-emerald-400" />
                 <span>
                   {user ? "จองคิวนวดแผนไทย" : "ดูคิวจองนวดแผนไทย"}
                 </span>
@@ -662,22 +677,19 @@ const filteredTherapists = therapists;
                 onClick={() => router.push("/booking-audit")}
                 className="flex items-center gap-3 px-5 py-3 text-white hover:bg-emerald-600 transition cursor-pointer"
               >
-                <FaClipboardList />
+                <ClipboardList className="w-4 h-4 text-blue-400" />
                 <span>ดูคิวนวดทั้งหมด</span>
               </div>
-              <div
-                  onClick={user ? handleBedsClick : () => router.push("/beds-special")}
-                  className="flex items-center gap-3 px-5 py-3 text-white hover:bg-emerald-600 transition cursor-pointer"
-                >
-                  <BedDouble />
-                  <span>
-                    {user ? "การจองเตียงพิเศษ" : "การจองเตียงพิเศษ"}
-                  </span>
-              </div>
             </div>
+                          <div
+                onClick={() => router.push("/beds-special")}
+                className="flex items-center gap-3 px-5 py-3 text-white hover:bg-emerald-600 transition cursor-pointer"
+              >
+                <BedDouble className="w-4 h-4 text-emerald-300" />
+                <span>จองเตียงพิเศษ</span>
+              </div>
 
             {/* ===================== เจ้าหน้าที่ ===================== */}
-
             {user && (
               <>
                 <div className="border-t border-slate-600 my-2" />
@@ -690,7 +702,7 @@ const filteredTherapists = therapists;
                   onClick={() => router.push("/all-bookings")}
                   className="flex items-center gap-3 px-5 py-3 text-white hover:bg-blue-600 transition cursor-pointer"
                 >
-                  <FaHistory />
+                  <History className="w-4 h-4 text-amber-400" />
                   <span>ประวัติการจอง</span>
                 </div>
 
@@ -698,14 +710,13 @@ const filteredTherapists = therapists;
                   onClick={() => router.push("/summary-history")}
                   className="flex items-center gap-3 px-5 py-3 text-white hover:bg-blue-600 transition cursor-pointer"
                 >
-                  <FaChartBar />
+                  <BarChart3 className="w-4 h-4 text-purple-400" />
                   <span>สรุปรายงาน</span>
                 </div>
               </>
             )}
 
             {/* ===================== Admin ===================== */}
-
             {user?.role === "admin" && (
               <>
                 <div className="border-t border-slate-600 my-2" />
@@ -718,44 +729,41 @@ const filteredTherapists = therapists;
                   onClick={() => router.push("/manage-therapists")}
                   className="flex items-center gap-3 px-5 py-3 text-white hover:bg-amber-600 transition cursor-pointer"
                 >
-                  <FaUsersCog />
+                  <Users className="w-4 h-4 text-rose-400" />
                   <span>จัดการบุคลากร</span>
                 </div>
-
               </>
             )}
 
             {/* ===================== ติดต่อ ===================== */}
-
             <div className="border-t border-slate-600 my-2" />
 
             <div
               onClick={() => setContactOpen(!contactOpen)}
               className="flex items-center gap-3 px-5 py-3 text-white hover:bg-slate-700 transition cursor-pointer"
             >
-              <FaHospital />
+              <Building2 className="w-4 h-4 text-teal-400" />
 
               <span className="flex-1">
                 ช่องทางติดต่อ
               </span>
 
               {contactOpen ? (
-                <HiChevronUp className="w-5 h-5" />
+                <ChevronUp className="w-5 h-5" />
               ) : (
-                <HiChevronDown className="w-5 h-5" />
+                <ChevronDown className="w-5 h-5" />
               )}
             </div>
 
             {contactOpen && (
               <div className="bg-slate-900">
-
                 <a
                   href="https://m.me/100070719421986"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-3 px-9 py-3 text-slate-200 hover:bg-blue-700 transition"
                 >
-                  <FaFacebook className="text-blue-400" />
+                  <Facebook className="w-4 h-4 text-blue-400" />
                   Facebook (จองคิว)
                 </a>
 
@@ -765,13 +773,11 @@ const filteredTherapists = therapists;
                   rel="noopener noreferrer"
                   className="flex items-center gap-3 px-9 py-3 text-slate-200 hover:bg-emerald-700 transition"
                 >
-                  <FaHospital className="text-emerald-400" />
+                  <Building2 className="w-4 h-4 text-emerald-400" />
                   เว็บไซต์ศูนย์บริการ
                 </a>
-
               </div>
             )}
-
           </motion.div>
         )}
       </AnimatePresence>

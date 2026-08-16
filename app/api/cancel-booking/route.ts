@@ -25,6 +25,23 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
+    // ✅ ใหม่: ถ้าคิวนี้มีการจองเตียงพิเศษอยู่แล้ว ห้ามยกเลิกการให้บริการช่วงเวลานั้น
+    const [specialBedRows] = await conn.query(
+      "SELECT id FROM special_bed_bookings WHERE booking_id = ?",
+      [id]
+    );
+    if ((specialBedRows as any).length > 0) {
+      conn.release();
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "ไม่สามารถยกเลิกได้ เนื่องจากคิวนี้มีการจองเตียงพิเศษไว้แล้ว กรุณายกเลิกการจองเตียงพิเศษก่อน",
+        },
+        { status: 400 }
+      );
+    }
+
     // อัปเดตสถานะ booking เป็น "ยกเลิก"
     await conn.query("UPDATE bookings SET status = 'ยกเลิก' WHERE id = ?", [id]);
 

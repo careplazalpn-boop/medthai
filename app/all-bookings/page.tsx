@@ -14,6 +14,29 @@ import { saveAs } from "file-saver";
 import { useAuth } from "@/context/AuthContext";
 import BookingSummary from "@/app/BookingSummary/BookingSummary";
 import { FaClipboardList } from "react-icons/fa";
+import {
+  Calendar as CalendarIcon,
+  User as UserIcon,
+  AlertCircle,
+  UserX,
+  Search,
+  Loader2,
+  Check,
+  Sparkles,
+  X,
+  Menu,
+  LogOut,
+  LogIn,
+  Calendar,
+  History,
+  BarChart3,
+  Users,
+  Facebook,
+  Building2,
+  ChevronDown,
+  ChevronUp,
+  ClipboardList
+} from "lucide-react";
 
 interface Booking {
   id: number;
@@ -29,6 +52,9 @@ interface Booking {
   status: string;
   created_at: string; // หรือ Date ถ้า parse เป็น Date แล้ว
   payment_status?: string;
+  // ✅ ใหม่: ข้อมูลเตียงพิเศษ (ถ้ามี) — ตั้งชื่อฟิลด์ให้ตรงกับที่ /api/bookings ใช้อยู่แล้ว
+  has_special_bed?: number | boolean;
+  bed_name?: string;
 }
 
 interface Therapist {
@@ -76,6 +102,7 @@ const getStatusColor = (b: Booking) => {
   const [filterDate, setFilterDate] = useState("");
   const [filterTimeSlot, setFilterTimeSlot] = useState("all");
   const [filterProvider, setFilterProvider] = useState("all");
+  const [filterSpecialBed, setFilterSpecialBed] = useState(false); // ✅ ใหม่: กรองเฉพาะคิวที่มีการจองเตียงพิเศษ
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -135,7 +162,7 @@ const getStatusColor = (b: Booking) => {
   (async () => {
     try {
       const res = await fetch(
-        `/api/all-bookings?date=${filterDate || ""}&provider=${filterProvider || ""}&therapist=${filterTherapist || ""}&timeSlots=${filterTimeSlot || ""}&status=${filterStatus || ""}&page=${page}&limit=${limit}`
+        `/api/all-bookings?date=${filterDate || ""}&provider=${filterProvider || ""}&therapist=${filterTherapist || ""}&timeSlots=${filterTimeSlot || ""}&status=${filterStatus || ""}&specialBed=${filterSpecialBed}&page=${page}&limit=${limit}`
       );
       const data = await res.json();
       if (!data.success) throw new Error(data.error || "เกิดข้อผิดพลาด");
@@ -158,7 +185,7 @@ const getStatusColor = (b: Booking) => {
       setLoading(false);
     }
   })();
-}, [filterDate, filterProvider, filterTherapist, filterTimeSlot, filterStatus, page, limit]);
+}, [filterDate, filterProvider, filterTherapist, filterTimeSlot, filterStatus, filterSpecialBed, page, limit]);
     
     const handleNext = () => {
     if (page < totalPages) setPage((p) => p + 1);
@@ -219,7 +246,7 @@ const getStatusColor = (b: Booking) => {
 
     try {
         // 🎯 2. เรียก API เพื่อดึงข้อมูลทั้งหมด (Export Mode: isExport=true)
-        const exportUrl = `/api/all-bookings?export=true&date=${filterDate || ""}&provider=${filterProvider || ""}&therapist=${filterTherapist || ""}&timeSlots=${filterTimeSlot || ""}&status=${filterStatus || ""}`;
+        const exportUrl = `/api/all-bookings?export=true&date=${filterDate || ""}&provider=${filterProvider || ""}&therapist=${filterTherapist || ""}&timeSlots=${filterTimeSlot || ""}&status=${filterStatus || ""}&specialBed=${filterSpecialBed}`;
 
         const exportRes = await fetch(exportUrl);
         const exportData = await exportRes.json();
@@ -321,15 +348,17 @@ const parseTime = (timeStr: string) => {
     const providerMatch = filterProvider === "all" || b.provider === filterProvider;
     const dateMatch = !filterDate || formatDate(b.date) === filterDate;
     const timeMatch = filterTimeSlot === "all" || normalizeTimeSlot(b.time_slot) === normalizeTimeSlot(filterTimeSlot);
+    // ✅ ใหม่: เฉพาะคิวที่มีการจองเตียงพิเศษ (ถ้าเปิดใช้ตัวกรองนี้)
+    const specialBedMatch = !filterSpecialBed || !!b.has_special_bed;
     
     const statusLabel = getStatusLabel(b);
 
     switch(filterStatus) {
-      case "upcoming": return nameMatch && therapistMatch && providerMatch && dateMatch && timeMatch && statusLabel==="รอดำเนินการ";
-      case "in_queue": return nameMatch && therapistMatch && providerMatch && dateMatch && timeMatch && statusLabel==="อยู่ในคิว";
-      case "past": return nameMatch && therapistMatch && providerMatch && dateMatch && timeMatch && statusLabel==="สำเร็จ";
-      case "cancelled": return nameMatch && therapistMatch && providerMatch && dateMatch && timeMatch && statusLabel==="ยกเลิก";
-      default: return nameMatch && therapistMatch && providerMatch && dateMatch && timeMatch;
+      case "upcoming": return nameMatch && therapistMatch && providerMatch && dateMatch && timeMatch && specialBedMatch && statusLabel==="รอดำเนินการ";
+      case "in_queue": return nameMatch && therapistMatch && providerMatch && dateMatch && timeMatch && specialBedMatch && statusLabel==="อยู่ในคิว";
+      case "past": return nameMatch && therapistMatch && providerMatch && dateMatch && timeMatch && specialBedMatch && statusLabel==="สำเร็จ";
+      case "cancelled": return nameMatch && therapistMatch && providerMatch && dateMatch && timeMatch && specialBedMatch && statusLabel==="ยกเลิก";
+      default: return nameMatch && therapistMatch && providerMatch && dateMatch && timeMatch && specialBedMatch;
     }
   });
   
@@ -404,7 +433,8 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
         else setShowConfirmSuccess(true);
         setTimeout(() => (action === "cancel" ? setShowCancelSuccess(false) : setShowConfirmSuccess(false)), 3000);
       } else {
-        alert(`เกิดข้อผิดพลาดในการ${action==="cancel"?"ยกเลิก":"ยืนยัน"}`);
+        // ✅ ใหม่: แสดงข้อความจาก backend ถ้ามี (เช่น กรณีถูกบล็อกเพราะมีการจองเตียงพิเศษ)
+        alert(data.message || data.error || `เกิดข้อผิดพลาดในการ${action==="cancel"?"ยกเลิก":"ยืนยัน"}`);
       }
     } catch {
       alert(`ไม่สามารถ${action==="cancel"?"ยกเลิก":"ยืนยัน"}การจองได้`);
@@ -423,22 +453,20 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
       {/* แถบเมนูบนสุด */}
       <div className="fixed top-0 left-0 w-full z-50 bg-gray-700 shadow-md flex justify-between items-center px-2 sm:px-4 py-2 sm:py-2">
         <div className="flex items-center gap-2 sm:gap-13">
-          {/* Hamburger */}
           <button
             onClick={() => setMenuOpen(!menuOpen)}
-            className="text-white text-xl sm:text-2xl"
+            className="text-white text-xl sm:text-2xl cursor-pointer"
             title="เมนู"
           >
-            {menuOpen ? <FaTimes /> : <FaBars />}
+            {menuOpen ? <X /> : <Menu />}
           </button>
 
-          {/* Logo */}
           <div
             className="ml-3 sm:ml-3 text-white font-bold text-base sm:text-lg flex items-center gap-1 cursor-pointer"
             onClick={() => router.push("/")}
             title="หน้าหลัก"
           >
-            <FaSpa className="text-sm sm:text-base" /> แพทย์แผนไทย
+            <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" /> แพทย์แผนไทย
           </div>
         </div>
 
@@ -493,13 +521,12 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: -300, opacity: 0 }}
             transition={{ duration: 0.3 }}
-            className="fixed top-0 left-0 w-72 h-full bg-slate-800/95 backdrop-blur-md z-40 flex flex-col pt-16 overflow-y-auto shadow-2xl"
+            className="fixed top-0 left-0 w-72 h-full bg-slate-800/95 backdrop-blur-md z-40 flex flex-col pt-16 overflow-y-auto shadow-2xl text-white"
           >
-
             {/* Header */}
             <div className="px-5 pb-4 border-b border-slate-600">
               <div className="flex items-center gap-2 text-xl font-bold text-white">
-                <FaSpa className="text-emerald-400" />
+                <Sparkles className="text-emerald-400 w-5 h-5" />
                 ระบบแพทย์แผนไทย
               </div>
 
@@ -511,14 +538,12 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
             </div>
 
             {/* ===================== เมนูหลัก ===================== */}
-
             <div className="py-2">
-
               <div
                 onClick={user ? handleBookingClick : () => router.push("/booking")}
                 className="flex items-center gap-3 px-5 py-3 text-white hover:bg-emerald-600 transition cursor-pointer"
               >
-                <FaCalendarAlt />
+                <Calendar className="w-4 h-4 text-emerald-400" />
                 <span>
                   {user ? "จองคิวนวดแผนไทย" : "ดูคิวจองนวดแผนไทย"}
                 </span>
@@ -528,23 +553,19 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
                 onClick={() => router.push("/booking-audit")}
                 className="flex items-center gap-3 px-5 py-3 text-white hover:bg-emerald-600 transition cursor-pointer"
               >
-                <FaClipboardList />
+                <ClipboardList className="w-4 h-4 text-blue-400" />
                 <span>ดูคิวนวดทั้งหมด</span>
               </div>
-              <div
-                  onClick={user ? handleBedsClick : () => router.push("/beds-special")}
-                  className="flex items-center gap-3 px-5 py-3 text-white hover:bg-emerald-600 transition cursor-pointer"
-                >
-                  <BedDouble />
-                  <span>
-                    {user ? "การจองเตียงพิเศษ" : "การจองเตียงพิเศษ"}
-                  </span>
+            </div>
+                          <div
+                onClick={() => router.push("/beds-special")}
+                className="flex items-center gap-3 px-5 py-3 text-white hover:bg-emerald-600 transition cursor-pointer"
+              >
+                <BedDouble className="w-4 h-4 text-emerald-300" />
+                <span>จองเตียงพิเศษ</span>
               </div>
 
-            </div>
-
             {/* ===================== เจ้าหน้าที่ ===================== */}
-
             {user && (
               <>
                 <div className="border-t border-slate-600 my-2" />
@@ -557,7 +578,7 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
                   onClick={() => router.push("/all-bookings")}
                   className="flex items-center gap-3 px-5 py-3 text-white hover:bg-blue-600 transition cursor-pointer"
                 >
-                  <FaHistory />
+                  <History className="w-4 h-4 text-amber-400" />
                   <span>ประวัติการจอง</span>
                 </div>
 
@@ -565,14 +586,13 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
                   onClick={() => router.push("/summary-history")}
                   className="flex items-center gap-3 px-5 py-3 text-white hover:bg-blue-600 transition cursor-pointer"
                 >
-                  <FaChartBar />
+                  <BarChart3 className="w-4 h-4 text-purple-400" />
                   <span>สรุปรายงาน</span>
                 </div>
               </>
             )}
 
             {/* ===================== Admin ===================== */}
-
             {user?.role === "admin" && (
               <>
                 <div className="border-t border-slate-600 my-2" />
@@ -585,44 +605,41 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
                   onClick={() => router.push("/manage-therapists")}
                   className="flex items-center gap-3 px-5 py-3 text-white hover:bg-amber-600 transition cursor-pointer"
                 >
-                  <FaUsersCog />
+                  <Users className="w-4 h-4 text-rose-400" />
                   <span>จัดการบุคลากร</span>
                 </div>
-
               </>
             )}
 
             {/* ===================== ติดต่อ ===================== */}
-
             <div className="border-t border-slate-600 my-2" />
 
             <div
               onClick={() => setContactOpen(!contactOpen)}
               className="flex items-center gap-3 px-5 py-3 text-white hover:bg-slate-700 transition cursor-pointer"
             >
-              <FaHospital />
+              <Building2 className="w-4 h-4 text-teal-400" />
 
               <span className="flex-1">
                 ช่องทางติดต่อ
               </span>
 
               {contactOpen ? (
-                <HiChevronUp className="w-5 h-5" />
+                <ChevronUp className="w-5 h-5" />
               ) : (
-                <HiChevronDown className="w-5 h-5" />
+                <ChevronDown className="w-5 h-5" />
               )}
             </div>
 
             {contactOpen && (
               <div className="bg-slate-900">
-
                 <a
                   href="https://m.me/100070719421986"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-3 px-9 py-3 text-slate-200 hover:bg-blue-700 transition"
                 >
-                  <FaFacebook className="text-blue-400" />
+                  <Facebook className="w-4 h-4 text-blue-400" />
                   Facebook (จองคิว)
                 </a>
 
@@ -632,16 +649,15 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
                   rel="noopener noreferrer"
                   className="flex items-center gap-3 px-9 py-3 text-slate-200 hover:bg-emerald-700 transition"
                 >
-                  <FaHospital className="text-emerald-400" />
+                  <Building2 className="w-4 h-4 text-emerald-400" />
                   เว็บไซต์ศูนย์บริการ
                 </a>
-
               </div>
             )}
-
           </motion.div>
         )}
       </AnimatePresence>
+      
       <h1 className="text-3xl sm:text-4xl font-extrabold text-emerald-700 mb-8 sm:mb-12 pt-15 text-center drop-shadow-sm">
         ประวัติการจอง
       </h1>
@@ -697,6 +713,20 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
           </select>
         </div>
 
+        <div className="w-full sm:w-[190px]">
+          <label className="block text-emerald-700 font-semibold mb-2 text-lg">เตียงพิเศษ:</label>
+          <label className="flex items-center gap-2 h-10 px-3 border border-gray-300 rounded-md cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={filterSpecialBed}
+              onChange={e => { setFilterSpecialBed(e.target.checked); setPage(1); }}
+              className="w-4 h-4 accent-emerald-600"
+            />
+            <BedDouble className="w-4 h-4 text-emerald-700" />
+            <span className="text-sm text-gray-700">เฉพาะคิวที่มีการจองเตียงพิเศษ</span>
+          </label>
+        </div>
+
         <div className="flex w-full sm:w-auto items-end">
           <button 
             onClick={() => {
@@ -706,6 +736,7 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
               setFilterDate(""); 
               setFilterTimeSlot("all"); 
               setFilterProvider("all");
+              setFilterSpecialBed(false);
             }}
             className="h-10 px-4 bg-emerald-600 text-white rounded-md font-semibold hover:bg-emerald-700 transition"
           >
@@ -1046,7 +1077,19 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
                 {/* ช่วงเวลา */}
                 <div className="flex flex-col sm:flex-col gap-1">
                   <Label icon={<Clock className="w-4 h-4" />} text="ช่วงเวลา" />
-                  <span className="font-normal text-base">{b.time_slot}</span>
+                  <span className="font-normal text-base flex items-center gap-1 flex-wrap">
+                    {b.time_slot}
+                    {/* ✅ ใหม่: แสดงสัญลักษณ์เตียงพิเศษ เหมือนหน้า booking */}
+                    {!!b.has_special_bed && (
+                      <span
+                        className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-bold rounded bg-emerald-100 text-emerald-800 border border-emerald-300"
+                        title={b.bed_name ? `เตียงพิเศษ: ${b.bed_name}` : "ใช้เตียงพิเศษ"}
+                      >
+                        <BedDouble className="w-3.5 h-3.5 text-emerald-700" />
+                        <span className="hidden sm:inline">เตียงพิเศษ</span>
+                      </span>
+                    )}
+                  </span>
                 </div>
 
                 {/* สถานะ */}
@@ -1133,22 +1176,37 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
                   )}
 
                   {/* ปุ่มยกเลิก */}
-                  <Dialog.Root>
-                    <Dialog.Trigger asChild>
-                      <button
-                        onClick={() => setSelectedId(b.id)}
-                        className="flex items-center justify-center w-15 h-10 bg-red-500 rounded-md shadow hover:bg-red-600 transition"
-                      >
-                        <FaTimes className="text-white w-5 h-5" />
-                      </button>
-                    </Dialog.Trigger>
-                    <BookingDialog
-                      title="ต้องการยกเลิกรายการนี้หรือไม่?"
-                      color="red"
-                      booking={b}
-                      onConfirm={() => handleBookingAction("cancel")}
-                    />
-                  </Dialog.Root>
+                  {/* ✅ ใหม่: ถ้าคิวนี้มีการจองเตียงพิเศษแล้ว ห้ามยกเลิกการให้บริการช่วงเวลานั้น */}
+                  {b.has_special_bed ? (
+                    <button
+                      disabled
+                      title={
+                        b.bed_name
+                          ? `ไม่สามารถยกเลิกได้ เนื่องจากมีการจองเตียงพิเศษ (${b.bed_name}) ไว้แล้ว`
+                          : "ไม่สามารถยกเลิกได้ เนื่องจากมีการจองเตียงพิเศษไว้แล้ว"
+                      }
+                      className="flex items-center justify-center w-15 h-10 bg-gray-300 rounded-md shadow cursor-not-allowed"
+                    >
+                      <BedDouble className="text-gray-500 w-5 h-5" />
+                    </button>
+                  ) : (
+                    <Dialog.Root>
+                      <Dialog.Trigger asChild>
+                        <button
+                          onClick={() => setSelectedId(b.id)}
+                          className="flex items-center justify-center w-15 h-10 bg-red-500 rounded-md shadow hover:bg-red-600 transition"
+                        >
+                          <FaTimes className="text-white w-5 h-5" />
+                        </button>
+                      </Dialog.Trigger>
+                      <BookingDialog
+                        title="ต้องการยกเลิกรายการนี้หรือไม่?"
+                        color="red"
+                        booking={b}
+                        onConfirm={() => handleBookingAction("cancel")}
+                      />
+                    </Dialog.Root>
+                  )}
                 </>
               )}
             </>

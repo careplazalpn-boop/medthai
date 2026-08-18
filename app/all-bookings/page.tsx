@@ -367,6 +367,19 @@ const parseTime = (timeStr: string) => {
   const attendedKeys = new Set<string>();
   const cancelledKeys = new Set<string>();
 
+
+// ตรวจสอบว่าวันที่ของการจองเป็นวันข้างหน้า (อนาคต) หรือไม่
+const isFutureBookingDate = (dateStr: string) => {
+  const bookingDate = new Date(dateStr);
+  bookingDate.setHours(0, 0, 0, 0);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  return bookingDate.getTime() > today.getTime();
+};
+
+
 bookings.forEach(b => {
   if (filterDate && formatDate(b.date) !== filterDate) return; // กรองตามวันที่ก่อน
 
@@ -1156,24 +1169,36 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
                 (b?.therapist && b?.therapist === user?.name)) && (
                 <>
                   {/* ปุ่มยืนยัน */}
-                  {getStatusLabel(b) === "รอดำเนินการ" && (
-                    <Dialog.Root>
-                      <Dialog.Trigger asChild>
+                    {getStatusLabel(b) === "รอดำเนินการ" && (
+                      isFutureBookingDate(b.date) ? (
+                        // หากยังไม่ถึงวันนัด ให้ disable ปุ่มไว้
                         <button
-                          onClick={() => setSelectedId(b.id)}
-                          className="flex items-center justify-center w-15 h-10 bg-emerald-600 rounded-md shadow hover:bg-emerald-700 transition"
+                          disabled
+                          title="ไม่สามารถยืนยันสถานะได้ เนื่องจากยังไม่ถึงวันนัดหมาย"
+                          className="flex items-center justify-center w-15 h-10 bg-gray-300 rounded-md shadow cursor-not-allowed"
                         >
-                          <FaCheck className="text-white w-5 h-5" />
+                          <FaCheck className="text-gray-400 w-5 h-5" />
                         </button>
-                      </Dialog.Trigger>
-                      <BookingDialog
-                        title="ต้องการยืนยันรายการนี้หรือไม่?"
-                        color="emerald"
-                        booking={b}
-                        onConfirm={() => handleBookingAction("confirm")}
-                      />
-                    </Dialog.Root>
-                  )}
+                      ) : (
+                        // เมื่อถึงวันนัดหมายแล้ว หรือวันในอดีต ทำงานตาม Logic เดิมปกติ
+                        <Dialog.Root>
+                          <Dialog.Trigger asChild>
+                            <button
+                              onClick={() => setSelectedId(b.id)}
+                              className="flex items-center justify-center w-15 h-10 bg-emerald-600 rounded-md shadow hover:bg-emerald-700 transition"
+                            >
+                              <FaCheck className="text-white w-5 h-5" />
+                            </button>
+                          </Dialog.Trigger>
+                          <BookingDialog
+                            title="ต้องการยืนยันรายการนี้หรือไม่?"
+                            color="emerald"
+                            booking={b}
+                            onConfirm={() => handleBookingAction("confirm")}
+                          />
+                        </Dialog.Root>
+                      )
+                    )}
 
                   {/* ปุ่มยกเลิก */}
                   {/* ✅ ใหม่: ถ้าคิวนี้มีการจองเตียงพิเศษแล้ว ห้ามยกเลิกการให้บริการช่วงเวลานั้น */}

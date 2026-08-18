@@ -65,6 +65,8 @@ try {
 
 type Booking = {
   id: number;
+  name?: string;
+  phone?: string;
   therapist: string;
   status: string;
   date: string;
@@ -301,6 +303,38 @@ export default function SummaryHistoryPage() {
   ).length;
   const paidCount = activeFiltered.filter((b) => b.payment_status === "paid" || b.payment_status === "ชำระเงิน").length;
   const ucCount = activeFiltered.filter((b) => b.payment_status === "UC" || b.payment_status === "บัตรทอง").length;
+
+  // 🌟 10 อันดับผู้ป่วยที่ใช้บริการมากที่สุด แยกตามสิทธิการรักษาพยาบาล (ไม่นับรายการจองที่ยกเลิก)
+  type PatientRank = { key: string; name: string; phone?: string; count: number };
+
+  const buildTopPatients = (list: Booking[]): PatientRank[] => {
+    const map = new Map<string, PatientRank>();
+    list.forEach((b) => {
+      const name = b.name?.trim() || "ไม่ระบุชื่อ";
+      const phone = b.phone?.trim() || "";
+      // ใช้ชื่อ + เบอร์โทร เป็นตัวระบุผู้ป่วยแต่ละคน กันชื่อซ้ำ
+      const key = phone ? `${name}__${phone}` : name;
+      if (!map.has(key)) map.set(key, { key, name, phone, count: 0 });
+      map.get(key)!.count += 1;
+    });
+    return Array.from(map.values())
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+  };
+
+  const unpaidBookingsForRank = activeFiltered.filter(
+    (b) => b.payment_status === "unpaid" || b.payment_status === "เบิกตรง" || !b.payment_status
+  );
+  const paidBookingsForRank = activeFiltered.filter(
+    (b) => b.payment_status === "paid" || b.payment_status === "ชำระเงิน"
+  );
+  const ucBookingsForRank = activeFiltered.filter(
+    (b) => b.payment_status === "UC" || b.payment_status === "บัตรทอง"
+  );
+
+  const topUnpaidPatients = buildTopPatients(unpaidBookingsForRank);
+  const topPaidPatients = buildTopPatients(paidBookingsForRank);
+  const topUcPatients = buildTopPatients(ucBookingsForRank);
 
   // 🌟 คำนวณสรุปสถิติการใช้บริการเตียงพิเศษ (Special Bed Bookings) - ไม่นับรายการจองที่ยกเลิก
   const defaultBeds: SpecialBed[] = [
@@ -843,6 +877,124 @@ export default function SummaryHistoryPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* 🌟 10 อันดับผู้ป่วยที่ใช้บริการมากที่สุด แยกตามสิทธิการรักษาพยาบาล */}
+          <div className="bg-white shadow rounded-lg p-5 max-w-6xl mx-auto mt-8 mb-4 border border-emerald-100">
+            <h2 className="text-xl font-bold text-emerald-800 mb-2 flex items-center justify-center gap-2">
+              <Users className="w-6 h-6 text-emerald-600" />
+              10 อันดับผู้ป่วยที่ใช้บริการมากที่สุด แยกตามสิทธิการรักษาพยาบาล
+            </h2>
+            <p className="text-center text-gray-500 text-xs sm:text-sm mb-6">
+              จัดอันดับตามจำนวนครั้งที่เข้ารับบริการ ประจำช่วงเวลาที่เลือก (ไม่นับรวมรายการจองที่ยกเลิก)
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* unpaid: สิทธิเบิกตรง */}
+              <div className="bg-sky-50 border-2 border-sky-200 rounded-2xl p-4 shadow-xs">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="p-2 bg-sky-500 text-white rounded-xl">
+                    <ShieldCheck className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-sky-900 text-sm">สิทธิเบิกตรง</h3>
+                    <p className="text-sky-700 text-[11px] font-semibold">unpaid</p>
+                  </div>
+                </div>
+                {topUnpaidPatients.length === 0 ? (
+                  <p className="text-xs text-sky-700 text-center py-6">ไม่มีข้อมูล</p>
+                ) : (
+                  <ol className="space-y-1.5">
+                    {topUnpaidPatients.map((p, idx) => (
+                      <li
+                        key={p.key}
+                        className="flex items-center justify-between gap-2 bg-white rounded-xl px-3 py-2 border border-sky-200"
+                      >
+                        <span className="flex items-center gap-2 min-w-0">
+                          <span className="w-5 h-5 shrink-0 rounded-full bg-sky-600 text-white text-[10px] font-bold flex items-center justify-center">
+                            {idx + 1}
+                          </span>
+                          <span className="text-xs font-semibold text-sky-900 truncate" title={p.name}>
+                            {p.name}
+                          </span>
+                        </span>
+                        <span className="text-xs font-black text-sky-700 shrink-0">{p.count} ครั้ง</span>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </div>
+
+              {/* paid: ชำระเงินเอง */}
+              <div className="bg-emerald-50 border-2 border-emerald-200 rounded-2xl p-4 shadow-xs">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="p-2 bg-emerald-600 text-white rounded-xl">
+                    <Wallet className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-emerald-900 text-sm">ชำระเงินเอง</h3>
+                    <p className="text-emerald-700 text-[11px] font-semibold">paid</p>
+                  </div>
+                </div>
+                {topPaidPatients.length === 0 ? (
+                  <p className="text-xs text-emerald-700 text-center py-6">ไม่มีข้อมูล</p>
+                ) : (
+                  <ol className="space-y-1.5">
+                    {topPaidPatients.map((p, idx) => (
+                      <li
+                        key={p.key}
+                        className="flex items-center justify-between gap-2 bg-white rounded-xl px-3 py-2 border border-emerald-200"
+                      >
+                        <span className="flex items-center gap-2 min-w-0">
+                          <span className="w-5 h-5 shrink-0 rounded-full bg-emerald-600 text-white text-[10px] font-bold flex items-center justify-center">
+                            {idx + 1}
+                          </span>
+                          <span className="text-xs font-semibold text-emerald-900 truncate" title={p.name}>
+                            {p.name}
+                          </span>
+                        </span>
+                        <span className="text-xs font-black text-emerald-700 shrink-0">{p.count} ครั้ง</span>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </div>
+
+              {/* UC: สิทธิบัตรทอง */}
+              <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-4 shadow-xs">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="p-2 bg-amber-500 text-white rounded-xl">
+                    <CreditCard className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-amber-900 text-sm">สิทธิบัตรทอง</h3>
+                    <p className="text-amber-700 text-[11px] font-semibold">UC</p>
+                  </div>
+                </div>
+                {topUcPatients.length === 0 ? (
+                  <p className="text-xs text-amber-700 text-center py-6">ไม่มีข้อมูล</p>
+                ) : (
+                  <ol className="space-y-1.5">
+                    {topUcPatients.map((p, idx) => (
+                      <li
+                        key={p.key}
+                        className="flex items-center justify-between gap-2 bg-white rounded-xl px-3 py-2 border border-amber-200"
+                      >
+                        <span className="flex items-center gap-2 min-w-0">
+                          <span className="w-5 h-5 shrink-0 rounded-full bg-amber-600 text-white text-[10px] font-bold flex items-center justify-center">
+                            {idx + 1}
+                          </span>
+                          <span className="text-xs font-semibold text-amber-900 truncate" title={p.name}>
+                            {p.name}
+                          </span>
+                        </span>
+                        <span className="text-xs font-black text-amber-700 shrink-0">{p.count} ครั้ง</span>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </div>
             </div>
           </div>
         </>

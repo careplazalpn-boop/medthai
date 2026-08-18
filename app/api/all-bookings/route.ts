@@ -71,6 +71,17 @@ export async function GET(req: Request) {
       }
     }
 
+    // ✅ ใหม่: ซิงก์สถานะเตียงพิเศษ — ถ้าคิวใดถูกบันทึกว่า "สำเร็จ" แล้ว (ไม่ว่าจะมาจาก
+    // auto-update ด้านบน หรือการกดยืนยันคิว) และคิวนั้นมีการจองเตียงพิเศษอยู่ (บันทึกไว้ใน
+    // special_bed_bookings.booking_id) แต่ยังไม่ถูกทำเครื่องหมายว่าให้บริการเตียงสำเร็จ
+    // (status ยังไม่เท่ากับ 1) ให้อัปเดตให้ตรงกันโดยอัตโนมัติ
+    await pool.execute(`
+      UPDATE special_bed_bookings sbb
+      INNER JOIN bookings b ON sbb.booking_id = b.id
+      SET sbb.status = 1
+      WHERE b.status = 'สำเร็จ' AND sbb.status <> 1
+    `);
+
     // --- Query หลัก ---
     // ✅ เพิ่ม LEFT JOIN กับ special_bed_bookings / special_beds เพื่อดึงข้อมูลเตียงพิเศษมาแสดงผล + ใช้กรอง
     // (ใช้ LEFT JOIN เพราะความสัมพันธ์เป็น booking : special_bed_booking = 1 : 1 อยู่แล้ว

@@ -13,6 +13,7 @@ import { FaClipboardList } from "react-icons/fa";
 import {
    Loader2,
   Check,
+  CheckCircle2,
   Sparkles,
   X,
   Menu,
@@ -713,6 +714,13 @@ const filteredTherapists = therapists;
                   <BarChart3 className="w-4 h-4 text-purple-400" />
                   <span>สรุปรายงาน</span>
                 </div>
+                <div
+                  onClick={() => router.push("/summary-therapists")}
+                  className="flex items-center gap-3 px-5 py-3 text-white hover:bg-blue-600 transition cursor-pointer"
+                >
+                  <BarChart3 className="w-4 h-4 text-purple-100" />
+                  <span>รายงานการปฎิบัติงาน</span>
+                </div>
               </>
             )}
 
@@ -783,13 +791,16 @@ const filteredTherapists = therapists;
       </AnimatePresence>
       <div className="max-w-6xl mx-auto p-6 pt-27 relative z-10">
         <h1
-          className="text-3xl sm:text-4xl font-extrabold text-emerald-700 mb-12 sm:mb-12 text-center drop-shadow-sm"
+          className="text-2xl sm:text-4xl font-extrabold text-emerald-800 mb-2 text-center"
         >
-          {isGuest ? "ดูคิวจองนวดแผนไทย" : "เลือกพนักงานนวดแผนไทยและช่วงเวลา"}
+          ตรวจสอบคิวว่าง
         </h1>
+        <p className="text-center text-emerald-700/70 text-sm sm:text-base mb-8 sm:mb-10">
+          หน้าดูข้อมูลเท่านั้น — เลือกวันที่เพื่อดูช่วงเวลาว่างของพนักงานนวดแต่ละท่าน
+        </p>
 
         <div className="mb-8 max-w-sm mx-auto">
-          <label className="flex items-center gap-2 text-emerald-700 font-semibold mb-2 text-lg">
+          <label className="flex items-center gap-2 text-emerald-700 font-semibold mb-2 text-base sm:text-lg">
             <CalendarIcon className="w-4 h-4" /> {isGuest ? "เลือกวันที่ต้องการดู" : "เลือกวันที่ต้องการนวด"}
           </label>
           <input
@@ -805,8 +816,16 @@ const filteredTherapists = therapists;
                 localStorage.removeItem("selectedDate"); // ลบเมื่อกด clear
               }
             }}
-            className={`border border-gray-300 rounded-lg p-3 w-full focus:outline-none focus:ring-2 focus:ring-emerald-400 transition ${!date ? "text-gray-400" : "text-gray-900"}`}
+            className={`border border-gray-300 rounded-xl p-3 w-full focus:outline-none focus:ring-2 focus:ring-emerald-400 transition shadow-sm bg-white ${!date ? "text-gray-400" : "text-gray-900"}`}
           />
+        </div>
+
+        {/* คำอธิบายสัญลักษณ์สี */}
+        <div className="max-w-2xl mx-auto mb-6 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs sm:text-sm font-medium text-gray-600 bg-white/80 backdrop-blur-sm rounded-2xl px-4 py-3 shadow-sm border border-gray-100">
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />ว่าง</span>
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-400" />ไม่ว่าง</span>
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-purple-400" />จองโดยแอดมิน</span>
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-gray-400" />ปิด/หยุด</span>
         </div>
 
         {/* Therapist & slots rendering */}
@@ -820,10 +839,19 @@ const filteredTherapists = therapists;
   const isAdminLike = !isGuest && (user.role_id === 909 || user.role_id === t.id);
 
   return (
-    <div key={t.name} className={`border p-5 rounded-2xl shadow-lg ${isOff ? "bg-gray-200" : "bg-white"} ${isSelected ? "ring-4 ring-emerald-300" : ""}`}>
-      <div className="flex items-center gap-2 mb-3">
-        <UserIcon className={`w-5 h-5 ${isOff ? "text-gray-500" : "text-emerald-600"}`} />
-        <h2 className={`text-lg font-semibold ${isOff ? "text-gray-500" : "text-emerald-700"}`}>{t.id}.{t.name}</h2>
+    <div key={t.name} className={`p-5 sm:p-6 rounded-3xl border transition-all duration-300 ${isOff ? "bg-gray-50 border-gray-200" : "bg-white border-gray-100"} ${isSelected ? "ring-4 ring-emerald-200 border-emerald-400 shadow-xl" : "shadow-md hover:shadow-lg"}`}>
+      <div className="flex items-center gap-3 mb-4">
+        <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-sm ${isOff ? "bg-gray-300 text-gray-600" : "bg-emerald-600 text-white"}`}>
+          <UserIcon className="w-5 h-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h2 className={`text-base sm:text-lg font-bold truncate ${isOff ? "text-gray-500" : "text-emerald-800"}`}>
+            {t.id}. {t.name}
+          </h2>
+          {isOff && (
+            <span className="inline-block text-[10px] font-bold bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full mt-0.5">วันนี้ไม่มา</span>
+          )}
+        </div>
         <div className="ml-auto flex items-center gap-2">
 
           {/* ✅ ใช้ isAdminLike แทน !isGuest */}
@@ -831,51 +859,61 @@ const filteredTherapists = therapists;
             <button
               disabled={isReadOnly}
               onClick={() => toggleOffTherapist(t.name)}
-              className={`px-3 py-1.5 text-sm rounded ${
-                isReadOnly ? "bg-gray-300 text-gray-500 cursor-not-allowed" : "bg-emerald-500 hover:bg-emerald-600"
+              className={`px-3 py-1.5 text-xs sm:text-sm rounded-full flex items-center gap-1.5 font-semibold text-white shadow-sm ${
+                isReadOnly ? "bg-gray-300 text-gray-500 cursor-not-allowed" : "bg-emerald-500 hover:bg-emerald-600 cursor-pointer"
               }`}
             >
-              {isOff ? "ไม่มา" : "มา"}
+              {isOff ? "ไม่มา" : "มา"}{isOff ? <UserX className="w-3.5 h-3.5" /> : <UserCheck className="w-3.5 h-3.5" />}
             </button>
           )}
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
         {timeSlots.map(slot => {
           const slotInfo = bookedSlots[t.name]?.find(b => b.time_slot === slot);
           const isBooked = !!slotInfo;
           const isActive = isSelected && selectedTime === slot;
           const isSlotDisabled = disabled.includes(slot);
 
-          let bookedBg = "bg-red-100 text-red-600 border-red-400";
+          let bookedBg = "bg-red-50 text-red-600 border-red-300";
           if (isAdminLike && slotInfo?.bookedbyrole === "admin") {
-            bookedBg = "bg-purple-100 text-purple-700 border-purple-400";
+            bookedBg = "bg-purple-50 text-purple-700 border-purple-300";
           }
 
           return (
-            <div key={slot} className="flex gap-1 items-center">
+            <div key={slot} className="flex gap-1.5 items-stretch">
               <button
                 disabled={isBooked || isOff || isSlotDisabled || isGuest}
                 onClick={() => handleSelect(t.name, slot)}
-                className={`text-sm px-3 py-2 rounded-lg font-medium border flex-1 flex flex-col items-center justify-center gap-1 transition shadow-sm
+                className={`text-sm px-3 py-2.5 rounded-xl font-medium border flex-1 flex flex-col items-center justify-center gap-1 transition-all duration-150 shadow-sm
                   ${
                     isSlotDisabled || isOff
-                      ? "bg-gray-300 text-gray-500 border-gray-400 cursor-not-allowed"
+                      ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
                       : isBooked
-                      ? bookedBg
+                      ? `${bookedBg} cursor-not-allowed`
                       : isActive
-                      ? "bg-emerald-600 text-white border-emerald-600"
-                      : "bg-white hover:bg-gray-200 text-emerald-800 border-gray-400"
+                      ? "bg-emerald-600 text-white border-emerald-600 shadow-md scale-[1.02]"
+                      : "bg-white hover:bg-emerald-50 hover:border-emerald-300 text-emerald-800 border-gray-200 cursor-pointer"
                   }`}
               >
-                <div className="flex items-center gap-1">
-                  <Clock className="w-4 h-4" /> {slot}
+                <div className="flex items-center gap-1.5 font-semibold">
+                  <Clock className="w-3.5 h-3.5" /> {slot}
                 </div>
-                {isBooked && (
+                {isBooked ? (
                   <div className="text-xs">
-                    {!isGuest ? `(${slotInfo?.name || "ไม่ระบุ"})` : "(ไม่ว่าง)"}
+                    {!isGuest ? `(${slotInfo?.name || "ไม่ระบุ"})` : "ไม่ว่าง"}
                   </div>
+                ) : isOff || isSlotDisabled ? (
+                  <span className="text-[11px] font-semibold text-gray-400">ปิดให้บริการ</span>
+                ) : isActive ? (
+                  <span className="text-[11px] font-semibold flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" />เลือกอยู่
+                  </span>
+                ) : (
+                  <span className="text-[11px] font-bold text-emerald-600 flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" />ว่าง
+                  </span>
                 )}
               </button>
 
@@ -883,7 +921,7 @@ const filteredTherapists = therapists;
               {date && isAdminLike && (
                 <button
                   onClick={() => toggleSlot(t.name, slot)}
-                  className={`px-2 py-1 rounded text-white ${
+                  className={`px-2 rounded-xl text-white flex items-center justify-center cursor-pointer transition ${
                     isOff
                       ? "bg-gray-400 cursor-not-allowed"
                       : isSlotDisabled
@@ -904,10 +942,10 @@ const filteredTherapists = therapists;
         <button
           onClick={handleOpenDialog}
           disabled={!(isSelected && selectedTime && date) || isOff}
-          className={`mt-5 w-full py-2 rounded-xl font-bold shadow transition text-center ${
+          className={`mt-5 w-full py-2.5 rounded-xl font-bold shadow transition text-center cursor-pointer ${
             isSelected && selectedTime && date && !isOff
               ? "bg-emerald-600 text-white hover:bg-emerald-700"
-              : "bg-gray-300 text-gray-500 cursor-not-allowed"
+              : "bg-gray-200 text-gray-400 cursor-not-allowed"
           }`}
         >
           เลือก

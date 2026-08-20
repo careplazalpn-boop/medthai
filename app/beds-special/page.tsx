@@ -721,6 +721,13 @@ export default function BedsSpecialPage() {
                   <BarChart3 className="w-5 h-5 text-purple-400" />
                   <span>สรุปรายงาน</span>
                 </div>
+                <div
+                  onClick={() => router.push("/summary-therapists")}
+                  className="flex items-center gap-3 px-5 py-3 text-white hover:bg-blue-600 transition cursor-pointer"
+                >
+                  <BarChart3 className="w-4 h-4 text-purple-100" />
+                  <span>รายงานการปฎิบัติงาน</span>
+                </div>
               </>
             )}
 

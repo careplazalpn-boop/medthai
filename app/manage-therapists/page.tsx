@@ -2,9 +2,26 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Trash2, UserPlus } from "lucide-react";
-import { FaHistory, FaFacebook, FaHospital, FaUsersCog, FaChartBar, FaCalendarAlt, FaSignOutAlt, FaSignInAlt, FaTimes, FaBars, FaSpa } from "react-icons/fa";
-import { HiChevronDown, HiChevronUp } from "react-icons/hi";
+import {
+  Pencil,
+  Trash2,
+  UserPlus,
+  X,
+  Menu,
+  LogOut,
+  LogIn,
+  Sparkles,
+  Calendar,
+  ClipboardList,
+  BedDouble,
+  History,
+  BarChart3,
+  Users,
+  Building2,
+  Facebook,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
 
@@ -14,7 +31,13 @@ interface Person {
   pname: string;
   fname: string;
   lname: string;
+  therapist_type?: number | null; // เฉพาะตาราง therapist: 0 = แพทย์ทั่วไป, 1 = แพทย์พิเศษ
+  status?: number | null;         // เฉพาะตาราง therapist: 0 = ใช้งาน, 1 = ปิดการใช้งาน
+  role_id?: number | null;        // เฉพาะตาราง med_staff: เชื่อมโยงกับ therapist.id (คนเดียวกันที่เป็นทั้งหมอนวดและผู้ให้บริการ)
 }
+
+const THERAPIST_TYPE_LABEL: Record<number, string> = { 0: "แพทย์ทั่วไป", 1: "แพทย์พิเศษ" };
+const THERAPIST_STATUS_LABEL: Record<number, string> = { 0: "ใช้งาน", 1: "ปิดการใช้งาน" };
 
 export default function ManageTherapistsPage() {
   const router = useRouter();
@@ -70,6 +93,23 @@ export default function ManageTherapistsPage() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  useEffect(() => {
+    if (selectedTable === "therapist") {
+      setForm({ therapist_type: 0, status: 0 });
+    } else if (selectedTable === "med_staff") {
+      setForm({ role_id: null });
+    } else {
+      setForm({});
+    }
+  }, [selectedTable]);
+
+  // หา therapist ที่เชื่อมโยงกับ med_staff คนนี้ (จาก role_id) เพื่อแสดงชื่อในตาราง
+  const getLinkedTherapistName = (roleId?: number | null) => {
+    if (!roleId) return null;
+    const t = therapists.find((th) => th.id === roleId);
+    return t ? `${t.pname}${t.fname} ${t.lname}` : null;
+  };
 
   if (!user) {
     return <p>กำลังตรวจสอบสิทธิ์...</p>; // render ชั่วคราว
@@ -215,6 +255,60 @@ export default function ManageTherapistsPage() {
             />
           </div>
 
+          {/* ฟิลด์เฉพาะตาราง "หมอนวด" (therapist): ประเภทแพทย์ / สถานะการใช้งาน */}
+          {selectedTable === "therapist" && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <div>
+                <label className="block mb-1 text-sm font-medium text-emerald-800">ประเภทแพทย์</label>
+                <select
+                  value={form.therapist_type ?? 0}
+                  onChange={(e) => setForm({ ...form, therapist_type: Number(e.target.value) })}
+                  className="w-full h-10 border border-gray-300 rounded-md px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900"
+                >
+                  <option value={0}>แพทย์ทั่วไป</option>
+                  <option value={1}>แพทย์พิเศษ</option>
+                </select>
+              </div>
+              <div>
+                <label className="block mb-1 text-sm font-medium text-emerald-800">สถานะการใช้งาน</label>
+                <select
+                  value={form.status ?? 0}
+                  onChange={(e) => setForm({ ...form, status: Number(e.target.value) })}
+                  className="w-full h-10 border border-gray-300 rounded-md px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900"
+                >
+                  <option value={0}>ใช้งาน</option>
+                  <option value={1}>ปิดการใช้งาน</option>
+                </select>
+              </div>
+            </div>
+          )}
+
+          {/* ฟิลด์เฉพาะตาราง "ผู้ให้บริการ" (med_staff): เชื่อมโยงกับหมอนวด */}
+          {selectedTable === "med_staff" && (
+            <div>
+              <label className="block mb-1 text-sm font-medium text-emerald-800">
+                เชื่อมโยงกับรายชื่อหมอนวด (ถ้าบุคคลนี้เป็นหมอนวดด้วย)
+              </label>
+              <select
+                value={form.role_id ?? ""}
+                onChange={(e) => setForm({ ...form, role_id: e.target.value === "" ? null : Number(e.target.value) })}
+                className={`w-full h-10 border border-gray-300 rounded-md px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
+                  form.role_id ? "text-gray-900" : "text-gray-400"
+                }`}
+              >
+                <option value="">-- ไม่เชื่อมโยง --</option>
+                {therapists.map((t) => (
+                  <option key={t.id} value={t.id} className="text-gray-900">
+                    {t.pname}{t.fname} {t.lname}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                ใช้สำหรับกรณีบุคคลเดียวกันเป็นทั้งหมอนวดและเจ้าหน้าที่ผู้ให้บริการ ระบบจะเก็บค่าเป็น med_staff.role_id = therapist.id
+              </p>
+            </div>
+          )}
+
           <div className="flex flex-wrap gap-3">
             <button
               onClick={handleAddSave}
@@ -239,33 +333,76 @@ const renderTable = (data: Person[], type: "therapist" | "med_staff") => (
           <tr>
             <th className="px-6 py-3 text-left text-sm font-medium">ลำดับ</th>
             <th className="px-6 py-3 text-left text-sm font-medium">ชื่อเต็ม</th>
+            {type === "therapist" ? (
+              <>
+                <th className="px-6 py-3 text-left text-sm font-medium">ประเภท</th>
+                <th className="px-6 py-3 text-left text-sm font-medium">สถานะ</th>
+              </>
+            ) : (
+              <th className="px-6 py-3 text-left text-sm font-medium">เชื่อมโยงกับหมอนวด</th>
+            )}
             <th className="px-6 py-3 text-center text-sm font-medium">การจัดการ</th>
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-300">
-          {data.map((p, index) => (
-            <tr key={p.id} className="hover:bg-emerald-50 transition">
-              <td className="px-6 py-3">{index + 1}</td>
-              <td className="px-6 py-3">{p.pname}{p.fname} {p.lname}</td>
-              <td className="px-6 py-3 flex justify-center gap-2">
-                <button
-                  onClick={() => openEditDialog(p, type)}
-                  className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 transition flex items-center gap-1"
-                >
-                  <Pencil size={16} /> แก้ไข
-                </button>
-                <button
-                  onClick={() => handleDelete(p.id)}
-                  className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 transition flex items-center gap-1"
-                >
-                  <Trash2 size={16} /> ลบ
-                </button>
-              </td>
-            </tr>
-          ))}
+          {data.map((p, index) => {
+            const linkedName = type === "med_staff" ? getLinkedTherapistName(p.role_id) : null;
+            return (
+              <tr key={p.id} className="hover:bg-emerald-50 transition">
+                <td className="px-6 py-3">{index + 1}</td>
+                <td className="px-6 py-3">{p.pname}{p.fname} {p.lname}</td>
+                {type === "therapist" ? (
+                  <>
+                    <td className="px-6 py-3">
+                      <span
+                        className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                          p.therapist_type === 1 ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-600"
+                        }`}
+                      >
+                        {THERAPIST_TYPE_LABEL[p.therapist_type ?? 0]}
+                      </span>
+                    </td>
+                    <td className="px-6 py-3">
+                      <span
+                        className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                          p.status === 1 ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700"
+                        }`}
+                      >
+                        {THERAPIST_STATUS_LABEL[p.status ?? 0]}
+                      </span>
+                    </td>
+                  </>
+                ) : (
+                  <td className="px-6 py-3">
+                    {linkedName ? (
+                      <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-sky-100 text-sky-700">
+                        หมอนวด: {linkedName}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-400 italic">ไม่เชื่อมโยง</span>
+                    )}
+                  </td>
+                )}
+                <td className="px-6 py-3 flex justify-center gap-2">
+                  <button
+                    onClick={() => openEditDialog(p, type)}
+                    className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 transition flex items-center gap-1"
+                  >
+                    <Pencil size={16} /> แก้ไข
+                  </button>
+                  <button
+                    onClick={() => handleDelete(p.id)}
+                    className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 transition flex items-center gap-1"
+                  >
+                    <Trash2 size={16} /> ลบ
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
           {data.length === 0 && (
             <tr>
-              <td colSpan={3} className="text-center text-gray-500 italic py-4">ไม่มีข้อมูล</td>
+              <td colSpan={type === "therapist" ? 5 : 4} className="text-center text-gray-500 italic py-4">ไม่มีข้อมูล</td>
             </tr>
           )}
         </tbody>
@@ -284,6 +421,35 @@ const renderTable = (data: Person[], type: "therapist" | "med_staff") => (
             <span className="font-semibold text-gray-600">ชื่อเต็ม: </span>
             <span className="text-gray-800">{p.pname}{p.fname} {p.lname}</span>
           </div>
+
+          {type === "therapist" ? (
+            <div className="mb-2 flex flex-wrap gap-2">
+              <span
+                className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                  p.therapist_type === 1 ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-600"
+                }`}
+              >
+                {THERAPIST_TYPE_LABEL[p.therapist_type ?? 0]}
+              </span>
+              <span
+                className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                  p.status === 1 ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700"
+                }`}
+              >
+                {THERAPIST_STATUS_LABEL[p.status ?? 0]}
+              </span>
+            </div>
+          ) : (
+            <div className="mb-2">
+              {getLinkedTherapistName(p.role_id) ? (
+                <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-sky-100 text-sky-700">
+                  หมอนวด: {getLinkedTherapistName(p.role_id)}
+                </span>
+              ) : (
+                <span className="text-xs text-gray-400 italic">ไม่เชื่อมโยง</span>
+              )}
+            </div>
+          )}
 
           <div className="flex gap-2 mt-3">
             <button
@@ -312,53 +478,57 @@ const renderTable = (data: Person[], type: "therapist" | "med_staff") => (
     <div className="min-h-screen bg-gray-50 text-emerald-700">
       {/* แถบเมนูบนสุด */}
       {/* Header */}
-            <div className="fixed top-0 left-0 w-full z-50 bg-gray-700 shadow-md flex justify-between items-center px-2 sm:px-4 py-2 sm:py-2">
-              <div className="flex items-center gap-2 sm:gap-13">
-                {/* Hamburger */}
-                <button
-                  onClick={() => setMenuOpen(!menuOpen)}
-                  className="text-white text-xl sm:text-2xl"
-                  title="เมนู"
-                >
-                  {menuOpen ? <FaTimes /> : <FaBars />}
-                </button>
-      
-                {/* Logo */}
-                <div
-                  className="ml-3 sm:ml-3 text-white font-bold text-base sm:text-lg flex items-center gap-1 cursor-pointer"
-                  onClick={() => router.push("/")}
-                  title="หน้าหลัก"
-                >
-                  <FaSpa className="text-sm sm:text-base" /> แพทย์แผนไทย
-                </div>
-              </div>
-      
-              {/* User Buttons */}
-              <div className="flex items-center gap-3 sm:gap-3 text-xs sm:text-sm">
-                {user ? (
-                  <>
-                    <button
-                      onClick={handleLogout}
-                      className="flex items-center gap-1 px-2 py-3 sm:px-4 sm:py-3 bg-red-600 text-white rounded-lg shadow font-semibold transition hover:bg-red-700 text-xs sm:text-sm"
-                      title="ลงชื่อออก"
-                    >
-                      <FaSignOutAlt className="w-3 h-3 sm:w-5 sm:h-5" />
-                      <span>ลงชื่อออก</span>
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    onClick={() => router.push("/login")}
-                    className="flex items-center gap-1 px-2 py-1 sm:px-4 sm:py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow transition hover:bg-gray-300 text-xs sm:text-sm"
-                    title="ลงชื่อเข้าใช้"
-                  >
-                    <FaSignInAlt className="w-3 h-3 sm:w-5 sm:h-5" />
-                    <span>สำหรับบุคลากร</span>
-                  </button>
-                )}
-              </div>
-            </div>
-        {/* Hamburger Menu */}
+      <div className="fixed top-0 left-0 w-full z-50 bg-gray-700 shadow-md flex justify-between items-center px-2 sm:px-4 py-2 sm:py-2">
+        <div className="flex items-center gap-2 sm:gap-13">
+          {/* Hamburger */}
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="text-white text-xl sm:text-2xl cursor-pointer"
+            title="เมนู"
+          >
+            {menuOpen ? <X className="w-5 h-5 sm:w-6 sm:h-6" /> : <Menu className="w-5 h-5 sm:w-6 sm:h-6" />}
+          </button>
+
+          {/* Logo */}
+          <div
+            className="ml-3 sm:ml-3 text-white font-bold text-base sm:text-lg flex items-center gap-1 cursor-pointer"
+            onClick={() => router.push("/")}
+            title="หน้าหลัก"
+          >
+            <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" /> แพทย์แผนไทย
+          </div>
+        </div>
+
+        {/* User Buttons */}
+        <div className="flex items-center gap-3 sm:gap-3 text-xs sm:text-sm">
+          {user ? (
+            <>
+              <span className="text-white font-semibold text-xs sm:text-sm">
+                คุณคือ {user.name || "ผู้ใช้"}
+              </span>
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-1 px-2 py-3 sm:px-4 sm:py-3 bg-red-600 text-white rounded-lg shadow font-semibold transition hover:bg-red-700 text-xs sm:text-sm cursor-pointer"
+                title="ลงชื่อออก"
+              >
+                <LogOut className="w-3 h-3 sm:w-5 sm:h-5" />
+                <span>ลงชื่อออก</span>
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => router.push("/login")}
+              className="flex items-center gap-1 px-2 py-1 sm:px-4 sm:py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow transition hover:bg-gray-300 text-xs sm:text-sm cursor-pointer"
+              title="ลงชื่อเข้าใช้"
+            >
+              <LogIn className="w-3 h-3 sm:w-5 sm:h-5" />
+              <span>สำหรับบุคลากร</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Hamburger Menu */}
       <AnimatePresence>
         {menuOpen && (
           <motion.div
@@ -367,13 +537,12 @@ const renderTable = (data: Person[], type: "therapist" | "med_staff") => (
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: -300, opacity: 0 }}
             transition={{ duration: 0.3 }}
-            className="fixed top-0 left-0 w-72 h-full bg-slate-800/95 backdrop-blur-md z-40 flex flex-col pt-16 overflow-y-auto shadow-2xl"
+            className="fixed top-0 left-0 w-72 h-full bg-slate-800/95 backdrop-blur-md z-40 flex flex-col pt-16 overflow-y-auto shadow-2xl text-white"
           >
-
             {/* Header */}
             <div className="px-5 pb-4 border-b border-slate-600">
               <div className="flex items-center gap-2 text-xl font-bold text-white">
-                <FaSpa className="text-emerald-400" />
+                <Sparkles className="text-emerald-400 w-5 h-5" />
                 ระบบแพทย์แผนไทย
               </div>
 
@@ -385,14 +554,12 @@ const renderTable = (data: Person[], type: "therapist" | "med_staff") => (
             </div>
 
             {/* ===================== เมนูหลัก ===================== */}
-
             <div className="py-2">
-
               <div
                 onClick={user ? handleBookingClick : () => router.push("/booking")}
                 className="flex items-center gap-3 px-5 py-3 text-white hover:bg-emerald-600 transition cursor-pointer"
               >
-                <FaCalendarAlt />
+                <Calendar className="w-4 h-4 text-emerald-400" />
                 <span>
                   {user ? "จองคิวนวดแผนไทย" : "ดูคิวจองนวดแผนไทย"}
                 </span>
@@ -401,14 +568,20 @@ const renderTable = (data: Person[], type: "therapist" | "med_staff") => (
               <div
                 onClick={() => router.push("/booking-audit")}
                 className="flex items-center gap-3 px-5 py-3 text-white hover:bg-emerald-600 transition cursor-pointer"
-              >               
+              >
+                <ClipboardList className="w-4 h-4 text-blue-400" />
                 <span>ดูคิวนวดทั้งหมด</span>
               </div>
-
+            </div>
+            <div
+              onClick={() => router.push("/beds-special")}
+              className="flex items-center gap-3 px-5 py-3 text-white hover:bg-emerald-600 transition cursor-pointer"
+            >
+              <BedDouble className="w-4 h-4 text-emerald-300" />
+              <span>จองเตียงพิเศษ</span>
             </div>
 
             {/* ===================== เจ้าหน้าที่ ===================== */}
-
             {user && (
               <>
                 <div className="border-t border-slate-600 my-2" />
@@ -421,7 +594,7 @@ const renderTable = (data: Person[], type: "therapist" | "med_staff") => (
                   onClick={() => router.push("/all-bookings")}
                   className="flex items-center gap-3 px-5 py-3 text-white hover:bg-blue-600 transition cursor-pointer"
                 >
-                  <FaHistory />
+                  <History className="w-4 h-4 text-amber-400" />
                   <span>ประวัติการจอง</span>
                 </div>
 
@@ -429,14 +602,21 @@ const renderTable = (data: Person[], type: "therapist" | "med_staff") => (
                   onClick={() => router.push("/summary-history")}
                   className="flex items-center gap-3 px-5 py-3 text-white hover:bg-blue-600 transition cursor-pointer"
                 >
-                  <FaChartBar />
+                  <BarChart3 className="w-4 h-4 text-purple-400" />
                   <span>สรุปรายงาน</span>
+                </div>
+
+                <div
+                  onClick={() => router.push("/summary-therapists")}
+                  className="flex items-center gap-3 px-5 py-3 text-white hover:bg-blue-600 transition cursor-pointer"
+                >
+                  <BarChart3 className="w-4 h-4 text-purple-100" />
+                  <span>รายงานการปฎิบัติงาน</span>
                 </div>
               </>
             )}
 
             {/* ===================== Admin ===================== */}
-
             {user?.role === "admin" && (
               <>
                 <div className="border-t border-slate-600 my-2" />
@@ -449,44 +629,41 @@ const renderTable = (data: Person[], type: "therapist" | "med_staff") => (
                   onClick={() => router.push("/manage-therapists")}
                   className="flex items-center gap-3 px-5 py-3 text-white hover:bg-amber-600 transition cursor-pointer"
                 >
-                  <FaUsersCog />
+                  <Users className="w-4 h-4 text-rose-400" />
                   <span>จัดการบุคลากร</span>
                 </div>
-
               </>
             )}
 
             {/* ===================== ติดต่อ ===================== */}
-
             <div className="border-t border-slate-600 my-2" />
 
             <div
               onClick={() => setContactOpen(!contactOpen)}
               className="flex items-center gap-3 px-5 py-3 text-white hover:bg-slate-700 transition cursor-pointer"
             >
-              <FaHospital />
+              <Building2 className="w-4 h-4 text-teal-400" />
 
               <span className="flex-1">
                 ช่องทางติดต่อ
               </span>
 
               {contactOpen ? (
-                <HiChevronUp className="w-5 h-5" />
+                <ChevronUp className="w-5 h-5" />
               ) : (
-                <HiChevronDown className="w-5 h-5" />
+                <ChevronDown className="w-5 h-5" />
               )}
             </div>
 
             {contactOpen && (
               <div className="bg-slate-900">
-
                 <a
                   href="https://m.me/100070719421986"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-3 px-9 py-3 text-slate-200 hover:bg-blue-700 transition"
                 >
-                  <FaFacebook className="text-blue-400" />
+                  <Facebook className="w-4 h-4 text-blue-400" />
                   Facebook (จองคิว)
                 </a>
 
@@ -496,13 +673,11 @@ const renderTable = (data: Person[], type: "therapist" | "med_staff") => (
                   rel="noopener noreferrer"
                   className="flex items-center gap-3 px-9 py-3 text-slate-200 hover:bg-emerald-700 transition"
                 >
-                  <FaHospital className="text-emerald-400" />
+                  <Building2 className="w-4 h-4 text-emerald-400" />
                   เว็บไซต์ศูนย์บริการ
                 </a>
-
               </div>
             )}
-
           </motion.div>
         )}
       </AnimatePresence>
@@ -572,6 +747,62 @@ const renderTable = (data: Person[], type: "therapist" | "med_staff") => (
             placeholder="นามสกุล"
           />
         </div>
+
+        {/* ฟิลด์เฉพาะตาราง "หมอนวด" (therapist) */}
+        {selectedTable === "therapist" && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="block mb-1 font-medium text-emerald-800">ประเภทแพทย์</label>
+              <select
+                value={editingPerson.therapist_type ?? 0}
+                onChange={(e) => setEditingPerson({ ...editingPerson, therapist_type: Number(e.target.value) })}
+                className="w-full h-10 border border-gray-300 rounded-md px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900"
+              >
+                <option value={0}>แพทย์ทั่วไป</option>
+                <option value={1}>แพทย์พิเศษ</option>
+              </select>
+            </div>
+            <div>
+              <label className="block mb-1 font-medium text-emerald-800">สถานะการใช้งาน</label>
+              <select
+                value={editingPerson.status ?? 0}
+                onChange={(e) => setEditingPerson({ ...editingPerson, status: Number(e.target.value) })}
+                className="w-full h-10 border border-gray-300 rounded-md px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900"
+              >
+                <option value={0}>ใช้งาน</option>
+                <option value={1}>ปิดการใช้งาน</option>
+              </select>
+            </div>
+          </div>
+        )}
+
+        {/* ฟิลด์เฉพาะตาราง "ผู้ให้บริการ" (med_staff) */}
+        {selectedTable === "med_staff" && (
+          <div>
+            <label className="block mb-1 font-medium text-emerald-800">
+              เชื่อมโยงกับรายชื่อหมอนวด (ถ้าบุคคลนี้เป็นหมอนวดด้วย)
+            </label>
+            <select
+              value={editingPerson.role_id ?? ""}
+              onChange={(e) =>
+                setEditingPerson({
+                  ...editingPerson,
+                  role_id: e.target.value === "" ? null : Number(e.target.value),
+                })
+              }
+              className={`w-full h-10 border border-gray-300 rounded-md px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
+                editingPerson.role_id ? "text-gray-900" : "text-gray-400"
+              }`}
+            >
+              <option value="">-- ไม่เชื่อมโยง --</option>
+              {therapists.map((t) => (
+                <option key={t.id} value={t.id} className="text-gray-900">
+                  {t.pname}{t.fname} {t.lname}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {/* ปุ่มบันทึก/ยกเลิก */}

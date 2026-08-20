@@ -20,7 +20,7 @@ export async function GET() {
   }
 }
 
-// 📌 POST: เพิ่มข้อมูล (เพิ่ม therapist_type และ status)
+// 📌 POST: เพิ่มข้อมูล (เพิ่ม therapist_type และ status / role_id)
 export async function POST(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -33,14 +33,14 @@ export async function POST(req: Request) {
       const { name, pname, fname, lname, therapist_type, status } = data;
       await pool.query(
         `INSERT INTO therapist (name, pname, fname, lname, therapist_type, status) VALUES (?, ?, ?, ?, ?, ?)`,
-        [name, pname, fname, lname, therapist_type || 0, status || 0]
+        [name, pname, fname, lname, therapist_type ?? 0, status ?? 0]
       );
     } else {
-      // สำหรับ med_staff (คงเดิม)
-      const { name, pname, fname, lname } = data;
+      // สำหรับ med_staff เพิ่มการรองรับ role_id ที่เชื่อมโยงกับ therapist.id
+      const { name, pname, fname, lname, role_id } = data;
       await pool.query(
-        `INSERT INTO med_staff (name, pname, fname, lname) VALUES (?, ?, ?, ?)`,
-        [name, pname, fname, lname]
+        `INSERT INTO med_staff (name, pname, fname, lname, role_id) VALUES (?, ?, ?, ?, ?)`,
+        [name, pname, fname, lname, role_id === "" || role_id === undefined ? null : role_id]
       );
     }
 
@@ -61,13 +61,13 @@ export async function PUT(req: Request) {
       const { id, name, pname, fname, lname, therapist_type, status } = data;
       await pool.query(
         `UPDATE therapist SET name=?, pname=?, fname=?, lname=?, therapist_type=?, status=? WHERE id=?`,
-        [name, pname, fname, lname, therapist_type, status, id]
+        [name, pname, fname, lname, therapist_type ?? 0, status ?? 0, id]
       );
     } else {
-      const { id, name, pname, fname, lname } = data;
+      const { id, name, pname, fname, lname, role_id } = data;
       await pool.query(
-        `UPDATE med_staff SET name=?, pname=?, fname=?, lname=? WHERE id=?`,
-        [name, pname, fname, lname, id]
+        `UPDATE med_staff SET name=?, pname=?, fname=?, lname=?, role_id=? WHERE id=?`,
+        [name, pname, fname, lname, role_id === "" || role_id === undefined ? null : role_id, id]
       );
     }
 

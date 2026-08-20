@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-//import { User, Phone, UserCheck, Clock, CalendarDays, CheckCircle2, Smile, Frown } from "lucide-react";
 import { User, Phone, UserCheck, Clock, CalendarDays, BedDouble, CheckCircle2 } from "lucide-react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { motion, AnimatePresence } from "framer-motion";
@@ -50,9 +49,8 @@ interface Booking {
   time_slot: string;
   date: string;
   status: string;
-  created_at: string; // หรือ Date ถ้า parse เป็น Date แล้ว
+  created_at: string; 
   payment_status?: string;
-  // ✅ ใหม่: ข้อมูลเตียงพิเศษ (ถ้ามี) — ตั้งชื่อฟิลด์ให้ตรงกับที่ /api/bookings ใช้อยู่แล้ว
   has_special_bed?: number | boolean;
   bed_name?: string;
 }
@@ -75,26 +73,19 @@ const getStatusColor = (b: Booking) => {
   }
 };
 
-  export default function AllBookingsPage() {
+export default function AllBookingsPage() {
   const router = useRouter();
   const { user, logout } = useAuth();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [providers, setProviders] = useState<string[]>([]);
-  //const [therapists, setTherapists] = useState<string[]>([]);
   const [therapists, setTherapists] = useState<Therapist[]>([]);
   const [timeSlots, setTimeSlots] = useState<string[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [showCancelSuccess, setShowCancelSuccess] = useState(false);
   const [showConfirmSuccess, setShowConfirmSuccess] = useState(false);
   const [showDeleteSuccess, setShowDeleteSuccess] = useState(false);
-  const [editingNameId, setEditingNameId] = useState<number | null>(null);
-  const [editingPnameValue, setEditingPnameValue] = useState("");
-  const [editingFnameValue, setEditingFnameValue] = useState("");
-  const [editingLnameValue, setEditingLnameValue] = useState("");
-  const [editingPhoneId, setEditingPhoneId] = useState<number | null>(null);
-  const [editingPhoneValue, setEditingPhoneValue] = useState<string>("");
-  const [menuOpen, setMenuOpen] = useState(false); // state สำหรับ hamburger
+  const [menuOpen, setMenuOpen] = useState(false); 
   const [, setShowAlert] = useState(false);
   const [filterName, setFilterName] = useState("");
   const [filterTherapist, setFilterTherapist] = useState("all");
@@ -102,7 +93,7 @@ const getStatusColor = (b: Booking) => {
   const [filterDate, setFilterDate] = useState("");
   const [filterTimeSlot, setFilterTimeSlot] = useState("all");
   const [filterProvider, setFilterProvider] = useState("all");
-  const [filterSpecialBed, setFilterSpecialBed] = useState(false); // ✅ ใหม่: กรองเฉพาะคิวที่มีการจองเตียงพิเศษ
+  const [filterSpecialBed, setFilterSpecialBed] = useState(false); 
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -123,8 +114,7 @@ const getStatusColor = (b: Booking) => {
         totalInQueue: 0,
     });
 
-  
-    useEffect(() => {
+  useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setMenuOpen(false);
@@ -153,41 +143,41 @@ const getStatusColor = (b: Booking) => {
 
   useEffect(() => {  
     if (!filterDate) {
-    setBookings([]);
-    setSummary({ totalAttended: 0, totalCancelled: 0 ,totalPending: 0,totalInQueue:0 });
-    return;
+      setBookings([]);
+      setSummary({ totalAttended: 0, totalCancelled: 0 ,totalPending: 0,totalInQueue:0 });
+      return;
     }
 
-  setLoading(true);
-  (async () => {
-    try {
-      const res = await fetch(
-        `/api/all-bookings?date=${filterDate || ""}&provider=${filterProvider || ""}&therapist=${filterTherapist || ""}&timeSlots=${filterTimeSlot || ""}&status=${filterStatus || ""}&specialBed=${filterSpecialBed}&page=${page}&limit=${limit}`
-      );
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error || "เกิดข้อผิดพลาด");
+    setLoading(true);
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/all-bookings?date=${filterDate || ""}&provider=${filterProvider || ""}&therapist=${filterTherapist || ""}&timeSlots=${filterTimeSlot || ""}&status=${filterStatus || ""}&specialBed=${filterSpecialBed}&page=${page}&limit=${limit}`
+        );
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || "เกิดข้อผิดพลาด");
 
-      setBookings(data.bookings);
-      setTotalPages(data.pagination.totalPages || 1);
+        setBookings(data.bookings);
+        setTotalPages(data.pagination.totalPages || 1);
 
-      if (data.summary) {
-          setSummary({
-           totalAttended: data.summary.totalAttended ||0 ,
-           totalCancelled: data.summary.totalCancelled || 0,
-           totalPending: data.summary.totalPending || 0,
-           totalInQueue: data.summary.totalInQueue || 0,
-          });
-         }
+        if (data.summary) {
+            setSummary({
+             totalAttended: data.summary.totalAttended ||0 ,
+             totalCancelled: data.summary.totalCancelled || 0,
+             totalPending: data.summary.totalPending || 0,
+             totalInQueue: data.summary.totalInQueue || 0,
+            });
+           }
 
-    } catch (e: any) {
-      setError(e.message || "เกิดข้อผิดพลาดไม่ทราบสาเหตุ");
-    } finally {
-      setLoading(false);
-    }
-  })();
-}, [filterDate, filterProvider, filterTherapist, filterTimeSlot, filterStatus, filterSpecialBed, page, limit]);
-    
-    const handleNext = () => {
+      } catch (e: any) {
+        setError(e.message || "เกิดข้อผิดพลาดไม่ทราบสาเหตุ");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [filterDate, filterProvider, filterTherapist, filterTimeSlot, filterStatus, filterSpecialBed, page, limit]);
+      
+  const handleNext = () => {
     if (page < totalPages) setPage((p) => p + 1);
   };
 
@@ -222,7 +212,7 @@ const getStatusColor = (b: Booking) => {
   }, []);
 
   if (!user) {
-    return <p>กำลังตรวจสอบสิทธิ์...</p>; // render ชั่วคราว
+    return <p>กำลังตรวจสอบสิทธิ์...</p>;
   }
 
   const handleBedsClick = () => {
@@ -238,14 +228,12 @@ const getStatusColor = (b: Booking) => {
     router.push("/beds-special");
   };  
 
-  const exportToExcel = async () => { // 💡 ต้องเป็น async
-    // 1. ตรวจสอบ Filter พื้นฐาน
+  const exportToExcel = async () => { 
     if (!filterDate) return alert("กรุณาเลือกวันที่ (Date Filter) ก่อนทำการ Export");
     
     setLoading(true);
 
     try {
-        // 🎯 2. เรียก API เพื่อดึงข้อมูลทั้งหมด (Export Mode: isExport=true)
         const exportUrl = `/api/all-bookings?export=true&date=${filterDate || ""}&provider=${filterProvider || ""}&therapist=${filterTherapist || ""}&timeSlots=${filterTimeSlot || ""}&status=${filterStatus || ""}&specialBed=${filterSpecialBed}`;
 
         const exportRes = await fetch(exportUrl);
@@ -260,12 +248,8 @@ const getStatusColor = (b: Booking) => {
             return;
         }
 
-        // 3. เรียงลำดับข้อมูลทั้งหมดที่ได้มา (ถ้าต้องการ)
-        // ใช้ allBookings แทน bookings
         const finalExportData = allBookings
-            // ไม่ต้อง filter ตามวันที่อีก เพราะ URL API กรองมาแล้ว
             .sort((a, b) => {
-                // Logic การเรียงลำดับเดิม
                 const [aStart] = a.time_slot.split("-");
                 const [bStart] = b.time_slot.split("-");
                 const timeDiff = parseTime(aStart) - parseTime(bStart);
@@ -278,13 +262,11 @@ const getStatusColor = (b: Booking) => {
             paid: "ชำระเงิน",
             UC: "สิทธิ UC"
         };
-        // 4. แปลงข้อมูล
         const data = finalExportData.map(b => ({
             "ผู้ให้บริการ": b.provider,
             "ผู้มารับบริการ": b.name,
             "เบอร์โทร": b.phone,
             "หมอนวด": b.therapist,
-            // ตรวจสอบชื่อคอลัมน์ใน maxWidths
             "วันที่": new Date(b.date).toLocaleDateString("th-TH",{year:"numeric",month:"2-digit",day:"2-digit",timeZone:"Asia/Bangkok"}),
             "ช่วงเวลา": b.time_slot,
             "สถานะ": getStatusLabel(b),           
@@ -292,8 +274,6 @@ const getStatusColor = (b: Booking) => {
           
         }));
 
-
-        // 5. สร้าง Excel File (Logic เดิม)
         const ws = XLSX.utils.json_to_sheet(data);
 
         const columnWidths = Object.keys(data[0]).map(key => {
@@ -308,7 +288,7 @@ const getStatusColor = (b: Booking) => {
               "หมอนวด": 30,
               "ช่วงเวลา": 15,
               "สถานะ" : 15,
-              "การชำระเงิน": 15, // ชื่อคอลัมน์นี้ต้องตรงกับคีย์ใน object 'data'
+              "การชำระเงิน": 15, 
             };
         
             return { wch: Math.min(maxLength + 2, maxWidths[key] || maxLength + 2) };
@@ -328,27 +308,25 @@ const getStatusColor = (b: Booking) => {
     } finally {
         setLoading(false);
     }
-};
+  };
 
-// ฟังก์ชันช่วยแปลง "HH:MM" เป็นนาที
-const parseTime = (timeStr: string) => {
-  const [h, m] = timeStr.split(":").map(Number);
-  return h * 60 + m;
-};
+  const parseTime = (timeStr: string) => {
+    const [h, m] = timeStr.split(":").map(Number);
+    return h * 60 + m;
+  };
 
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr);
     return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,"0")}-${d.getDate().toString().padStart(2,"0")}`;
   };
-    const normalizeTimeSlot = (time: string) => time.replace(/\s/g, '');
+  const normalizeTimeSlot = (time: string) => time.replace(/\s/g, '');
 
-    const filteredBookings = bookings.filter(b => {
+  const filteredBookings = bookings.filter(b => {
     const nameMatch = b.name.toLowerCase().includes(filterName.toLowerCase());
     const therapistMatch = filterTherapist === "all" || b.therapist === filterTherapist;
     const providerMatch = filterProvider === "all" || b.provider === filterProvider;
     const dateMatch = !filterDate || formatDate(b.date) === filterDate;
     const timeMatch = filterTimeSlot === "all" || normalizeTimeSlot(b.time_slot) === normalizeTimeSlot(filterTimeSlot);
-    // ✅ ใหม่: เฉพาะคิวที่มีการจองเตียงพิเศษ (ถ้าเปิดใช้ตัวกรองนี้)
     const specialBedMatch = !filterSpecialBed || !!b.has_special_bed;
     
     const statusLabel = getStatusLabel(b);
@@ -361,37 +339,17 @@ const parseTime = (timeStr: string) => {
       default: return nameMatch && therapistMatch && providerMatch && dateMatch && timeMatch && specialBedMatch;
     }
   });
-  
-  const totalAttended = filteredBookings.filter(b => b.status === "สำเร็จ").length;
-  const totalCancelled = filteredBookings.filter(b => b.status === "ยกเลิก").length;
-  const attendedKeys = new Set<string>();
-  const cancelledKeys = new Set<string>();
 
+  // ตรวจสอบว่าวันที่ของการจองเป็นวันข้างหน้า (อนาคต) หรือไม่
+  const isFutureBookingDate = (dateStr: string) => {
+    const bookingDate = new Date(dateStr);
+    bookingDate.setHours(0, 0, 0, 0);
 
-// ตรวจสอบว่าวันที่ของการจองเป็นวันข้างหน้า (อนาคต) หรือไม่
-const isFutureBookingDate = (dateStr: string) => {
-  const bookingDate = new Date(dateStr);
-  bookingDate.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  return bookingDate.getTime() > today.getTime();
-};
-
-
-bookings.forEach(b => {
-  if (filterDate && formatDate(b.date) !== filterDate) return; // กรองตามวันที่ก่อน
-
-  const key = `${b.name}-${formatDate(b.date)}`;
-  const status = getStatusLabel(b);
-
-  if (status === "สำเร็จ") {
-    attendedKeys.add(key);  // มานวด
-  } else if (status === "ยกเลิก" && !attendedKeys.has(key)) {
-    cancelledKeys.add(key); // ไม่มานวด
-  }
-});
+    return bookingDate.getTime() > today.getTime();
+  };
 
   const handleBookingClick = () => {
     if (!user) {
@@ -410,16 +368,6 @@ bookings.forEach(b => {
     logout();
     router.push("/login");
   };
-
-const attendedBookings = Array.from(attendedKeys).map(k => {
-  const [name, date] = k.split("-");
-  return bookings.find(b => b.name === name && formatDate(b.date) === date)!;
-});
-
-const cancelledBookings = Array.from(cancelledKeys).map(k => {
-  const [name, date] = k.split("-");
-  return bookings.find(b => b.name === name && formatDate(b.date) === date)!;
-});
 
   const selectedBooking = bookings.find(b => b.id === selectedId);
 
@@ -446,7 +394,6 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
         else setShowConfirmSuccess(true);
         setTimeout(() => (action === "cancel" ? setShowCancelSuccess(false) : setShowConfirmSuccess(false)), 3000);
       } else {
-        // ✅ ใหม่: แสดงข้อความจาก backend ถ้ามี (เช่น กรณีถูกบล็อกเพราะมีการจองเตียงพิเศษ)
         alert(data.message || data.error || `เกิดข้อผิดพลาดในการ${action==="cancel"?"ยกเลิก":"ยืนยัน"}`);
       }
     } catch {
@@ -837,108 +784,22 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
                 {/* ผู้มารับบริการ */}
                 <div className="flex flex-col sm:flex-col gap-1">
                   <Label icon={<User className="w-4 h-4" />} text="ผู้มารับบริการ" />
-                  {editingNameId === b.id ? (
-                    <div className="flex flex-col gap-1">
-                      {/* Input 3 ช่อง */}
-                      <div className="flex flex-col sm:flex-row gap-1">
-                        <input
-                          placeholder="คำนำหน้า"
-                          value={editingPnameValue}
-                          onChange={(e) => setEditingPnameValue(e.target.value)}
-                          className="px-2 py-1 border border-gray-300 rounded-md text-gray-900 w-19"
-                          autoFocus
-                        />
-                        <input
-                          placeholder="ชื่อจริง"
-                          value={editingFnameValue}
-                          onChange={(e) => setEditingFnameValue(e.target.value)}
-                          className="px-2 py-1 border border-gray-300 rounded-md text-gray-900 w-19"
-                        />
-                        <input
-                          placeholder="นามสกุล"
-                          value={editingLnameValue}
-                          onChange={(e) => setEditingLnameValue(e.target.value)}
-                          className="px-2 py-1 border border-gray-300 rounded-md text-gray-900 w-19"
-                        />
-                      </div>
-                      {/* ปุ่มยืนยัน/ยกเลิก */}
-                      <div className="flex gap-2 mt-1">
-                        <button
-                          onClick={async () => {
-                            // รวม pname+fname ติดกัน ตามด้วย lname
-                            const fullName = [editingPnameValue + editingFnameValue, editingLnameValue]
-                              .filter(Boolean)
-                              .join(" ");
-
-                            if (
-                              fullName &&
-                              (editingPnameValue !== b.pname ||
-                              editingFnameValue !== b.fname ||
-                              editingLnameValue !== b.lname)
-                            ) {
-                              try {
-                                const res = await fetch(`/api/update-booking-name`, {
-                                  method: "POST",
-                                  headers: { "Content-Type": "application/json" },
-                                  body: JSON.stringify({
-                                    id: b.id,
-                                    pname: editingPnameValue,
-                                    fname: editingFnameValue,
-                                    lname: editingLnameValue,
-                                  }),
-                                });
-                                const data = await res.json();
-                                if (data.success) {
-                                  // แสดง fullname หลังอัปเดต
-                                  setBookings((prev) =>
-                                    prev.map((x) =>
-                                      x.id === b.id
-                                        ? {
-                                            ...x,
-                                            name: fullName,
-                                            pname: editingPnameValue,
-                                            fname: editingFnameValue,
-                                            lname: editingLnameValue,
-                                          }
-                                        : x
-                                    )
-                                  );
-                                } else {
-                                  alert("ไม่สามารถอัปเดตชื่อได้: " + data.error);
-                                }
-                              } catch (err) {
-                                alert("เกิดข้อผิดพลาด: " + err);
-                              }
-                            }
-                            setEditingNameId(null);
-                          }}
-                          className="px-2 py-1 text-xs bg-emerald-600 text-white rounded hover:bg-emerald-700 transition"
-                        >
-                          ยืนยัน
-                        </button>
-
-                        <button
-                          onClick={() => setEditingNameId(null)}
-                          className="px-2 py-1 text-xs bg-gray-300 text-gray-700 rounded hover:bg-gray-400 transition"
-                        >
-                          ยกเลิก
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <span
-                      className="font-normal text-base cursor-pointer"
-                      onClick={() => {
-                        setEditingNameId(b.id);
-                        // แสดงข้อมูลเดิมก่อนแก้ไข
-                        setEditingPnameValue(b.pname ?? "");
-                        setEditingFnameValue(b.fname ?? "");
-                        setEditingLnameValue(b.lname ?? "");
-                      }}
-                    >
+                  <div className="flex flex-col items-start gap-1">
+                    <span className="font-normal text-base">
                       {b.name}
                     </span>
-                  )}
+                    {/* แสดง Icon เตียงพิเศษ */}
+                    {Boolean(b.has_special_bed) && (
+                      <span
+                        className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[11px] font-bold rounded bg-emerald-100 text-emerald-800 border border-emerald-300"
+                        title={b.bed_name ? `เตียงพิเศษ: ${b.bed_name}` : "ใช้เตียงพิเศษ"}
+                      >
+                        <BedDouble className="w-3.5 h-3.5 text-emerald-700" />
+                        <span>เตียงพิเศษ{b.bed_name ? ` (${b.bed_name})` : ""}</span>
+                      </span>
+                    )}
+                  </div>
+
                   {/* ปุ่ม toggle การจ่ายเงิน */}
                   <button
                     onClick={async () => {
@@ -992,66 +853,9 @@ const cancelledBookings = Array.from(cancelledKeys).map(k => {
                 {/* เบอร์โทร */}
                 <div className="flex flex-col sm:flex-col gap-1">
                   <Label icon={<Phone className="w-4 h-4" />} text="เบอร์โทร" />
-                  {editingPhoneId === b.id ? (
-                    <div className="flex flex-col gap-1">
-                      <input
-                        value={editingPhoneValue}
-                        onChange={(e) => setEditingPhoneValue(e.target.value)}
-                        className="px-2 py-1 border border-gray-300 rounded-md text-gray-900 w-32"
-                        autoFocus
-                      />
-                      <div className="flex gap-2 mt-1">
-                        <button
-                          onClick={async () => {
-                            if (editingPhoneValue && editingPhoneValue !== b.phone) {
-                              try {
-                                const res = await fetch("/api/update-booking-phone", {
-                                  method: "POST",
-                                  headers: { "Content-Type": "application/json" },
-                                  body: JSON.stringify({
-                                    id: b.id,
-                                    phone: editingPhoneValue,
-                                  }),
-                                });
-                                const data = await res.json();
-                                if (data.success) {
-                                  setBookings((prev) =>
-                                    prev.map((x) =>
-                                      x.id === b.id ? { ...x, phone: editingPhoneValue } : x
-                                    )
-                                  );
-                                } else {
-                                  alert("ไม่สามารถอัปเดตเบอร์โทรได้: " + data.error);
-                                }
-                              } catch (err) {
-                                alert("เกิดข้อผิดพลาด: " + err);
-                              }
-                            }
-                            setEditingPhoneId(null);
-                          }}
-                          className="px-2 py-1 text-xs bg-emerald-600 text-white rounded hover:bg-emerald-700 transition"
-                        >
-                          ยืนยัน
-                        </button>
-                        <button
-                          onClick={() => setEditingPhoneId(null)}
-                          className="px-2 py-1 text-xs bg-gray-300 text-gray-700 rounded hover:bg-gray-400 transition"
-                        >
-                          ยกเลิก
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <span
-                      className="font-normal text-base cursor-pointer"
-                      onClick={() => {
-                        setEditingPhoneId(b.id);
-                        setEditingPhoneValue(b.phone ?? "");
-                      }}
-                    >
-                      {b.phone}
-                    </span>
-                  )}
+                  <span className="font-normal text-base">
+                    {b.phone}
+                  </span>
                 </div>
                 {/* หมอนวด */}
                 <div className="flex flex-col sm:flex-col gap-1">

@@ -46,6 +46,7 @@ interface BookingInfo {
 interface Therapist {
   id: number;
   name: string;
+  shortname?: string;
 }
 interface MedStaff {
   id: number;
@@ -846,7 +847,7 @@ const filteredTherapists = therapists;
         </div>
         <div className="min-w-0 flex-1">
           <h2 className={`text-base sm:text-lg font-bold truncate ${isOff ? "text-gray-500" : "text-emerald-800"}`}>
-            {t.id}. {t.name}
+            {t.id}. {t.shortname}
           </h2>
           {isOff && (
             <span className="inline-block text-[10px] font-bold bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full mt-0.5">วันนี้ไม่มา</span>

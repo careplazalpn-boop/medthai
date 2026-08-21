@@ -76,6 +76,7 @@ interface BookingInfo {
 interface Therapist {
   id: number;
   name: string;
+  shortname?: string;
   therapist_type?: number;
 }
 
@@ -871,7 +872,7 @@ export default function BookingPage() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <h2 className={`text-base sm:text-lg font-bold truncate ${isOff ? "text-gray-500" : isSpecialType ? "text-amber-700" : "text-emerald-800"}`}>
-                      {t.id}. {t.name}
+                      {t.id}. {t.shortname}
                     </h2>
                     <div className="flex items-center gap-1.5 mt-0.5">
                       {isSpecialType && (

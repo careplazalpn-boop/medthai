@@ -26,6 +26,7 @@ export async function GET() {
         SELECT
           id,
           name,
+          CONCAT_WS(' ', fname, lname) AS shortname,
           therapist_type,
           status
         FROM therapist
@@ -37,6 +38,7 @@ export async function GET() {
         SELECT
           id,
           name,
+          CONCAT_WS(' ', fname, lname) AS shortname,
           therapist_type,
           status
         FROM therapist

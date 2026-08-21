@@ -41,11 +41,21 @@ export async function GET(request: Request) {
           b.therapist, 
           b.time_slot, 
           b.name, 
+          b.hn,
           b.status, 
           b.bookedbyrole,
           (CASE WHEN sbb.id IS NOT NULL THEN 1 ELSE 0 END) AS has_special_bed,
           sb.bed_name,
-          sb.room_name
+          sb.room_name,
+          (CASE WHEN EXISTS (
+            SELECT 1 FROM med_user mu
+            WHERE mu.hn IS NOT NULL AND mu.hn <> ''
+            AND REPLACE(REPLACE(mu.mobile_phone_number, '-', ''), ' ', '') = REPLACE(REPLACE(b.phone, '-', ''), ' ', '')
+          ) THEN 1 ELSE 0 END) AS has_confirmed_hn,
+          (CASE WHEN EXISTS (
+            SELECT 1 FROM new_user nu
+            WHERE REPLACE(REPLACE(nu.mobile_phone_number, '-', ''), ' ', '') = REPLACE(REPLACE(b.phone, '-', ''), ' ', '')
+          ) THEN 1 ELSE 0 END) AS is_new_user_pending
         FROM bookings b
         INNER JOIN therapist t ON (b.therapist = t.name OR b.therapist = t.fname)
         LEFT JOIN special_bed_bookings sbb ON b.id = sbb.booking_id
@@ -59,11 +69,21 @@ export async function GET(request: Request) {
           b.therapist, 
           b.time_slot, 
           b.name, 
+          b.hn,
           b.status, 
           b.bookedbyrole,
           (CASE WHEN sbb.id IS NOT NULL THEN 1 ELSE 0 END) AS has_special_bed,
           sb.bed_name,
-          sb.room_name
+          sb.room_name,
+          (CASE WHEN EXISTS (
+            SELECT 1 FROM med_user mu
+            WHERE mu.hn IS NOT NULL AND mu.hn <> ''
+            AND REPLACE(REPLACE(mu.mobile_phone_number, '-', ''), ' ', '') = REPLACE(REPLACE(b.phone, '-', ''), ' ', '')
+          ) THEN 1 ELSE 0 END) AS has_confirmed_hn,
+          (CASE WHEN EXISTS (
+            SELECT 1 FROM new_user nu
+            WHERE REPLACE(REPLACE(nu.mobile_phone_number, '-', ''), ' ', '') = REPLACE(REPLACE(b.phone, '-', ''), ' ', '')
+          ) THEN 1 ELSE 0 END) AS is_new_user_pending
         FROM bookings b
         INNER JOIN therapist t ON (b.therapist = t.name OR b.therapist = t.fname)
         LEFT JOIN special_bed_bookings sbb ON b.id = sbb.booking_id
@@ -86,8 +106,18 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { provider, hn, name, phone, therapist, time, date, bookedbyrole } =
-      await request.json();
+    const {
+      provider,
+      hn,
+      name,
+      phone,
+      therapist,
+      time,
+      date,
+      bookedbyrole,
+      id_card_number,
+      idCard, // เผื่อฝั่งหน้าเว็บส่งมาในชื่อ idCard (camelCase) แทน id_card_number
+    } = await request.json();
 
     const missingFields = [];
     if (!provider) missingFields.push("provider");
@@ -122,6 +152,30 @@ export async function POST(request: Request) {
         "INSERT INTO bookings (hn, name, phone, date, therapist, time_slot, provider, bookedbyrole, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'รอดำเนินการ')",
         [hn || null, name, phone, date, therapist, time, provider, bookedbyrole || 'user']
       );
+
+      // 📌 ผู้มารับบริการรายใหม่ที่ยังไม่มี HN (ไม่ได้ดึงจากตารางหลัก)
+      // บันทึกข้อมูลเบื้องต้นไว้ในตาราง new_user เพื่อรอเจ้าหน้าที่บันทึก HN ให้สมบูรณ์ภายหลัง
+      // เป็นการทำงานแบบ best-effort: ถ้าขั้นตอนนี้ล้มเหลว จะไม่กระทบการจองที่บันทึกไปแล้วด้านบน
+      if (!hn) {
+        try {
+          const idCardValue = id_card_number || idCard || null;
+
+          const [dup]: any = await conn.query(
+            "SELECT id FROM new_user WHERE name = ? AND mobile_phone_number = ? LIMIT 1",
+            [name, phone]
+          );
+
+          if (!dup || dup.length === 0) {
+            await conn.query(
+              "INSERT INTO new_user (name, id_card_number, mobile_phone_number, created_at) VALUES (?, ?, ?, NOW())",
+              [name, idCardValue, phone]
+            );
+          }
+        } catch (newUserError) {
+          console.error("บันทึกข้อมูล new_user (รอ HN) ล้มเหลว:", newUserError);
+          // ไม่ throw ต่อ เพื่อไม่ให้กระทบผลลัพธ์การจองที่สำเร็จไปแล้ว
+        }
+      }
     } finally {
       conn.release();
     }

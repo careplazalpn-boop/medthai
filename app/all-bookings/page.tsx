@@ -53,6 +53,9 @@ interface Booking {
   payment_status?: string;
   has_special_bed?: number | boolean;
   bed_name?: string;
+  hn?: string | null;
+  has_confirmed_hn?: number | boolean;
+  is_new_user_pending?: number | boolean;
 }
 
 interface Therapist {
@@ -768,7 +771,11 @@ export default function AllBookingsPage() {
       ) : (
         
         <ul className="space-y-4 w-full max-w-[92rem] mx-auto">
-          {filteredBookings.map((b, idx) => (
+          {filteredBookings.map((b, idx) => {
+            // 📌 ผู้มารับบริการรายใหม่ที่ยังไม่มี HN สมบูรณ์ (รอเจ้าหน้าที่บันทึกข้อมูลใน new_user/med_user)
+            // ใช้เงื่อนไขเดียวกับหน้า booking: มีข้อมูลรออยู่ใน new_user (ตามเบอร์โทร) แต่ยังไม่พบ HN ยืนยันแล้วใน med_user
+            const isPendingHN = !!b.is_new_user_pending && !b.has_confirmed_hn;
+            return (
             <li
               key={b.id}
               className={`bg-white border rounded-xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center border-l-8 ${getStatusColor(
@@ -803,6 +810,16 @@ export default function AllBookingsPage() {
                       >
                         <BedDouble className="w-3.5 h-3.5 text-emerald-700" />
                         <span>เตียงพิเศษ{b.bed_name ? ` (${b.bed_name})` : ""}</span>
+                      </span>
+                    )}
+                    {/* ✅ ใหม่: สัญลักษณ์เตือน ยังไม่มี HN / ข้อมูลใหม่ยังไม่สมบูรณ์ (เหมือนหน้า booking) */}
+                    {isPendingHN && (
+                      <span
+                        className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[11px] font-bold rounded bg-amber-100 text-amber-800 border border-amber-300"
+                        title="ผู้มารับบริการรายใหม่ ยังไม่มี HN — รอเจ้าหน้าที่บันทึกข้อมูลให้สมบูรณ์"
+                      >
+                        <AlertCircle className="w-3.5 h-3.5 text-amber-700" />
+                        <span>รอบันทึก HN</span>
                       </span>
                     )}
                   </div>
@@ -981,7 +998,16 @@ export default function AllBookingsPage() {
                 <>
                   {/* ปุ่มยืนยัน */}
                     {getStatusLabel(b) === "รอดำเนินการ" && (
-                      isFutureBookingDate(b.date) ? (
+                      isPendingHN ? (
+                        // ✅ ใหม่: ยังไม่มี HN / ข้อมูลใหม่ยังไม่สมบูรณ์ ห้ามยืนยันสำเร็จ (ปุ่มยกเลิกยังใช้งานได้ปกติ)
+                        <button
+                          disabled
+                          title="ไม่สามารถยืนยันสถานะได้ เนื่องจากยังไม่มี HN — รอเจ้าหน้าที่บันทึกข้อมูลให้สมบูรณ์"
+                          className="flex items-center justify-center w-15 h-10 bg-gray-300 rounded-md shadow cursor-not-allowed"
+                        >
+                          <FaCheck className="text-gray-400 w-5 h-5" />
+                        </button>
+                      ) : isFutureBookingDate(b.date) ? (
                         // หากยังไม่ถึงวันนัด ให้ disable ปุ่มไว้
                         <button
                           disabled
@@ -1059,7 +1085,7 @@ export default function AllBookingsPage() {
                 )}
               </div>
             </li>
-          ))}
+          );})}
         </ul>
       )}
 

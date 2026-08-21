@@ -87,8 +87,18 @@ export async function GET(req: Request) {
     let query = `
       SELECT
         b.id, b.provider, b.name, b.phone, b.therapist, b.time_slot, b.date, b.status, b.payment_status, b.created_at,
+        b.hn,
         (sbb.id IS NOT NULL) AS has_special_bed,
-        sb.bed_name AS bed_name
+        sb.bed_name AS bed_name,
+        (CASE WHEN EXISTS (
+          SELECT 1 FROM med_user mu
+          WHERE mu.hn IS NOT NULL AND mu.hn <> ''
+          AND REPLACE(REPLACE(mu.mobile_phone_number, '-', ''), ' ', '') = REPLACE(REPLACE(b.phone, '-', ''), ' ', '')
+        ) THEN 1 ELSE 0 END) AS has_confirmed_hn,
+        (CASE WHEN EXISTS (
+          SELECT 1 FROM new_user nu
+          WHERE REPLACE(REPLACE(nu.mobile_phone_number, '-', ''), ' ', '') = REPLACE(REPLACE(b.phone, '-', ''), ' ', '')
+        ) THEN 1 ELSE 0 END) AS is_new_user_pending
       FROM bookings b
       LEFT JOIN special_bed_bookings sbb ON b.id = sbb.booking_id
       LEFT JOIN special_beds sb ON sbb.bed_id = sb.id

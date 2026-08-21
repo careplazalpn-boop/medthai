@@ -122,7 +122,31 @@ export async function POST(request: Request) {
     const conn = await pool.getConnection();
 
     try {
-      // 1. ตรวจสอบว่าเตียงนี้ในช่วงเวลานี้ถูกจองไปแล้วหรือไม่
+      // 1. ✅ ใหม่: ตรวจสอบว่าคิวนวดนี้มี HN แล้วหรือยัง — ห้ามจองเตียงพิเศษให้คนไข้ที่ยังไม่มี HN
+      const [bookingRows]: any = await conn.query(
+        "SELECT hn FROM bookings WHERE id = ?",
+        [booking_id]
+      );
+
+      if (bookingRows.length === 0) {
+        return NextResponse.json(
+          { success: false, error: "ไม่พบข้อมูลคิวจองนวดนี้" },
+          { status: 404 }
+        );
+      }
+
+      const bookingHn = bookingRows[0]?.hn;
+      if (!bookingHn || !String(bookingHn).trim()) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "ไม่สามารถจองเตียงพิเศษได้ เนื่องจากคนไข้รายนี้ยังไม่มี HN กรุณาให้เจ้าหน้าที่บันทึก HN ให้คนไข้ให้ครบถ้วนก่อน",
+          },
+          { status: 400 }
+        );
+      }
+
+      // 2. ตรวจสอบว่าเตียงนี้ในช่วงเวลานี้ถูกจองไปแล้วหรือไม่
       const [existingBed]: any = await conn.query(
         `SELECT sbb.id 
          FROM special_bed_bookings sbb
@@ -138,7 +162,7 @@ export async function POST(request: Request) {
         );
       }
 
-      // 2. ตรวจสอบว่าคิวจองนวดนี้ลงเตียงซ้ำหรือไม่
+      // 3. ตรวจสอบว่าคิวจองนวดนี้ลงเตียงซ้ำหรือไม่
       const [existingBooking]: any = await conn.query(
         "SELECT id FROM special_bed_bookings WHERE booking_id = ?",
         [booking_id]
@@ -151,7 +175,7 @@ export async function POST(request: Request) {
         );
       }
 
-      // 3. บันทึกการจองเตียงพิเศษลงตาราง (กำหนด status = 0 สำหรับการจองใหม่)
+      // 4. บันทึกการจองเตียงพิเศษลงตาราง (กำหนด status = 0 สำหรับการจองใหม่)
       await conn.query(
         `INSERT INTO special_bed_bookings (bed_id, booking_id, date, time_slot, created_by, note, status)
          VALUES (?, ?, ?, ?, ?, ?, ?)`,

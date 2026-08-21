@@ -7,6 +7,7 @@ import {
   User as UserIcon,
   Clock,
   AlertCircle,
+  AlertTriangle,
   UserCheck,
   UserX,
   Search,
@@ -68,6 +69,9 @@ interface UserInfo {
 interface BookingInfo {
   time_slot: string;
   name: string;
+  hn?: string | null; // ค่า HN ที่บันทึกไว้ตอนจอง (อาจไม่ครบทุกกรณี)
+  is_new_user_pending?: number | boolean; // ตรงกับข้อมูลในตาราง new_user (เบอร์โทร) หรือไม่
+  has_confirmed_hn?: number | boolean; // ตรวจสอบกับตาราง med_user (ตารางหลักที่ sync HN จริง) แล้วว่ามี HN ยืนยันแล้ว
   bookedbyrole?: string;
   has_special_bed?: number | boolean;
   bed_name?: string;
@@ -242,6 +246,9 @@ export default function BookingPage() {
           grouped[b.therapist].push({
             time_slot: b.time_slot,
             name: b.name,
+            hn: b.hn,
+            is_new_user_pending: b.is_new_user_pending,
+            has_confirmed_hn: b.has_confirmed_hn,
             bookedbyrole: b.bookedbyrole,
             has_special_bed: b.has_special_bed,
             bed_name: b.bed_name
@@ -906,11 +913,18 @@ export default function BookingPage() {
                   const isActive = isSelected && selectedTime === slot;
                   const isSlotDisabled = disabled.includes(slot);
                   const hasSpecialBed = !!slotInfo?.has_special_bed;
+                  // 📌 ผู้มารับบริการรายใหม่ที่จองโดยยังไม่มี HN (รอเจ้าหน้าที่บันทึกข้อมูลให้สมบูรณ์ในตาราง new_user)
+                  // 📌 "รอบันทึก HN" = ตรงกับข้อมูลใน new_user (เบอร์โทร) และยังไม่พบว่ามี HN ยืนยันแล้วใน med_user
+                  // (ไม่พึ่งพา bookings.hn อย่างเดียว เพราะอาจไม่ได้ถูกบันทึกไว้ครบทุกกรณี)
+                  const isPendingHN = isBooked && !!slotInfo?.is_new_user_pending && !slotInfo?.has_confirmed_hn;
 
                   let bookedBg = "bg-red-50 text-red-600 border-red-300";
 
                   if (!isGuest && slotInfo?.bookedbyrole === "admin") {
                     bookedBg = "bg-purple-50 text-purple-700 border-purple-300";
+                  }
+                  if (!isGuest && isPendingHN) {
+                    bookedBg = "bg-amber-50 text-amber-700 border-amber-300";
                   }
                   return (
                     <div key={slot} className="flex gap-1.5 items-stretch">
@@ -936,6 +950,16 @@ export default function BookingPage() {
                         {isBooked ? (
                           <div className="text-xs flex items-center justify-center gap-1 flex-wrap">
                             <span>{!isGuest ? `(${slotInfo?.name || "ไม่ระบุ"})` : "ไม่ว่าง"}</span>
+                            {/* แสดงสัญลักษณ์เตือน: ผู้มารับบริการรายใหม่ยังไม่มี HN สมบูรณ์ (รอบันทึกจาก new_user) */}
+                            {!isGuest && isPendingHN && (
+                              <span
+                                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-bold rounded bg-amber-100 text-amber-800 border border-amber-300"
+                                title="ผู้มารับบริการรายใหม่ ยังไม่มี HN — รอเจ้าหน้าที่บันทึกข้อมูลให้สมบูรณ์"
+                              >
+                                <AlertTriangle className="w-3.5 h-3.5 text-amber-700" />
+                                <span className="hidden sm:inline">รอบันทึก HN</span>
+                              </span>
+                            )}
                             {/* แสดงสัญลักษณ์ไอคอนเตียงพิเศษ */}
                             {hasSpecialBed && (
                               <span

@@ -772,8 +772,8 @@ export default function AllBookingsPage() {
         
         <ul className="space-y-4 w-full max-w-[92rem] mx-auto">
           {filteredBookings.map((b, idx) => {
-            // 📌 ผู้มารับบริการรายใหม่ที่ยังไม่มี HN สมบูรณ์ (รอเจ้าหน้าที่บันทึกข้อมูลใน new_user/med_user)
-            // ใช้เงื่อนไขเดียวกับหน้า booking: มีข้อมูลรออยู่ใน new_user (ตามเบอร์โทร) แต่ยังไม่พบ HN ยืนยันแล้วใน med_user
+            // 📌 ผู้มารับบริการรายใหม่ที่ยังไม่มี HN สมบูรณ์ (รอเจ้าหน้าที่บันทึก HN ในตาราง bookings)
+            // เช็คตรงจากคอลัมน์ bookings.hn (เร็วกว่าเดิม ไม่ต้อง join med_user/new_user)
             const isPendingHN = !!b.is_new_user_pending && !b.has_confirmed_hn;
             return (
             <li

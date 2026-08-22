@@ -90,15 +90,10 @@ export async function GET(req: Request) {
         b.hn,
         (sbb.id IS NOT NULL) AS has_special_bed,
         sb.bed_name AS bed_name,
-        (CASE WHEN EXISTS (
-          SELECT 1 FROM med_user mu
-          WHERE mu.hn IS NOT NULL AND mu.hn <> ''
-          AND REPLACE(REPLACE(mu.mobile_phone_number, '-', ''), ' ', '') = REPLACE(REPLACE(b.phone, '-', ''), ' ', '')
-        ) THEN 1 ELSE 0 END) AS has_confirmed_hn,
-        (CASE WHEN EXISTS (
-          SELECT 1 FROM new_user nu
-          WHERE REPLACE(REPLACE(nu.mobile_phone_number, '-', ''), ' ', '') = REPLACE(REPLACE(b.phone, '-', ''), ' ', '')
-        ) THEN 1 ELSE 0 END) AS is_new_user_pending
+        -- ✅ เปลี่ยนมาเช็ค HN จากตาราง bookings โดยตรง (เร็วกว่าเดิมมาก
+        -- เพราะไม่ต้อง join กับ med_user ที่มีข้อมูลจำนวนมาก)
+        (CASE WHEN b.hn IS NOT NULL AND b.hn <> '' THEN 1 ELSE 0 END) AS has_confirmed_hn,
+        (CASE WHEN b.hn IS NULL OR b.hn = '' THEN 1 ELSE 0 END) AS is_new_user_pending
       FROM bookings b
       LEFT JOIN special_bed_bookings sbb ON b.id = sbb.booking_id
       LEFT JOIN special_beds sb ON sbb.bed_id = sb.id

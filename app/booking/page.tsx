@@ -194,7 +194,10 @@ export default function BookingPage() {
       );
       setDialogTherapist(matched ? matched.name : "");
     }
-  }, [user, medStaff]);
+    // ✅ ใช้ user?.role_id แทน user ทั้ง object เพื่อไม่ให้ effect นี้ทำงานซ้ำ
+    // ทุกครั้งที่ user object เปลี่ยน reference (เช่นจาก context re-render) ทั้งที่ role_id ไม่ได้เปลี่ยน
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.role_id, medStaff]);
 
   useEffect(() => {
     const roleQuery = user ? `?role=${encodeURIComponent(user.role || "")}&role_id=${encodeURIComponent(user.role_id || "")}` : "";
@@ -224,7 +227,11 @@ export default function BookingPage() {
           "16:00-17:30"
         ]);
       });
-  }, [user]);
+    // ✅ ใช้ user?.role / user?.role_id แทน user ทั้ง object — ค่าที่ใช้จริงใน roleQuery
+    // มีแค่ 2 ฟิลด์นี้ การใช้ user ทั้งก้อนเป็น dependency ทำให้ effect (และ fetch)
+    // ทำงานซ้ำโดยไม่จำเป็นทุกครั้งที่ user object เปลี่ยน reference
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.role, user?.role_id]);
 
   useEffect(() => {
     if (!date) {
@@ -262,7 +269,12 @@ export default function BookingPage() {
       setOffTherapists(data?.success ? data.offTherapists || [] : []);
       setDisabledSlots(data?.success ? data.disabledSlotsByTherapist || {} : {});
     });
-  }, [date, user]);
+    // ✅ ใช้ user?.role / user?.role_id แทน user ทั้ง object — เดิมใช้ [date, user]
+    // ทำให้ทุกครั้งที่ user object เปลี่ยน reference (แม้ role/role_id เดิม) จะยิง
+    // /api/bookings และ /api/off-therapists ซ้ำทั้งที่วันที่ไม่ได้เปลี่ยนเลย
+    // เงื่อนไขการ fetch จริง (roleQuery) ขึ้นกับแค่ 2 ฟิลด์นี้เท่านั้น จึงไม่กระทบผลลัพธ์
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [date, user?.role, user?.role_id]);
 
   const formatPhone = (value: string) => {
     const digits = value.replace(/\D/g, "");

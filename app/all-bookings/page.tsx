@@ -843,13 +843,19 @@ export default function AllBookingsPage() {
                     )}
                     {/* ✅ ใหม่: สัญลักษณ์เตือน ยังไม่มี HN / ข้อมูลใหม่ยังไม่สมบูรณ์ (เหมือนหน้า booking) */}
                     {isPendingHN && (
-                      <span
-                        className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[11px] font-bold rounded bg-amber-100 text-amber-800 border border-amber-300"
-                        title="ผู้มารับบริการรายใหม่ ยังไม่มี HN — รอเจ้าหน้าที่บันทึกข้อมูลให้สมบูรณ์"
-                      >
-                        <AlertCircle className="w-3.5 h-3.5 text-amber-700" />
-                        <span>รอบันทึก HN</span>
-                      </span>
+                      <>
+                        <span
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[11px] font-bold rounded bg-amber-100 text-amber-800 border border-amber-300"
+                          title="ผู้มารับบริการรายใหม่ ยังไม่มี HN — รอเจ้าหน้าที่บันทึกข้อมูลให้สมบูรณ์"
+                        >
+                          <AlertCircle className="w-3.5 h-3.5 text-amber-700" />
+                          <span>รอบันทึก HN</span>
+                        </span>
+                        {/* ✅ ใหม่: ข้อความแจ้งขั้นตอนถัดไปสำหรับผู้ที่ยังไม่มี HN */}
+                        <span className="text-[11px] font-medium text-amber-700 leading-snug">
+                         ข้อมูลผู้รับบริการไม่สมบูรณ์ โปรดตรวจสอบ HN  ทำการยกเลิกคิวและลงข้อมูลใหม่
+                        </span>
+                      </>
                     )}
                   </div>
 

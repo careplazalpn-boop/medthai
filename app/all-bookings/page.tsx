@@ -76,6 +76,17 @@ const getStatusColor = (b: Booking) => {
   }
 };
 
+// ✅ ใหม่: สีพื้นหลังของการ์ด แยกฟังก์ชันต่างหากจาก getStatusColor (ไม่แก้ของเดิม)
+// ใช้คู่กับ border-l-8 ด้านบน เพื่อให้แต่ละสถานะแยกจากกันชัดเจนขึ้น
+const getStatusBgColor = (b: Booking) => {
+  switch (getStatusLabel(b)) {
+    case "ยกเลิก": return "bg-red-50";
+    case "อยู่ในคิว": return "bg-orange-50";
+    case "สำเร็จ": return "bg-emerald-50";
+    default: return "bg-gray-50";
+  }
+};
+
 export default function AllBookingsPage() {
   const router = useRouter();
   const { user, logout } = useAuth();
@@ -778,9 +789,14 @@ export default function AllBookingsPage() {
             return (
             <li
               key={b.id}
-              className={`bg-white border rounded-xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center border-l-8 ${getStatusColor(
-                b
-              )}`}
+              className={`border rounded-xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center border-l-8 ${
+                // ✅ ใหม่: ถ้ายังไม่มี HN (isPendingHN) ให้ใช้แถบสี/พื้นหลังที่ต่างจาก Rec. อื่นแทน
+                // โดยไม่แตะ Logic เดิมของ getStatusColor / getStatusBgColor
+                // (สถานะอื่นๆ ยังคำนวณจาก b.status เหมือนเดิมทุกกรณี)
+                isPendingHN
+                  ? "border-amber-500 bg-amber-50"
+                  : `${getStatusColor(b)} ${getStatusBgColor(b)}`
+              }`}
             >
               {/* เลขลำดับ */}
               <div className="flex items-center gap-2 pr-0 sm:pr-4 mb-3 sm:mb-0">

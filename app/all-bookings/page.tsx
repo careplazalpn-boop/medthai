@@ -67,6 +67,10 @@ const getStatusLabel = (b: Booking) => {
   return b.status || "รอดำเนินการ";
 };
 
+// ✅ ใหม่: ฟังก์ชันกลางเช็คว่า booking นี้ยังไม่มี HN หรือไม่ (ใช้ทั้งตอน sort และตอน render)
+// logic เดิมทุกประการ: !!b.is_new_user_pending && !b.has_confirmed_hn
+const isBookingPendingHN = (b: Booking) => !!b.is_new_user_pending && !b.has_confirmed_hn;
+
 const getStatusColor = (b: Booking) => {
   switch (getStatusLabel(b)) {
     case "ยกเลิก": return "border-red-500";
@@ -335,7 +339,8 @@ export default function AllBookingsPage() {
   };
   const normalizeTimeSlot = (time: string) => time.replace(/\s/g, '');
 
-  const filteredBookings = bookings.filter(b => {
+  const filteredBookings = bookings
+    .filter(b => {
     const nameMatch = b.name.toLowerCase().includes(filterName.toLowerCase());
     const therapistMatch = filterTherapist === "all" || b.therapist === filterTherapist;
     const providerMatch = filterProvider === "all" || b.provider === filterProvider;
@@ -352,7 +357,15 @@ export default function AllBookingsPage() {
       case "cancelled": return nameMatch && therapistMatch && providerMatch && dateMatch && timeMatch && specialBedMatch && statusLabel==="ยกเลิก";
       default: return nameMatch && therapistMatch && providerMatch && dateMatch && timeMatch && specialBedMatch;
     }
-  });
+    })
+    // ✅ ใหม่: ให้ผู้มารับบริการที่ยังไม่มี HN ขึ้นแสดงเป็นลำดับแรกเสมอ
+    // ใช้ sort แบบ stable (JS การันตีความเสถียรของลำดับ) จึงไม่กระทบลำดับเดิม (วันที่/เวลา/ชื่อ จาก backend)
+    // ของรายการที่เหลือ ไม่ว่าจะอยู่ในกลุ่ม pending HN ด้วยกัน หรือกลุ่มที่มี HN แล้วด้วยกัน
+    .sort((a, b) => {
+      const aPending = isBookingPendingHN(a) ? 0 : 1;
+      const bPending = isBookingPendingHN(b) ? 0 : 1;
+      return aPending - bPending;
+    });
 
   // ตรวจสอบว่าวันที่ของการจองเป็นวันข้างหน้า (อนาคต) หรือไม่
   const isFutureBookingDate = (dateStr: string) => {
@@ -785,7 +798,7 @@ export default function AllBookingsPage() {
           {filteredBookings.map((b, idx) => {
             // 📌 ผู้มารับบริการรายใหม่ที่ยังไม่มี HN สมบูรณ์ (รอเจ้าหน้าที่บันทึก HN ในตาราง bookings)
             // เช็คตรงจากคอลัมน์ bookings.hn (เร็วกว่าเดิม ไม่ต้อง join med_user/new_user)
-            const isPendingHN = !!b.is_new_user_pending && !b.has_confirmed_hn;
+            const isPendingHN = isBookingPendingHN(b);
             return (
             <li
               key={b.id}

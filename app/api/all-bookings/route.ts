@@ -160,6 +160,7 @@ export async function GET(req: Request) {
     if (!isExport) { // 🎯 ใช้ LIMIT และ OFFSET เมื่อ 'ไม่ใช่' โหมด Export เท่านั้น
         query += `
             ORDER BY 
+              (CASE WHEN b.hn IS NULL OR b.hn = '' THEN 0 ELSE 1 END) ASC,
               b.date ASC,
               STR_TO_DATE(SUBSTRING_INDEX(b.time_slot, '-', 1), '%H:%i') ASC,
               b.name ASC
@@ -169,6 +170,7 @@ export async function GET(req: Request) {
     } else {
         query += `
             ORDER BY 
+              (CASE WHEN b.hn IS NULL OR b.hn = '' THEN 0 ELSE 1 END) ASC,
               b.date ASC,
               STR_TO_DATE(SUBSTRING_INDEX(b.time_slot, '-', 1), '%H:%i') ASC,
               b.name ASC

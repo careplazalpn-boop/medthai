@@ -47,16 +47,36 @@ export async function GET(request: Request) {
           (CASE WHEN sbb.id IS NOT NULL THEN 1 ELSE 0 END) AS has_special_bed,
           sb.bed_name,
           sb.room_name,
-          -- ✅ เปลี่ยนมาเช็ค HN จากตาราง bookings โดยตรง (เร็วกว่าเดิมมาก
-          -- เพราะไม่ต้อง join กับ med_user ที่มีข้อมูลจำนวนมาก)
+          (CASE WHEN b.hn IS NOT NULL AND b.hn <> '' THEN 1 ELSE 0 END) AS has_confirmed_hn,
+          (CASE WHEN b.hn IS NULL OR b.hn = '' THEN 1 ELSE 0 END) AS is_new_user_pending
+        FROM bookings b
+        INNER JOIN therapist t ON t.id = b.therapist_id
+        LEFT JOIN special_bed_bookings sbb ON b.id = sbb.booking_id
+        LEFT JOIN special_beds sb ON sbb.bed_id = sb.id
+        WHERE b.date = ? AND b.status != 'ยกเลิก' AND t.status = 0 AND b.therapist_id IS NOT NULL
+
+        UNION ALL
+
+        SELECT 
+          b.id, 
+          b.therapist, 
+          b.time_slot, 
+          b.name, 
+          b.hn,
+          b.status, 
+          b.bookedbyrole,
+          (CASE WHEN sbb.id IS NOT NULL THEN 1 ELSE 0 END) AS has_special_bed,
+          sb.bed_name,
+          sb.room_name,
           (CASE WHEN b.hn IS NOT NULL AND b.hn <> '' THEN 1 ELSE 0 END) AS has_confirmed_hn,
           (CASE WHEN b.hn IS NULL OR b.hn = '' THEN 1 ELSE 0 END) AS is_new_user_pending
         FROM bookings b
         INNER JOIN therapist t ON (b.therapist = t.name OR b.therapist = t.fname)
         LEFT JOIN special_bed_bookings sbb ON b.id = sbb.booking_id
         LEFT JOIN special_beds sb ON sbb.bed_id = sb.id
-        WHERE b.date = ? AND b.status != 'ยกเลิก' AND t.status = 0
+        WHERE b.date = ? AND b.status != 'ยกเลิก' AND t.status = 0 AND b.therapist_id IS NULL
       `;
+      queryParams.push(date);
     } else {
       query = `
         SELECT 
@@ -70,16 +90,36 @@ export async function GET(request: Request) {
           (CASE WHEN sbb.id IS NOT NULL THEN 1 ELSE 0 END) AS has_special_bed,
           sb.bed_name,
           sb.room_name,
-          -- ✅ เปลี่ยนมาเช็ค HN จากตาราง bookings โดยตรง (เร็วกว่าเดิมมาก
-          -- เพราะไม่ต้อง join กับ med_user ที่มีข้อมูลจำนวนมาก)
+          (CASE WHEN b.hn IS NOT NULL AND b.hn <> '' THEN 1 ELSE 0 END) AS has_confirmed_hn,
+          (CASE WHEN b.hn IS NULL OR b.hn = '' THEN 1 ELSE 0 END) AS is_new_user_pending
+        FROM bookings b
+        INNER JOIN therapist t ON t.id = b.therapist_id
+        LEFT JOIN special_bed_bookings sbb ON b.id = sbb.booking_id
+        LEFT JOIN special_beds sb ON sbb.bed_id = sb.id
+        WHERE b.date = ? AND b.status != 'ยกเลิก' AND t.status = 0 AND t.therapist_type = 0 AND b.therapist_id IS NOT NULL
+
+        UNION ALL
+
+        SELECT 
+          b.id, 
+          b.therapist, 
+          b.time_slot, 
+          b.name, 
+          b.hn,
+          b.status, 
+          b.bookedbyrole,
+          (CASE WHEN sbb.id IS NOT NULL THEN 1 ELSE 0 END) AS has_special_bed,
+          sb.bed_name,
+          sb.room_name,
           (CASE WHEN b.hn IS NOT NULL AND b.hn <> '' THEN 1 ELSE 0 END) AS has_confirmed_hn,
           (CASE WHEN b.hn IS NULL OR b.hn = '' THEN 1 ELSE 0 END) AS is_new_user_pending
         FROM bookings b
         INNER JOIN therapist t ON (b.therapist = t.name OR b.therapist = t.fname)
         LEFT JOIN special_bed_bookings sbb ON b.id = sbb.booking_id
         LEFT JOIN special_beds sb ON sbb.bed_id = sb.id
-        WHERE b.date = ? AND b.status != 'ยกเลิก' AND t.status = 0 AND t.therapist_type = 0
+        WHERE b.date = ? AND b.status != 'ยกเลิก' AND t.status = 0 AND t.therapist_type = 0 AND b.therapist_id IS NULL
       `;
+      queryParams.push(date);
     }
 
     const [rows] = await conn.query(query, queryParams);
@@ -138,9 +178,22 @@ export async function POST(request: Request) {
         );
       }
 
+      // ✅ ใหม่: หา therapist_id จากชื่อที่เลือก (best-effort) เพื่อบันทึกไว้ควบคู่กับชื่อเดิม
+      // ไม่กระทบการทำงานเดิมแม้หาไม่เจอ (จะบันทึกเป็น NULL แล้ว query เก่ายังใช้ชื่อ fallback ได้ตามปกติ)
+      let therapistId: number | null = null;
+      try {
+        const [therapistRows]: any = await conn.query(
+          "SELECT id FROM therapist WHERE (name = ? OR fname = ?) AND status = 0 LIMIT 1",
+          [therapist, therapist]
+        );
+        therapistId = therapistRows?.[0]?.id ?? null;
+      } catch (lookupError) {
+        console.error("หา therapist_id ไม่สำเร็จ (ไม่กระทบการจอง):", lookupError);
+      }
+
       await conn.query(
-        "INSERT INTO bookings (hn, name, phone, date, therapist, time_slot, provider, bookedbyrole, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'รอดำเนินการ')",
-        [hn || null, name, phone, date, therapist, time, provider, bookedbyrole || 'user']
+        "INSERT INTO bookings (hn, name, phone, date, therapist, therapist_id, time_slot, provider, bookedbyrole, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'รอดำเนินการ')",
+        [hn || null, name, phone, date, therapist, therapistId, time, provider, bookedbyrole || 'user']
       );
 
       // 📌 ผู้มารับบริการรายใหม่ที่ยังไม่มี HN (ไม่ได้ดึงจากตารางหลัก)

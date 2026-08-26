@@ -176,69 +176,74 @@ export async function GET(req: Request) {
     }
 
 
-    // --- ดึงข้อมูล ---
-    const [rows]: any = await pool.execute(query, queryParams);
-    const [countRows]: any = await pool.execute(countQuery, countParams);
+    // --- Summary (รวมทุกหน้า ตาม filter เดียวกัน) ---
+    let summaryCondition = "";
+    const summaryParams: any[] = [];
 
-    const total = countRows[0]?.total || 0;
-    const totalPages = Math.ceil(total / limit);
-    
- // --- Summary (รวมทุกหน้า ตาม filter เดียวกัน) ---
-      let summaryCondition = "";
-      const summaryParams: any[] = [];
+    // สร้างเงื่อนไขเหมือน countQuery แต่ไม่เอา LIMIT/OFFSET
+    if (filterDate && filterDate !== "all") {
+      summaryCondition += " AND b.date = ?";
+      summaryParams.push(filterDate);
+    }
+    if (filterTimeSlot && filterTimeSlot !== "all") {
+      summaryCondition += " AND REPLACE(REPLACE(TRIM(b.time_slot), '–', '-'), ' ', '') = REPLACE(?, ' ', '')";
+      summaryParams.push(filterTimeSlot.trim());
+    }
+    if (filterProvider && filterProvider !== "all") {
+      summaryCondition += " AND b.provider = ?";
+      summaryParams.push(filterProvider);
+    }
+    if (filterTherapist && filterTherapist !== "all") {
+      summaryCondition += " AND b.therapist = ?";
+      summaryParams.push(filterTherapist);
+    }
+    // ✅ ใหม่: ให้ summary สอดคล้องกับตัวกรองเตียงพิเศษด้วย
+    if (filterSpecialBed) {
+      summaryCondition += " AND sbb.id IS NOT NULL";
+    }
 
-      // สร้างเงื่อนไขเหมือน countQuery แต่ไม่เอา LIMIT/OFFSET
-      if (filterDate && filterDate !== "all") {
-        summaryCondition += " AND b.date = ?";
-        summaryParams.push(filterDate);
-      }
-      if (filterTimeSlot && filterTimeSlot !== "all") {
-        summaryCondition += " AND REPLACE(REPLACE(TRIM(b.time_slot), '–', '-'), ' ', '') = REPLACE(?, ' ', '')";
-        summaryParams.push(filterTimeSlot.trim());
-      }
-      if (filterProvider && filterProvider !== "all") {
-        summaryCondition += " AND b.provider = ?";
-        summaryParams.push(filterProvider);
-      }
-      if (filterTherapist && filterTherapist !== "all") {
-        summaryCondition += " AND b.therapist = ?";
-        summaryParams.push(filterTherapist);
-      }
-      // ✅ ใหม่: ให้ summary สอดคล้องกับตัวกรองเตียงพิเศษด้วย
-      if (filterSpecialBed) {
-        summaryCondition += " AND sbb.id IS NOT NULL";
-      }
-
-      
-      // --- Query summary ครบ 4 สถานะ ---
-      // ✅ เพิ่ม LEFT JOIN special_bed_bookings เข้ามาด้วย (1:1 กับ bookings จึงไม่กระทบจำนวนนับเดิม)
-      const summaryFrom = `
-        FROM bookings b
-        LEFT JOIN special_bed_bookings sbb ON b.id = sbb.booking_id
-      `;
-      const attendedQuery = `SELECT COUNT(*) AS totalAttended ${summaryFrom} WHERE b.status = 'สำเร็จ' ${summaryCondition}`;
-      const cancelledQuery = `SELECT COUNT(*) AS totalCancelled ${summaryFrom} WHERE b.status = 'ยกเลิก' ${summaryCondition}`;
-      const pendingQuery = `SELECT COUNT(*) AS totalPending ${summaryFrom} WHERE b.status = 'รอดำเนินการ' ${summaryCondition}`;
-      const inQueueQuery = `SELECT COUNT(*) AS totalInQueue ${summaryFrom} WHERE b.status = 'อยู่ในคิว' ${summaryCondition}`;
-
-
-      const [attendedRows]: any = await pool.execute(attendedQuery, summaryParams.slice());
-      const [cancelledRows]: any = await pool.execute(cancelledQuery, summaryParams.slice());
-      const [pendingRows]: any = await pool.execute(pendingQuery, summaryParams.slice());
-      const [inQueueRows]: any = await pool.execute(inQueueQuery, summaryParams.slice());
-
-      const totalAttended = Number(attendedRows?.[0]?.totalAttended) || 0;
-      const totalCancelled = Number(cancelledRows?.[0]?.totalCancelled) || 0;
-      const totalPending = Number(pendingRows?.[0]?.totalPending) || 0;
-      const totalInQueue = Number(inQueueRows?.[0]?.totalInQueue) || 0;
+    // ✅ ปรับปรุง: รวม 4 query สรุปสถานะเดิม (attended/cancelled/pending/inQueue) เป็น query เดียว
+    // ด้วย conditional aggregation — สแกนตาราง bookings แค่รอบเดียวแทน 4 รอบ
+    // ผลลัพธ์ตัวเลขที่ได้เหมือนเดิมทุกประการ (เงื่อนไข filter และการนับแต่ละสถานะไม่เปลี่ยน)
+    const summaryQuery = `
+      SELECT
+        SUM(CASE WHEN b.status = 'สำเร็จ' THEN 1 ELSE 0 END) AS totalAttended,
+        SUM(CASE WHEN b.status = 'ยกเลิก' THEN 1 ELSE 0 END) AS totalCancelled,
+        SUM(CASE WHEN b.status = 'รอดำเนินการ' THEN 1 ELSE 0 END) AS totalPending,
+        SUM(CASE WHEN b.status = 'อยู่ในคิว' THEN 1 ELSE 0 END) AS totalInQueue
+      FROM bookings b
+      LEFT JOIN special_bed_bookings sbb ON b.id = sbb.booking_id
+      WHERE 1=1 ${summaryCondition}
+    `;
 
     // --- Average per month ---
     const now = new Date();
     const year = now.getFullYear();
-    const [avgRows]: any = await pool.execute(
-      "SELECT COUNT(*) / 12 AS avg_per_month FROM bookings WHERE YEAR(date) = ?",
-      [year]
-    );
+    const avgQuery = "SELECT COUNT(*) / 12 AS avg_per_month FROM bookings WHERE YEAR(date) = ?";
+
+    // ✅ ปรับปรุง: ยิง query ทั้ง 4 ตัวที่เป็นอิสระต่อกัน (ไม่พึ่งผลลัพธ์ของกันและกัน) พร้อมกัน
+    // ด้วย Promise.all แทนการ await ทีละตัวตามลำดับ — ลดเวลารอรวมจาก "ผลรวมของทุก query"
+    // เหลือแค่ "เวลาของ query ที่ช้าที่สุดตัวเดียว" ผลลัพธ์ที่ได้เหมือนเดิมทุกประการ
+    const [
+      [rows],
+      [countRows],
+      [summaryRows],
+      [avgRows],
+    ]: any = await Promise.all([
+      pool.execute(query, queryParams),
+      pool.execute(countQuery, countParams),
+      pool.execute(summaryQuery, summaryParams),
+      pool.execute(avgQuery, [year]),
+    ]);
+
+    const total = countRows[0]?.total || 0;
+    const totalPages = Math.ceil(total / limit);
+
+    const totalAttended = Number(summaryRows?.[0]?.totalAttended) || 0;
+    const totalCancelled = Number(summaryRows?.[0]?.totalCancelled) || 0;
+    const totalPending = Number(summaryRows?.[0]?.totalPending) || 0;
+    const totalInQueue = Number(summaryRows?.[0]?.totalInQueue) || 0;
+
     const avgPerMonth = avgRows[0]?.avg_per_month || 0;
 
     // ✅ ส่งข้อมูลกลับ

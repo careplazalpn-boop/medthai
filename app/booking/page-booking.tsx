@@ -1,0 +1,1150 @@
+"use client";
+
+import { useState, useEffect, useContext, useRef, createContext } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import {
+  Calendar as CalendarIcon,
+  User as UserIcon,
+  Clock,
+  AlertCircle,
+  AlertTriangle,
+  UserCheck,
+  UserX,
+  Search,
+  Loader2,
+  Check,
+  CheckCircle2,
+  Sparkles,
+  X,
+  Menu,
+  LogOut,
+  LogIn,
+  Calendar,
+  History,
+  BarChart3,
+  Users,
+  Facebook,
+  Building2,
+  BedDouble,
+  ChevronDown,
+  ChevronUp,
+  ClipboardList
+} from "lucide-react";
+import * as Dialog from "@radix-ui/react-dialog";
+
+// === Hook การนำทางจริง / Mock สำรองสำหรับ Preview ===
+let useRouterHook: any;
+try {
+  useRouterHook = require("next/navigation").useRouter;
+} catch (e) {
+  useRouterHook = () => ({
+    push: (path: string) => {
+      if (typeof window !== "undefined") {
+        console.log("นำทางไปยัง:", path);
+        window.location.href = path;
+      }
+    },
+    refresh: () => {},
+  });
+}
+
+// === AuthContext ===
+let AuthContext: any;
+try {
+  AuthContext = require("@/context/AuthContext").AuthContext;
+} catch (e) {
+  AuthContext = createContext({
+    user: { name: "นายดุสิทธิ์ ไชยศรีหา", role: "admin", role_id: 909, isAdmin: true },
+    logout: () => console.log("Logout triggered"),
+  });
+}
+
+interface UserInfo {
+  hn?: string;
+  name: string;
+  phone: string;
+  id_card_number?: string;
+}
+
+interface BookingInfo {
+  time_slot: string;
+  name: string;
+  hn?: string | null; // ค่า HN ที่บันทึกไว้ตอนจอง (อาจไม่ครบทุกกรณี)
+  is_new_user_pending?: number | boolean; // ตรงกับข้อมูลในตาราง new_user (เบอร์โทร) หรือไม่
+  has_confirmed_hn?: number | boolean; // ตรวจสอบกับตาราง med_user (ตารางหลักที่ sync HN จริง) แล้วว่ามี HN ยืนยันแล้ว
+  bookedbyrole?: string;
+  has_special_bed?: number | boolean;
+  bed_name?: string;
+}
+
+interface Therapist {
+  id: number;
+  name: string;
+  shortname?: string;
+  therapist_type?: number;
+}
+
+interface MedStaff {
+  id: number;
+  name: string;
+  role_id: number;
+}
+
+export default function BookingPage() {
+  const router = useRouterHook();
+  const { user, logout } = (useContext(AuthContext) || {}) as { user: any; logout: () => void };
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isGuest = !user;
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [idCardNumber, setIdCardNumber] = useState("");
+  const [therapists, setTherapists] = useState<Therapist[]>([]);
+  const [medStaff, setMedStaff] = useState<MedStaff[]>([]);
+  const [timeSlots, setTimeSlots] = useState<string[]>([]);
+  const [date, setDate] = useState("");
+  const [selectedTherapist, setSelectedTherapist] = useState("");
+  const [selectedTime, setSelectedTime] = useState("");
+  const [bookedSlots, setBookedSlots] = useState<Record<string, BookingInfo[]>>({});
+  const [disabledSlots, setDisabledSlots] = useState<Record<string, string[]>>({});
+  const [showAlert, setShowAlert] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [clientHN, setClientHN] = useState("");
+  const [clientName, setClientName] = useState("");
+  const [clientPhone, setClientPhone] = useState("");
+  const [searchResults, setSearchResults] = useState<UserInfo[]>([]);
+  const [dialogTherapist, setDialogTherapist] = useState<string>("");
+  const [offTherapists, setOffTherapists] = useState<string[]>([]);
+  const [addPatientDialog, setAddPatientDialog] = useState(false);
+  const [noHN, setNoHN] = useState(false);
+  const [hn, setHn] = useState("");
+  const [patientPrefix, setPatientPrefix] = useState("");
+  const [patientFirstName, setPatientFirstName] = useState("");
+  const [patientLastName, setPatientLastName] = useState("");
+  const [patientPhone, setPatientPhone] = useState("");
+  const [contactOpen, setContactOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setMenuOpen(false);
+      }
+    };
+    if (menuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("keydown", handleEsc);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEsc);
+    };
+  }, [menuOpen]);
+
+  useEffect(() => {
+    if (!showAlert) return;
+    const timer = setTimeout(() => setShowAlert(false), 2000);
+    return () => clearTimeout(timer);
+  }, [showAlert]);
+
+  useEffect(() => {
+    const savedDate = localStorage.getItem("selectedDate");
+    if (savedDate) {
+      const today = new Date();
+      const todayLocal = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const [year, month, day] = savedDate.split("-").map(Number);
+      const selected = new Date(year, month - 1, day);
+
+      if (selected.getTime() < todayLocal.getTime()) {
+        localStorage.removeItem("selectedDate");
+        setDate("");
+      } else {
+        setDate(savedDate);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (user) {
+      setDialogTherapist(user.name);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    fetch("/api/med-staff")
+      .then(res => res.json())
+      .then(data => {
+        if (data?.success) {
+          setMedStaff(data.staff);
+        } else {
+          setMedStaff([]);
+        }
+      })
+      .catch(() => setMedStaff([]));
+  }, []);
+
+  useEffect(() => {
+    if (user && medStaff.length > 0) {
+      const matched = medStaff.find(
+        s => s.role_id !== 0 && Number(s.role_id) === Number(user.role_id)
+      );
+      setDialogTherapist(matched ? matched.name : "");
+    }
+    // ✅ ใช้ user?.role_id แทน user ทั้ง object เพื่อไม่ให้ effect นี้ทำงานซ้ำ
+    // ทุกครั้งที่ user object เปลี่ยน reference (เช่นจาก context re-render) ทั้งที่ role_id ไม่ได้เปลี่ยน
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.role_id, medStaff]);
+
+  useEffect(() => {
+    const roleQuery = user ? `?role=${encodeURIComponent(user.role || "")}&role_id=${encodeURIComponent(user.role_id || "")}` : "";
+
+    fetch(`/api/therapists${roleQuery}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data?.success) setTherapists(data.therapists);
+      })
+      .catch(() => {
+        setTherapists([
+          { id: 1, name: "นายดุสิทธิ์ ไชยศรีหา", therapist_type: 909 },
+          { id: 2, name: "น.ส.พิมณ์วิไล สิงห์ชัย", therapist_type: 0 }
+        ]);
+      });          
+
+    fetch("/api/time-slots")
+      .then(res => res.json())
+      .then(data => data?.success && setTimeSlots(data.timeSlots))
+      .catch(() => {
+        setTimeSlots([
+          "8:00-9:30",
+          "9:30-11:00",
+          "11:00-12:30",
+          "13:00-14:30",
+          "14:30-16:00",
+          "16:00-17:30"
+        ]);
+      });
+    // ✅ ใช้ user?.role / user?.role_id แทน user ทั้ง object — ค่าที่ใช้จริงใน roleQuery
+    // มีแค่ 2 ฟิลด์นี้ การใช้ user ทั้งก้อนเป็น dependency ทำให้ effect (และ fetch)
+    // ทำงานซ้ำโดยไม่จำเป็นทุกครั้งที่ user object เปลี่ยน reference
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.role, user?.role_id]);
+
+  useEffect(() => {
+    if (!date) {
+      setBookedSlots({});
+      setOffTherapists([]);
+      setDisabledSlots({});
+      setSelectedTherapist("");
+      setSelectedTime("");
+      return;
+    }
+
+    const roleQuery = user ? `&role=${encodeURIComponent(user.role || "")}&role_id=${encodeURIComponent(user.role_id || "")}` : "";
+
+    fetchWithLoading(`/api/bookings?date=${encodeURIComponent(date)}${roleQuery}`, data => {
+      if (data?.success) {
+        const grouped: Record<string, BookingInfo[]> = {};
+        data.bookings.forEach((b: any) => {
+          if (!grouped[b.therapist]) grouped[b.therapist] = [];
+          grouped[b.therapist].push({
+            time_slot: b.time_slot,
+            name: b.name,
+            hn: b.hn,
+            is_new_user_pending: b.is_new_user_pending,
+            has_confirmed_hn: b.has_confirmed_hn,
+            bookedbyrole: b.bookedbyrole,
+            has_special_bed: b.has_special_bed,
+            bed_name: b.bed_name
+          });
+        });
+        setBookedSlots(grouped);
+      } else setBookedSlots({});
+    });
+
+    fetchWithLoading(`/api/off-therapists?date=${encodeURIComponent(date)}`, data => {
+      setOffTherapists(data?.success ? data.offTherapists || [] : []);
+      setDisabledSlots(data?.success ? data.disabledSlotsByTherapist || {} : {});
+    });
+    // ✅ ใช้ user?.role / user?.role_id แทน user ทั้ง object — เดิมใช้ [date, user]
+    // ทำให้ทุกครั้งที่ user object เปลี่ยน reference (แม้ role/role_id เดิม) จะยิง
+    // /api/bookings และ /api/off-therapists ซ้ำทั้งที่วันที่ไม่ได้เปลี่ยนเลย
+    // เงื่อนไขการ fetch จริง (roleQuery) ขึ้นกับแค่ 2 ฟิลด์นี้เท่านั้น จึงไม่กระทบผลลัพธ์
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [date, user?.role, user?.role_id]);
+
+  const formatPhone = (value: string) => {
+    const digits = value.replace(/\D/g, "");
+    if (!digits) return "";
+    return digits.length <= 3 ? digits : `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  };
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => setClientPhone(formatPhone(e.target.value));
+
+  const handleSelect = (therapist: string, time: string) => {
+    if (!date) return setShowAlert(true);
+    setSelectedTherapist(therapist);
+    setSelectedTime(time);
+  };
+
+  const handleBookingClick = () => {
+    if (!user) {
+      setShowAlert(true);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(() => {
+        setShowAlert(false);
+        timeoutRef.current = null;
+      }, 5000);
+      return;
+    }
+    router.push("/booking");
+  };
+  
+  const handleLogout = async () => {
+    await logout();
+    router.push("/login");
+    router.refresh();
+  };
+
+  const handleSubmit = () => {
+    if (isGuest) {
+      alert("โหมดดูอย่างเดียว ไม่สามารถบันทึกการจองได้");
+      return;
+    }
+    if (!clientName || !clientPhone || !date || !selectedTherapist || !selectedTime) {
+      alert("กรุณากรอกข้อมูลให้ครบถ้วน");
+      return;
+    }
+    if (!clientHN && !noHN) {
+      alert("กรุณากรอก HN ให้ครบ 9 ตัว");
+      return;
+    }
+
+    router.push(`/confirm?${new URLSearchParams({
+      hn: clientHN,
+      name: clientName,
+      phone: clientPhone,
+      idCard: idCardNumber,
+      date,
+      therapist: selectedTherapist,
+      provider: selectedTherapist,
+      time: selectedTime,
+      bookedbyrole: user?.role || "user"
+    }).toString()}`);
+  };
+
+  const handleOpenDialog = () => {
+    if (isGuest) {
+      alert("โหมดดูอย่างเดียว ไม่สามารถเปิดการจองได้");
+      return;
+    }
+    if (!selectedTime || !date) {
+      setShowAlert(true);
+      return;
+    }
+
+    setClientHN("");
+    setClientName("");
+    setClientPhone("");
+    setSearchResults([]);
+    setIdCardNumber("");
+    setNoHN(false);
+
+    setDialogOpen(true);
+  };
+
+  const handleSearchHN = async () => {
+    if (!clientHN.trim()) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/search-users?hn=${encodeURIComponent(clientHN.trim())}`);
+      const data = await res.json();
+      setSearchResults(data?.success ? data.users : []);
+      if (!data?.success) alert("ไม่พบผู้ใช้");
+    } catch {
+      alert("เกิดข้อผิดพลาดในการค้นหา");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSearchName = async () => {
+    if (!clientName.trim()) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/search-users?name=${encodeURIComponent(clientName.trim())}`);
+      const data = await res.json();
+      setSearchResults(data?.success ? data.users : []);
+      if (!data?.success) alert("ไม่พบข้อมูลผู้ใช้");
+    } catch {
+      alert("เกิดข้อผิดพลาดในการค้นหา");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddPatient = async () => {
+    if (isGuest) {
+      alert("โหมดดูอย่างเดียว ไม่สามารถเพิ่มคนไข้ได้");
+      return;
+    }
+
+    const digitsPhone = patientPhone.replace(/\D/g, "");
+    if (!hn || !patientPrefix || !patientFirstName || !patientLastName || !digitsPhone) {
+      alert("กรุณากรอกข้อมูลให้ครบทุกช่อง");
+      return;
+    }
+    if (hn.length !== 9) {
+      alert("กรุณากรอก HN ให้ครบ 9 ตัว");
+      return;
+    }
+
+    const fullName = `${patientPrefix}${patientFirstName} ${patientLastName}`;
+
+    try {
+      const res = await fetch("/api/add-patient", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          hn,
+          pname: patientPrefix,
+          fname: patientFirstName,
+          lname: patientLastName,
+          name: fullName,
+          mobile_phone_number: patientPhone,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data?.success) {
+        alert(data.message || "เพิ่มคนไข้เรียบร้อยแล้ว");
+        setAddPatientDialog(false);
+        setHn("");
+        setPatientPrefix("");
+        setPatientFirstName("");
+        setPatientLastName("");
+        setPatientPhone("");
+      } else {
+        alert(data?.message || "ไม่สามารถเพิ่มคนไข้ได้");
+      }
+    } catch (error) {
+      console.error(error);
+      alert("เกิดข้อผิดพลาดในการเพิ่มคนไข้");
+    }
+  };
+
+  const handleSelectUser = (user: UserInfo) => {
+    setClientName(user.name);
+    setClientHN(user.hn || "");
+    setClientPhone(formatPhone(user.phone || ""));
+    setIdCardNumber(user.id_card_number || "");
+    setSearchResults([]);
+  };
+
+  const toggleOffTherapist = async (therapist: string) => {
+    if (isGuest) {
+      alert("โหมดดูอย่างเดียว ไม่สามารถอัปเดตหมอไม่มาได้");
+      return;
+    }
+    if (!date) return alert("กรุณาเลือกวันที่ก่อน");
+    try {
+      const res = await fetch("/api/toggle-off-therapist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ therapist, date }),
+      });
+      const data = await res.json();
+      if (data?.success) {
+        setOffTherapists(prev => prev.includes(therapist) ? prev.filter(t => t !== therapist) : [...prev, therapist]);
+      } else alert("ไม่สามารถอัปเดตหมอไม่มาได้");
+    } catch { alert("เกิดข้อผิดพลาดในการอัปเดตหมอไม่มา"); }
+  };
+
+  // 🌟 ตรวจสอบว่าช่วงเวลานี้มีการจองเตียงพิเศษอยู่หรือไม่ ก่อนอนุญาตให้คลิกเปิด/ปิดช่วงเวลา
+  const toggleSlot = async (therapist: string, slot: string) => {
+    if (isGuest) {
+      alert("โหมดดูอย่างเดียว ไม่สามารถอัปเดต slot ได้");
+      return;
+    }
+    if (!date) return alert("กรุณาเลือกวันที่ก่อน");
+
+    const slotInfo = bookedSlots[therapist]?.find(b => b.time_slot === slot);
+    const hasSpecialBed = !!slotInfo?.has_special_bed;
+
+    // ถ้ามีการจองเตียงพิเศษอยู่ จะไม่อนุญาตให้ปิดหรือยกเลิกการให้บริการ
+    if (hasSpecialBed) {
+      const bedName = slotInfo?.bed_name ? ` (${slotInfo.bed_name})` : "";
+      alert(`ไม่สามารถยกเลิกการให้บริการในช่วงเวลา ${slot} ได้!\n\nเนื่องจากมีการจองเตียงพิเศษ${bedName} ของคุณ "${slotInfo?.name}" ในช่วงเวลานี้แล้ว`);
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/toggle-off-therapist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ therapist, date, slot }),
+      });
+      const data = await res.json();
+      if (data?.success) {
+        setDisabledSlots(prev => {
+          const current = prev[therapist] || [];
+          const updated = current.includes(slot) ? current.filter(s => s !== slot) : [...current, slot];
+          return { ...prev, [therapist]: updated };
+        });
+      } else alert("ไม่สามารถอัปเดต slot ได้");
+    } catch { alert("เกิดข้อผิดพลาดในการอัปเดต slot"); }
+  };
+
+  const fetchWithLoading = async (url: string, setter: (data: any) => void) => {
+    setLoading(true);
+    try {
+      const res = await fetch(url);
+      const data = await res.json();
+      setter(data);
+    } catch (err) {
+      console.error(err);
+      setter(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredTherapists = user
+    ? user.role_id === 909
+      ? therapists
+      : therapists.filter(t => t.id === user.role_id)
+    : therapists;
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-white to-emerald-100 relative overflow-hidden">
+      {loading && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-[1000]">
+          <Loader2 className="w-12 h-12 text-white animate-spin" />
+        </div>
+      )}
+      {/* แถบเมนูบนสุด */}
+      <div className="fixed top-0 left-0 w-full z-50 bg-gray-700 shadow-md flex justify-between items-center px-2 sm:px-4 py-2 sm:py-2">
+        <div className="flex items-center gap-2 sm:gap-13">
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="text-white text-xl sm:text-2xl cursor-pointer"
+            title="เมนู"
+          >
+            {menuOpen ? <X /> : <Menu />}
+          </button>
+
+          <div
+            className="ml-3 sm:ml-3 text-white font-bold text-base sm:text-lg flex items-center gap-1 cursor-pointer"
+            onClick={() => router.push("/")}
+            title="หน้าหลัก"
+          >
+            <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" /> แพทย์แผนไทย
+          </div>
+        </div>
+        <div className="flex gap-2 sm:gap-3 flex-wrap sm:flex-nowrap">
+          {user?.role === "admin" && (
+            <>
+              <button
+                onClick={() => setAddPatientDialog(true)}
+                className="flex items-center gap-1 sm:gap-2 px-3 py-3 sm:px-3 sm:py-3 rounded-lg bg-white text-emerald-700 font-semibold shadow text-xs sm:text-sm transition hover:bg-gray-300 cursor-pointer"
+                title="คนไข้มี HN แต่หาไม่เจอ"
+              >
+                HN ?
+              </button>
+              <Dialog.Root
+                open={addPatientDialog}
+                onOpenChange={(open) => {
+                  setAddPatientDialog(open);
+                  if (!open) {
+                    setHn("");
+                    setPatientPrefix("");
+                    setPatientFirstName("");
+                    setPatientLastName("");
+                    setPatientPhone("");
+                  }
+                }}
+              >
+                <Dialog.Portal>
+                  <Dialog.Overlay className="fixed inset-0 bg-black/30 z-40" />
+                  <Dialog.Content className="fixed z-50 left-1/2 top-1/2 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white p-6 shadow-lg">
+                    <Dialog.Title className="text-xl font-bold mb-4 text-emerald-700">เพิ่มข้อมูลคนไข้ (เพิ่มเสร็จแล้วให้จองใหม่)</Dialog.Title>
+
+                    <label className="block mb-3">
+                      <span className="text-sm font-medium text-emerald-800">HN</span>
+                      <input
+                        type="text"
+                        value={hn}
+                        onChange={e => setHn(e.target.value.replace(/\D/g, "").slice(0, 9))}
+                        placeholder="กรอก HN"
+                        maxLength={9}
+                        className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900"
+                      />
+                    </label>
+
+                    <div className="flex gap-2 mb-3">
+                      <label className="flex flex-col w-20">
+                        <span className="text-sm font-medium text-emerald-800">คำนำหน้า</span>
+                        <input
+                          type="text"
+                          value={patientPrefix}
+                          onChange={e => setPatientPrefix(e.target.value)}
+                          placeholder="คำย่อ"
+                          className="mt-1 w-full border border-gray-300 rounded-md px-2 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900"
+                        />
+                      </label>
+                      <label className="flex-1 flex flex-col">
+                        <span className="text-sm font-medium text-emerald-800">ชื่อจริง</span>
+                        <input
+                          type="text"
+                          value={patientFirstName}
+                          onChange={e => setPatientFirstName(e.target.value)}
+                          placeholder="ชื่อ"
+                          className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900"
+                        />
+                      </label>
+                      <label className="flex-1 flex flex-col">
+                        <span className="text-sm font-medium text-emerald-800">นามสกุล</span>
+                        <input
+                          type="text"
+                          value={patientLastName}
+                          onChange={e => setPatientLastName(e.target.value)}
+                          placeholder="นามสกุล"
+                          className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900"
+                        />
+                      </label>
+                    </div>
+
+                    <label className="block mb-3">
+                      <span className="text-sm font-medium text-emerald-800">เบอร์โทร</span>
+                      <input
+                        type="text"
+                        value={patientPhone}
+                        onChange={e => {
+                          let digits = e.target.value.replace(/\D/g, "");
+                          if (digits.length > 3) {
+                            digits = digits.slice(0, 3) + "-" + digits.slice(3, 10);
+                          }
+                          setPatientPhone(digits.slice(0, 11));
+                        }}
+                        placeholder="กรอกเบอร์โทร"
+                        maxLength={11}
+                        className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900"
+                      />
+                    </label>
+
+                    <div className="mt-4 flex justify-end gap-2">
+                      <button
+                        onClick={handleAddPatient}
+                        className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer"
+                      >
+                        ยืนยัน
+                      </button>
+                      <Dialog.Close asChild>
+                        <button className="px-4 py-2 rounded-lg bg-gray-300 hover:bg-gray-400 text-gray-800 cursor-pointer">
+                          ยกเลิก
+                        </button>
+                      </Dialog.Close>
+                    </div>
+                  </Dialog.Content>
+                </Dialog.Portal>
+              </Dialog.Root>
+            </>
+          )}
+          <div className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+            {user ? (
+              <>
+                <span className="text-white font-semibold text-xs sm:text-sm">
+                คุณคือ {user.name || "ผู้ใช้"}
+                </span>
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-1 px-2 py-3 sm:px-4 sm:py-3 bg-red-600 text-white rounded-lg shadow font-semibold transition hover:bg-red-700 text-xs sm:text-sm cursor-pointer"
+                  title="ลงชื่อออก"
+                >
+                  <LogOut className="w-3 h-3 sm:w-5 sm:h-5" />
+                  <span>ลงชื่อออก</span>
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => router.push("/login")}
+                className="flex items-center gap-1 px-2 py-3 sm:px-4 sm:py-3 rounded-lg bg-white text-emerald-700 font-semibold shadow transition hover:bg-gray-300 text-xs sm:text-sm cursor-pointer"
+                title="ลงชื่อเข้าใช้"
+              >
+                <LogIn className="w-3 h-3 sm:w-5 sm:h-5" />
+                <span>สำหรับบุคลากร</span>
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Hamburger Menu */}
+      <AnimatePresence>
+        {menuOpen && (
+          <motion.div
+            ref={menuRef}
+            initial={{ x: -300, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: -300, opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="fixed top-0 left-0 w-72 h-full bg-slate-800/95 backdrop-blur-md z-40 flex flex-col pt-16 overflow-y-auto shadow-2xl text-white"
+          >
+            {/* Header */}
+            <div className="px-5 pb-4 border-b border-slate-600">
+              <div className="flex items-center gap-2 text-xl font-bold text-white">
+                <Sparkles className="text-emerald-400 w-5 h-5" />
+                ระบบแพทย์แผนไทย
+              </div>
+
+              {user && (
+                <div className="mt-2 text-sm text-slate-300">
+                  ผู้ใช้งาน : <span className="font-semibold">{user.name}</span>
+                </div>
+              )}
+            </div>
+
+            {/* ===================== เมนูหลัก ===================== */}
+            <div className="py-2">
+              <div
+                onClick={user ? handleBookingClick : () => router.push("/booking")}
+                className="flex items-center gap-3 px-5 py-3 text-white hover:bg-emerald-600 transition cursor-pointer"
+              >
+                <Calendar className="w-4 h-4 text-emerald-400" />
+                <span>
+                  {user ? "จองคิวนวดแผนไทย" : "ดูคิวจองนวดแผนไทย"}
+                </span>
+              </div>
+
+              <div
+                onClick={() => router.push("/booking-audit")}
+                className="flex items-center gap-3 px-5 py-3 text-white hover:bg-emerald-600 transition cursor-pointer"
+              >
+                <ClipboardList className="w-4 h-4 text-blue-400" />
+                <span>ดูคิวนวดทั้งหมด</span>
+              </div>
+            </div>
+                          <div
+                onClick={() => router.push("/beds-special")}
+                className="flex items-center gap-3 px-5 py-3 text-white hover:bg-emerald-600 transition cursor-pointer"
+              >
+                <BedDouble className="w-4 h-4 text-emerald-300" />
+                <span>จองเตียงพิเศษ</span>
+              </div>
+
+            {/* ===================== เจ้าหน้าที่ ===================== */}
+            {user && (
+              <>
+                <div className="border-t border-slate-600 my-2" />
+
+                <div className="px-5 py-2 text-xs font-semibold uppercase tracking-widest text-slate-400">
+                  สำหรับเจ้าหน้าที่
+                </div>
+
+                <div
+                  onClick={() => router.push("/all-bookings")}
+                  className="flex items-center gap-3 px-5 py-3 text-white hover:bg-blue-600 transition cursor-pointer"
+                >
+                  <History className="w-4 h-4 text-amber-400" />
+                  <span>ประวัติการจอง</span>
+                </div>
+
+                <div
+                  onClick={() => router.push("/summary-history")}
+                  className="flex items-center gap-3 px-5 py-3 text-white hover:bg-blue-600 transition cursor-pointer"
+                >
+                  <BarChart3 className="w-4 h-4 text-purple-400" />
+                  <span>สรุปรายงาน</span>
+                </div>
+                                <div
+                  onClick={() => router.push("/summary-therapists")}
+                  className="flex items-center gap-3 px-5 py-3 text-white hover:bg-blue-600 transition cursor-pointer"
+                >
+                  <BarChart3 className="w-4 h-4 text-purple-100" />
+                  <span>รายงานการปฎิบัติงาน</span>
+                </div>
+              </>
+            )}
+
+            {/* ===================== Admin ===================== */}
+            {user?.role === "admin" && (
+              <>
+                <div className="border-t border-slate-600 my-2" />
+
+                <div className="px-5 py-2 text-xs font-semibold uppercase tracking-widest text-amber-300">
+                  จัดการระบบ
+                </div>
+
+                <div
+                  onClick={() => router.push("/manage-therapists")}
+                  className="flex items-center gap-3 px-5 py-3 text-white hover:bg-amber-600 transition cursor-pointer"
+                >
+                  <Users className="w-4 h-4 text-rose-400" />
+                  <span>จัดการบุคลากร</span>
+                </div>
+              </>
+            )}
+
+            {/* ===================== ติดต่อ ===================== */}
+            <div className="border-t border-slate-600 my-2" />
+
+            <div
+              onClick={() => setContactOpen(!contactOpen)}
+              className="flex items-center gap-3 px-5 py-3 text-white hover:bg-slate-700 transition cursor-pointer"
+            >
+              <Building2 className="w-4 h-4 text-teal-400" />
+
+              <span className="flex-1">
+                ช่องทางติดต่อ
+              </span>
+
+              {contactOpen ? (
+                <ChevronUp className="w-5 h-5" />
+              ) : (
+                <ChevronDown className="w-5 h-5" />
+              )}
+            </div>
+
+            {contactOpen && (
+              <div className="bg-slate-900">
+                <a
+                  href="https://m.me/100070719421986"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 px-9 py-3 text-slate-200 hover:bg-blue-700 transition"
+                >
+                  <Facebook className="w-4 h-4 text-blue-400" />
+                  Facebook (จองคิว)
+                </a>
+
+                <a
+                  href="https://www.lmwcc.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 px-9 py-3 text-slate-200 hover:bg-emerald-700 transition"
+                >
+                  <Building2 className="w-4 h-4 text-emerald-400" />
+                  เว็บไซต์ศูนย์บริการ
+                </a>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div className="max-w-6xl mx-auto p-6 pt-27 relative z-10">
+        <h1
+          className="text-2xl sm:text-4xl font-extrabold text-emerald-800 mb-2 text-center"
+        >
+          {isGuest ? "ดูคิวจองนวดแผนไทย" : "เลือกพนักงานนวดแผนไทยและช่วงเวลา"}
+        </h1>
+        <p className="text-center text-emerald-700/70 text-sm sm:text-base mb-8 sm:mb-10">
+          {isGuest ? "เลือกวันที่เพื่อดูช่วงเวลาที่ว่างของแต่ละท่าน" : "เลือกวันที่ ผู้ให้บริการ และช่วงเวลาที่ต้องการนัดหมาย"}
+        </p>
+
+        <div className="mb-8 max-w-sm mx-auto">
+          <label className="flex items-center gap-2 text-emerald-700 font-semibold mb-2 text-base sm:text-lg">
+            <CalendarIcon className="w-4 h-4" /> {isGuest ? "เลือกวันที่ต้องการดู" : "เลือกวันที่ต้องการนวด"}
+          </label>
+          <input
+            type="date"
+            value={date || ""}
+            min={new Date().toISOString().split("T")[0]}
+            onChange={e => {
+              const val = e.target.value;
+              setDate(val);
+              if (val) {
+                localStorage.setItem("selectedDate", val);
+              } else {
+                localStorage.removeItem("selectedDate");
+              }
+            }}
+            className={`border border-gray-300 rounded-xl p-3 w-full focus:outline-none focus:ring-2 focus:ring-emerald-400 transition shadow-sm bg-white ${!date ? "text-gray-400" : "text-gray-900"}`}
+          />
+        </div>
+
+        {/* คำอธิบายสัญลักษณ์สี */}
+        <div className="max-w-2xl mx-auto mb-6 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs sm:text-sm font-medium text-gray-600 bg-white/80 backdrop-blur-sm rounded-2xl px-4 py-3 shadow-sm border border-gray-100">
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />ว่าง</span>
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-400" />ไม่ว่าง</span>
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-purple-400" />จองโดยแอดมิน</span>
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-400" />แพทย์พิเศษ</span>
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-gray-400" />ปิด/หยุด</span>
+        </div>
+
+        {/* Therapist & slots rendering */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {filteredTherapists.map(t => {
+            const isSelected = selectedTherapist === t.name;
+            const isOff = offTherapists.includes(t.name);
+            const disabled = disabledSlots[t.name] || [];
+            const isSpecialType = t.therapist_type === 1;
+
+            return (
+              <div key={t.name} className={`p-5 sm:p-6 rounded-3xl border transition-all duration-300 ${isOff ? "bg-gray-50 border-gray-200" : isSpecialType ? "bg-gradient-to-br from-amber-50 to-white border-amber-200" : "bg-white border-gray-100"} ${isSelected ? "ring-4 ring-emerald-200 border-emerald-400 shadow-xl" : "shadow-md hover:shadow-lg"}`}>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-sm ${isOff ? "bg-gray-300 text-gray-600" : isSpecialType ? "bg-amber-400 text-white" : "bg-emerald-600 text-white"}`}>
+                    <UserIcon className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h2 className={`text-base sm:text-lg font-bold truncate ${isOff ? "text-gray-500" : isSpecialType ? "text-amber-700" : "text-emerald-800"}`}>
+                      {t.id}. {t.shortname}
+                    </h2>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      {isSpecialType && (
+                        <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">แพทย์พิเศษ</span>
+                      )}
+                      {isOff && (
+                        <span className="text-[10px] font-bold bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">วันนี้ไม่มา</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="ml-auto flex items-center gap-2">
+                    {date && !isGuest && (
+                    <button
+                      onClick={() => toggleOffTherapist(t.name)}
+                      className={`px-3 py-1.5 text-xs sm:text-sm rounded-full flex items-center gap-1.5 font-semibold text-white hover:brightness-90 cursor-pointer transition shadow-sm ${
+                        isOff
+                          ? "bg-red-500 hover:bg-red-600"
+                          : "bg-emerald-500 hover:bg-emerald-600"
+                      }`}
+                    >
+                      {isOff ? "ไม่มา" : "มา"}{isOff ? <UserX className="w-3.5 h-3.5" /> : <UserCheck className="w-3.5 h-3.5" />}
+                    </button>
+                  )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {timeSlots.map(slot => {
+                  const slotInfo = bookedSlots[t.name]?.find(b => b.time_slot === slot);
+                  const isBooked = !!slotInfo;
+                  const isActive = isSelected && selectedTime === slot;
+                  const isSlotDisabled = disabled.includes(slot);
+                  const hasSpecialBed = !!slotInfo?.has_special_bed;
+                  // 📌 ผู้มารับบริการรายใหม่ที่จองโดยยังไม่มี HN (รอเจ้าหน้าที่บันทึกข้อมูลให้สมบูรณ์ในตาราง new_user)
+                  // 📌 "รอบันทึก HN" = ตรงกับข้อมูลใน new_user (เบอร์โทร) และยังไม่พบว่ามี HN ยืนยันแล้วใน med_user
+                  // (ไม่พึ่งพา bookings.hn อย่างเดียว เพราะอาจไม่ได้ถูกบันทึกไว้ครบทุกกรณี)
+                  const isPendingHN = isBooked && !!slotInfo?.is_new_user_pending && !slotInfo?.has_confirmed_hn;
+
+                  let bookedBg = "bg-red-50 text-red-600 border-red-300";
+
+                  if (!isGuest && slotInfo?.bookedbyrole === "admin") {
+                    bookedBg = "bg-purple-50 text-purple-700 border-purple-300";
+                  }
+                  if (!isGuest && isPendingHN) {
+                    bookedBg = "bg-amber-50 text-amber-700 border-amber-300";
+                  }
+                  return (
+                    <div key={slot} className="flex gap-1.5 items-stretch">
+                    <button
+                      disabled={isBooked || isOff || isSlotDisabled || isGuest}
+                      onClick={() => handleSelect(t.name, slot)}
+                      className={`text-sm px-3 py-2.5 rounded-xl font-medium border flex-1 flex flex-col items-center justify-center gap-1 transition-all duration-150 shadow-sm
+                        ${
+                          isSlotDisabled || isOff
+                            ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
+                            : isBooked
+                            ? `${bookedBg} cursor-not-allowed`
+                            : isActive
+                            ? "bg-emerald-600 text-white border-emerald-600 shadow-md scale-[1.02]"
+                            : isSpecialType
+                            ? "bg-white hover:bg-amber-50 hover:border-amber-300 text-amber-800 border-amber-200 cursor-pointer"
+                            : "bg-white hover:bg-emerald-50 hover:border-emerald-300 text-emerald-800 border-gray-200 cursor-pointer"
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5 font-semibold">
+                          <Clock className="w-3.5 h-3.5" /> {slot}
+                        </div>
+                        {isBooked ? (
+                          <div className="text-xs flex items-center justify-center gap-1 flex-wrap">
+                            <span>{!isGuest ? `(${slotInfo?.name || "ไม่ระบุ"})` : "ไม่ว่าง"}</span>
+                            {/* แสดงสัญลักษณ์เตือน: ผู้มารับบริการรายใหม่ยังไม่มี HN สมบูรณ์ (รอบันทึกจาก new_user) */}
+                            {!isGuest && isPendingHN && (
+                              <span
+                                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-bold rounded bg-amber-100 text-amber-800 border border-amber-300"
+                                title="ผู้มารับบริการรายใหม่ ยังไม่มี HN — รอเจ้าหน้าที่บันทึกข้อมูลให้สมบูรณ์"
+                              >
+                                <AlertTriangle className="w-3.5 h-3.5 text-amber-700" />
+                                <span className="hidden sm:inline">รอบันทึก HN</span>
+                              </span>
+                            )}
+                            {/* แสดงสัญลักษณ์ไอคอนเตียงพิเศษ */}
+                            {hasSpecialBed && (
+                              <span
+                                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-bold rounded bg-emerald-100 text-emerald-800 border border-emerald-300"
+                                title={slotInfo?.bed_name ? `เตียงพิเศษ: ${slotInfo.bed_name}` : "ใช้เตียงพิเศษ"}
+                              >
+                                <BedDouble className="w-3.5 h-3.5 text-emerald-700" />
+                                <span className="hidden sm:inline">เตียงพิเศษ</span>
+                              </span>
+                            )}
+                          </div>
+                        ) : isOff || isSlotDisabled ? (
+                          <span className="text-[11px] font-semibold text-gray-400">ปิดให้บริการ</span>
+                        ) : isActive ? (
+                          <span className="text-[11px] font-semibold flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3" />เลือกอยู่
+                          </span>
+                        ) : (
+                          <span className="text-[11px] font-bold text-emerald-600 flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3" />ว่าง
+                          </span>
+                        )}
+                      </button>
+                      {date && !isGuest && (
+                        <button
+                          onClick={() => toggleSlot(t.name, slot)}
+                          className={`px-2 rounded-xl text-white cursor-pointer transition flex items-center justify-center ${
+                            isOff
+                              ? "bg-gray-400 cursor-not-allowed"
+                              : isSlotDisabled
+                              ? "bg-red-500 hover:bg-red-600"
+                              : "bg-emerald-500 hover:bg-emerald-600"
+                          } ${hasSpecialBed ? "opacity-60 cursor-not-allowed" : ""}`}
+                          title={hasSpecialBed ? "ไม่สามารถปิดช่องเวลานี้ได้เนื่องจากมีการจองเตียงพิเศษแล้ว" : "เปิด/ปิด การให้บริการช่องเวลานี้"}
+                        >
+                          {isSlotDisabled ? <X className="w-3.5 h-3.5" /> : <Check className="w-3.5 h-3.5" />}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+                </div>
+                {!isGuest && (
+                  <button
+                    onClick={handleOpenDialog}
+                    disabled={!(isSelected && selectedTime && date) || isOff}
+                    className={`mt-5 w-full py-2.5 rounded-xl font-bold shadow transition text-center cursor-pointer ${
+                      isSelected && selectedTime && date && !isOff
+                        ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                        : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                    }`}
+                  >
+                    เลือก
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Dialog */}
+        <Dialog.Root open={dialogOpen} onOpenChange={setDialogOpen}>
+          <Dialog.Portal>
+            <Dialog.Overlay className="fixed inset-0 bg-black/30 z-40" />
+            <Dialog.Content className="fixed z-50 left-1/2 top-1/2 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white p-6 shadow-lg">
+              <Dialog.Title className="text-xl font-bold mb-4 text-emerald-700 flex justify-between items-center">
+                <span>กรอกข้อมูลผู้มารับบริการ</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNoHN(prev => !prev);
+                    setClientHN("");
+                    setClientName("");
+                    setClientPhone("");
+                    setIdCardNumber("");
+                    setSearchResults([]);
+                  }}
+                  className="px-3 py-1 bg-emerald-500 hover:bg-emerald-600 rounded text-white text-sm cursor-pointer"
+                >
+                  {noHN ? "กลับ" : "คนไข้ใหม่"}
+                </button>
+              </Dialog.Title>             
+              {["hn", "name", "phone"].map((field) => {
+                if (field === "hn" && noHN) return null;
+
+                return (
+                  <label key={field} className="block mb-3">
+                    <span className="text-sm font-medium text-emerald-800">
+                      {field === "hn" ? "HN" : field === "name" ? "ผู้มารับบริการ" : "เบอร์โทร"}
+                    </span>
+                    <div className="flex border border-gray-300 rounded-md focus-within:ring-2 focus-within:ring-emerald-400 transition">
+                      <input
+                        type="text"
+                        value={
+                          field === "hn" ? clientHN : field === "name" ? clientName : clientPhone
+                        }
+                        onChange={(e) =>
+                          field === "hn"
+                            ? setClientHN(e.target.value)
+                            : field === "name"
+                            ? setClientName(e.target.value)
+                            : handlePhoneChange(e)
+                        }
+                        maxLength={field === "hn" ? 9 : field === "phone" ? 11 : undefined}
+                        placeholder={
+                          field === "hn" ? "กรอก HN" : field === "name" ? "กรอกชื่อ" : "กรอกเบอร์โทร"
+                        }
+                        className="flex-1 px-3 py-2 rounded-l-md focus:outline-none text-gray-900"
+                      />
+                      {(field === "name" || field === "hn") && !noHN && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          field === "name" ? handleSearchName() : handleSearchHN()
+                        }
+                        disabled={loading}
+                        className="px-4 py-2 bg-emerald-500 text-white rounded-r-md hover:bg-emerald-600 flex items-center justify-center cursor-pointer"
+                      >
+                        <Search className="w-5 h-5" />
+                      </button>
+                      )}
+                    </div>
+                  </label>
+                );
+              })}
+
+              {noHN && (
+                <label className="block mb-3">
+                  <span className="text-sm font-medium text-emerald-800">หมายเลขบัตรประชาชน</span>
+                  <input
+                    type="text"
+                    value={idCardNumber}
+                    onChange={e =>
+                      setIdCardNumber(e.target.value.replace(/\D/g, "").slice(0, 13))
+                    }
+                    maxLength={13}
+                    placeholder="กรอกหมายเลขบัตรประชาชน"
+                    className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900"
+                  />
+                </label>
+              )}
+
+              {searchResults.length > 0 && (
+                <div className="border p-2 rounded max-h-40 overflow-y-auto mb-3">
+                  {searchResults.map(u => (
+                    <button key={u.hn || u.name} onClick={() => handleSelectUser(u)} className="w-full flex justify-between items-center px-2 py-1 hover:bg-emerald-100 rounded text-gray-900 cursor-pointer">
+                      <span className="font-medium text-left">{u.name}</span>
+                      <span className="text-sm text-gray-500 text-right">{u.phone || "ไม่มีเบอร์"}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <div className="mt-4 flex justify-end gap-2">
+                <button onClick={handleSubmit} className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer">ยืนยัน</button>
+                <Dialog.Close asChild>
+                  <button className="px-4 py-2 rounded-lg bg-gray-300 hover:bg-gray-400 text-gray-800 cursor-pointer">ยกเลิก</button>
+                </Dialog.Close>
+              </div>
+            </Dialog.Content>
+          </Dialog.Portal>
+        </Dialog.Root>
+
+        {/* Alert popup */}
+        <AnimatePresence>
+          {showAlert && (
+            <div key={Date.now()} className="fixed top-6 left-1/2 -translate-x-1/2 bg-red-500 text-white px-4 py-2 rounded shadow z-50 flex items-center gap-2">
+              <AlertCircle className="w-5 h-5" />
+              <span>กรุณาเลือกวันที่ก่อน</span>
+            </div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+}

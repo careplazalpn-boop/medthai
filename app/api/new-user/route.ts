@@ -38,10 +38,23 @@ export async function POST(request: Request) {
         );
       }
 
+      // ✅ ใหม่: หา therapist_id จากชื่อที่เลือก (best-effort) เพื่อบันทึกไว้ควบคู่กับชื่อเดิม
+      // เหมือนกับ /api/bookings และ /api/booking-audit — ไม่กระทบการทำงานเดิมแม้หาไม่เจอ (บันทึกเป็น NULL แทน)
+      let therapistId: number | null = null;
+      try {
+        const [therapistRows]: any = await conn.query(
+          "SELECT id FROM therapist WHERE (name = ? OR fname = ?) AND status = 0 LIMIT 1",
+          [therapist, therapist]
+        );
+        therapistId = therapistRows?.[0]?.id ?? null;
+      } catch (lookupError) {
+        console.error("หา therapist_id ไม่สำเร็จ (ไม่กระทบการจอง):", lookupError);
+      }
+
       // บันทึก bookings (ทำทุกครั้ง)
       await conn.query(
-        "INSERT INTO bookings (name, phone, date, therapist, time_slot, provider, status) VALUES (?, ?, ?, ?, ?, ?, 'รอดำเนินการ')",
-        [name, phone, date, therapist, time, provider]
+        "INSERT INTO bookings (name, phone, date, therapist, therapist_id, time_slot, provider, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'รอดำเนินการ')",
+        [name, phone, date, therapist, therapistId, time, provider]
       );
     } finally {
       conn.release();

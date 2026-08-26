@@ -799,6 +799,8 @@ export default function AllBookingsPage() {
             // 📌 ผู้มารับบริการรายใหม่ที่ยังไม่มี HN สมบูรณ์ (รอเจ้าหน้าที่บันทึก HN ในตาราง bookings)
             // เช็คตรงจากคอลัมน์ bookings.hn (เร็วกว่าเดิม ไม่ต้อง join med_user/new_user)
             const isPendingHN = isBookingPendingHN(b);
+            // ✅ ใหม่: เมื่อ booking นี้ "สำเร็จ" แล้ว ไม่ควรแก้ไข payment_status ได้อีก
+            const isCompleted = getStatusLabel(b) === "สำเร็จ";
             return (
             <li
               key={b.id}
@@ -867,7 +869,12 @@ export default function AllBookingsPage() {
 
                   {/* ปุ่ม toggle การจ่ายเงิน */}
                   <button
+                    disabled={isCompleted}
                     onClick={async () => {
+                      // ✅ ใหม่: กันเหนียวอีกชั้น ไม่ให้แก้ไขได้เมื่อ booking นี้ "สำเร็จ" แล้ว
+                      // (ปุ่มถูก disable อยู่แล้ว แต่กันไว้เผื่อกรณี event หลุดผ่านมา)
+                      if (isCompleted) return;
+
                       // 1. กำหนด Logic การวนค่าใหม่: unpaid -> paid -> UC -> unpaid
                       const current = b.payment_status;
                       const newStatus = current === "paid" ? "UC" : current === "UC" ? "unpaid" : "paid";
@@ -892,7 +899,12 @@ export default function AllBookingsPage() {
                         alert("เกิดข้อผิดพลาด: " + err);
                       }
                     }}
+                    title={isCompleted ? "รายการนี้สำเร็จแล้ว ไม่สามารถแก้ไขสถานะการจ่ายเงินได้" : undefined}
                     className={`mt-1 px-2 py-1 text-xs rounded transition w-28 text-white font-bold ${
+                      isCompleted
+                        ? "opacity-60 cursor-not-allowed"
+                        : ""
+                    } ${
                       b.payment_status === "paid"
                         ? "bg-emerald-600 hover:bg-emerald-700"
                         : b.payment_status === "UC"

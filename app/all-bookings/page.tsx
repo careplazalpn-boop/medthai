@@ -831,6 +831,12 @@ export default function AllBookingsPage() {
                     <span className="font-normal text-base">
                       {b.name}
                     </span>
+                    {/* ✅ ใหม่: แสดง HN ต่อท้ายชื่อ (แสดงเฉพาะเมื่อมีค่า HN เท่านั้น ไม่กระทบเงื่อนไข isPendingHN เดิม) */}
+                    {b.hn && (
+                      <span className="text-[11px] font-medium text-gray-500">
+                        HN: {b.hn}
+                      </span>
+                    )}
                     {/* แสดง Icon เตียงพิเศษ */}
                     {Boolean(b.has_special_bed) && (
                       <span
@@ -853,7 +859,7 @@ export default function AllBookingsPage() {
                         </span>
                         {/* ✅ ใหม่: ข้อความแจ้งขั้นตอนถัดไปสำหรับผู้ที่ยังไม่มี HN */}
                         <span className="text-[11px] font-medium text-amber-700 leading-snug">
-                         ข้อมูลผู้รับบริการไม่สมบูรณ์ โปรดตรวจสอบ HN  ทำการยกเลิกคิวและลงข้อมูลใหม่
+                          เมื่อบันทึกประวัติได้ HN และทำ OPD CARD เสร็จแล้วให้ทำการยกเลิกและจองคิวใหม่
                         </span>
                       </>
                     )}

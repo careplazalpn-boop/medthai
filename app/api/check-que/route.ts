@@ -129,6 +129,8 @@ export async function GET(req: Request) {
       // ใช้ DATE_FORMAT แทน DATE() เพื่อให้ MySQL คืนค่าเป็น string ตรงๆ
       // (กัน timezone bug แบบเดียวกับที่แก้ไว้ใน api/summary-therapists และ api/bookings)
       // เรียง "ล่าสุดไปเก่าสุด" (อนาคต -> ปัจจุบัน -> อดีต) ด้วย date DESC + เวลา DESC แล้วค่อยตัดหน้าด้วย LIMIT/OFFSET
+      // ✅ ใหม่: LEFT JOIN special_bed_bookings / special_beds เพื่อดึงข้อมูลเตียงพิเศษมาแสดงคู่กับประวัติ
+      // (เป็น LEFT JOIN เพราะ booking : special_bed_booking = 1 : 1 อยู่แล้ว จึงไม่ทำให้จำนวนแถวประวัติเปลี่ยนไป)
       const [historyRows]: any = await conn.query(
         `
         SELECT
@@ -140,9 +142,15 @@ export async function GET(req: Request) {
           t.name AS therapist_name,
           b.status,
           b.payment_status,
-          b.provider
+          b.provider,
+          (sbb.id IS NOT NULL) AS has_special_bed,
+          sb.bed_code,
+          sb.bed_name,
+          sb.room_name
         FROM bookings b
         LEFT JOIN therapist t ON t.id = b.therapist_id
+        LEFT JOIN special_bed_bookings sbb ON sbb.booking_id = b.id
+        LEFT JOIN special_beds sb ON sb.id = sbb.bed_id
         WHERE b.hn = ?
         ORDER BY b.date DESC, STR_TO_DATE(SUBSTRING_INDEX(b.time_slot, '-', 1), '%H:%i') DESC
         LIMIT ? OFFSET ?
@@ -158,6 +166,11 @@ export async function GET(req: Request) {
         status: r.status || "รอดำเนินการ",
         payment_status: r.payment_status || "unpaid",
         provider: r.provider,
+        // ✅ ใหม่: ข้อมูลเตียงพิเศษ (ถ้ามีการจอง)
+        hasSpecialBed: !!r.has_special_bed,
+        bedCode: r.bed_code || null,
+        bedName: r.bed_name || null,
+        roomName: r.room_name || null,
       }));
 
       return NextResponse.json({

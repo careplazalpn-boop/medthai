@@ -57,6 +57,10 @@ interface HistoryRow {
   status: string;
   payment_status: string;
   provider?: string;
+  hasSpecialBed?: boolean;
+  bedCode?: string | null;
+  bedName?: string | null;
+  roomName?: string | null;
 }
 
 // แปลง YYYY-MM-DD -> "29 สิงหาคม 2569" (พ.ศ.) — ไม่ผ่าน Date object/toISOString
@@ -635,6 +639,7 @@ export default function CheckQuePage() {
                       <th className="px-4 py-3 text-left font-medium">วันที่</th>
                       <th className="px-4 py-3 text-left font-medium">ช่วงเวลา</th>
                       <th className="px-4 py-3 text-left font-medium">ผู้ให้บริการ</th>
+                      <th className="px-4 py-3 text-center font-medium">เตียงพิเศษ</th>
                       <th className="px-4 py-3 text-center font-medium">สถานะ</th>
                       <th className="px-4 py-3 text-center font-medium">การชำระเงิน</th>
                     </tr>
@@ -659,6 +664,24 @@ export default function CheckQuePage() {
                               <UserCheck className="w-3.5 h-3.5 text-emerald-500" />
                               {h.therapist}
                             </span>
+                          </td>
+                          <td className="px-4 py-2 text-center">
+                            {h.hasSpecialBed ? (
+                              <span
+                                className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded border bg-emerald-100 text-emerald-800 border-emerald-300"
+                                title={
+                                  h.roomName || h.bedName || h.bedCode
+                                    ? `เตียงพิเศษ${h.bedName ? `: ${h.bedName}` : ""}${h.bedCode ? ` (${h.bedCode})` : ""}${h.roomName ? ` — ห้อง ${h.roomName}` : ""}`
+                                    : "ใช้เตียงพิเศษ"
+                                }
+                              >
+                                <BedDouble className="w-3.5 h-3.5 text-emerald-700" />
+                                {h.bedName || h.bedCode || "เตียงพิเศษ"}
+                                {h.roomName ? ` (ห้อง ${h.roomName})` : ""}
+                              </span>
+                            ) : (
+                              <span className="text-gray-300">—</span>
+                            )}
                           </td>
                           <td className="px-4 py-2 text-center">
                             <span

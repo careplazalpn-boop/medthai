@@ -808,6 +808,10 @@ export default function AllBookingsPage() {
             const isPendingHN = isBookingPendingHN(b);
             // ✅ ใหม่: เมื่อ booking นี้ "สำเร็จ" แล้ว ไม่ควรแก้ไข payment_status ได้อีก
             const isCompleted = getStatusLabel(b) === "สำเร็จ";
+            // ✅ ใหม่: สิทธิ์แก้ไขรายการนี้ — แอดมิน (909) แก้ไขได้ทุกรายการ
+            // ผู้ใช้ทั่วไปแก้ไขได้เฉพาะรายการของตนเอง (อิงจาก therapist ที่ผูกกับบัญชีผู้ใช้ เหมือนปุ่มยืนยัน/ยกเลิกเดิม)
+            const canManageBooking =
+              user?.role_id === 909 || (!!b?.therapist && b.therapist === user?.name);
             return (
             <li
               key={b.id}
@@ -876,11 +880,13 @@ export default function AllBookingsPage() {
 
                   {/* ปุ่ม toggle การจ่ายเงิน */}
                   <button
-                    disabled={isCompleted}
+                    disabled={isCompleted || !canManageBooking}
                     onClick={async () => {
                       // ✅ ใหม่: กันเหนียวอีกชั้น ไม่ให้แก้ไขได้เมื่อ booking นี้ "สำเร็จ" แล้ว
                       // (ปุ่มถูก disable อยู่แล้ว แต่กันไว้เผื่อกรณี event หลุดผ่านมา)
                       if (isCompleted) return;
+                      // ✅ ใหม่: กันเหนียวอีกชั้น ไม่ให้แก้ไขรายการของผู้อื่นได้ (เฉพาะแอดมิน หรือเจ้าของรายการเท่านั้น)
+                      if (!canManageBooking) return;
 
                       // 1. กำหนด Logic การวนค่าใหม่: unpaid -> paid -> UC -> unpaid
                       const current = b.payment_status;
@@ -890,7 +896,13 @@ export default function AllBookingsPage() {
                         const res = await fetch("/api/update-payment-status", {
                           method: "POST",
                           headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ id: b.id, status: newStatus }),
+                          // ✅ ใหม่: ส่ง userId/role ของผู้ใช้ที่ login ไปด้วย เพื่อให้ฝั่ง server ตรวจสอบสิทธิ์ได้
+                          body: JSON.stringify({
+                            id: b.id,
+                            status: newStatus,
+                            userId: (user as any)?.id,
+                            role_id: user?.role_id,
+                          }),
                         });
                         const data = await res.json();
                         if (data.success) {
@@ -900,15 +912,21 @@ export default function AllBookingsPage() {
                             )
                           );
                         } else {
-                          alert("อัปเดตสถานะการจ่ายเงินไม่สำเร็จ");
+                          alert(data.error || "อัปเดตสถานะการจ่ายเงินไม่สำเร็จ");
                         }
                       } catch (err) {
                         alert("เกิดข้อผิดพลาด: " + err);
                       }
                     }}
-                    title={isCompleted ? "รายการนี้สำเร็จแล้ว ไม่สามารถแก้ไขสถานะการจ่ายเงินได้" : undefined}
-                    className={`mt-1 px-2 py-1 text-xs rounded transition w-28 text-white font-bold ${
+                    title={
                       isCompleted
+                        ? "รายการนี้สำเร็จแล้ว ไม่สามารถแก้ไขสถานะการจ่ายเงินได้"
+                        : !canManageBooking
+                        ? "ไม่สามารถแก้ไขได้ เนื่องจากไม่ใช่รายการของคุณ"
+                        : undefined
+                    }
+                    className={`mt-1 px-2 py-1 text-xs rounded transition w-28 text-white font-bold ${
+                      isCompleted || !canManageBooking
                         ? "opacity-60 cursor-not-allowed"
                         : ""
                     } ${
@@ -1014,7 +1032,18 @@ export default function AllBookingsPage() {
 
               {/* ปุ่ม action */}
               <div className="flex gap-2 mt-3 sm:mt-0">
-                {getStatusLabel(b) === "ยกเลิก" && (
+                {getStatusLabel(b) === "ยกเลิก" && !canManageBooking && (
+                  // ✅ ใหม่: ไม่ใช่แอดมิน และไม่ใช่เจ้าของรายการ — แสดงสถานะเฉยๆ กดลบไม่ได้
+                  <button
+                    disabled
+                    title="ไม่สามารถลบรายการนี้ได้ เนื่องจากไม่ใช่รายการของคุณ"
+                    className="px-4 py-2 rounded-md flex items-center gap-2 bg-gray-300 text-gray-600 cursor-not-allowed"
+                  >
+                    <FaTimes className="text-red-500" />
+                    ยกเลิกแล้ว
+                  </button>
+                )}
+                {getStatusLabel(b) === "ยกเลิก" && canManageBooking && (
                   <Dialog.Root open={cancelDialogOpen && selectedId === b.id} onOpenChange={setCancelDialogOpen}>
                     <Dialog.Trigger asChild>
                       <button
@@ -1053,8 +1082,7 @@ export default function AllBookingsPage() {
       {(getStatusLabel(b) === "รอดำเนินการ" || getStatusLabel(b) === "อยู่ในคิว") && (
             <>
               {/* ✅ แสดงปุ่มเฉพาะแอดมิน (909) หรือหมอนวดที่เป็นเจ้าของ booking */}
-              {(user?.role_id === 909 ||
-                (b?.therapist && b?.therapist === user?.name)) && (
+              {canManageBooking && (
                 <>
                   {/* ปุ่มยืนยัน */}
                     {getStatusLabel(b) === "รอดำเนินการ" && (

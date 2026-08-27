@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   Sparkles,
   Calendar,
+  Search,
   Clock,
   Phone,
   Mail,
@@ -293,6 +294,13 @@ export default function HomePage() {
                 >
                   <BarChart3 className="w-4 h-4 text-purple-100" />
                   <span>รายงานการปฎิบัติงาน</span>
+                </div>
+                <div
+                  onClick={() => router.push("/check-que")}
+                  className="flex items-center gap-3 px-5 py-3 text-white hover:bg-blue-600 transition cursor-pointer"
+                >
+                  <Search className="w-4 h-4 text-purple-100" />
+                  <span>ค้นหาข้อมูลผู้รับบริการ</span>
                 </div>
               </>
             )}

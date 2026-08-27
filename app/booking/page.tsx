@@ -711,7 +711,7 @@ export default function BookingPage() {
             <div className="py-2">
               <div
                 onClick={user ? handleBookingClick : () => router.push("/booking")}
-                className="flex items-center gap-3 px-5 py-3 text-white hover:bg-emerald-600 transition cursor-pointer"
+               className="flex items-center gap-3 px-5 py-3 text-white bg-emerald-600/30 hover:bg-emerald-600 transition cursor-pointer"
               >
                 <Calendar className="w-4 h-4 text-emerald-400" />
                 <span>
@@ -759,12 +759,19 @@ export default function BookingPage() {
                   <BarChart3 className="w-4 h-4 text-purple-400" />
                   <span>สรุปรายงาน</span>
                 </div>
-                                <div
+                <div
                   onClick={() => router.push("/summary-therapists")}
                   className="flex items-center gap-3 px-5 py-3 text-white hover:bg-blue-600 transition cursor-pointer"
                 >
                   <BarChart3 className="w-4 h-4 text-purple-100" />
                   <span>รายงานการปฎิบัติงาน</span>
+                </div>
+                <div
+                  onClick={() => router.push("/check-que")}
+                  className="flex items-center gap-3 px-5 py-3 text-white hover:bg-blue-600 transition cursor-pointer"
+                >
+                  <Search className="w-4 h-4 text-purple-100" />
+                  <span>ค้นหาข้อมูลผู้รับบริการ</span>
                 </div>
               </>
             )}

@@ -677,7 +677,7 @@ const filteredTherapists = therapists;
 
               <div
                 onClick={() => router.push("/booking-audit")}
-                className="flex items-center gap-3 px-5 py-3 text-white hover:bg-emerald-600 transition cursor-pointer"
+                className="flex items-center gap-3 px-5 py-3 text-white bg-emerald-600/30 hover:bg-emerald-600 transition cursor-pointer"
               >
                 <ClipboardList className="w-4 h-4 text-blue-400" />
                 <span>ดูคิวนวดทั้งหมด</span>
@@ -721,6 +721,13 @@ const filteredTherapists = therapists;
                 >
                   <BarChart3 className="w-4 h-4 text-purple-100" />
                   <span>รายงานการปฎิบัติงาน</span>
+                </div>
+                <div
+                  onClick={() => router.push("/check-que")}
+                  className="flex items-center gap-3 px-5 py-3 text-white hover:bg-blue-600 transition cursor-pointer"
+                >
+                  <Search className="w-4 h-4 text-purple-100" />
+                  <span>ค้นหาข้อมูลผู้รับบริการ</span>
                 </div>
               </>
             )}

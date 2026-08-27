@@ -1,6 +1,30 @@
 import { NextResponse } from "next/server";
 import pool from "../dbconnection/db";
 
+// ✅ ใหม่: แปลงวันที่ (YYYY-MM-DD) เป็นรูปแบบไทย พ.ศ. เช่น "27 สิงหาคม 2569"
+// ใช้เฉพาะตอนแสดงผลข้อความแจ้งเตือน ไม่กระทบการเก็บ/query วันที่ในฐานข้อมูล (ยังเป็น ค.ศ. เหมือนเดิมทุกที่)
+const THAI_MONTHS = [
+  "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+  "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
+];
+function formatThaiDate(dateInput: string | Date): string {
+  let y: number, m: number, d: number;
+
+  if (dateInput instanceof Date) {
+    // ✅ แก้บั๊ก: ใช้ getFullYear/getMonth/getDate (เวลาท้องถิ่น) แทน toISOString()
+    // เพราะ toISOString() แปลงเป็น UTC ก่อน ทำให้วันที่เลื่อนถอยไป 1 วันในเซิร์ฟเวอร์โซนเวลา UTC+7 (ไทย)
+    y = dateInput.getFullYear();
+    m = dateInput.getMonth() + 1;
+    d = dateInput.getDate();
+  } else {
+    const parts = String(dateInput).slice(0, 10).split("-").map(Number);
+    [y, m, d] = parts;
+  }
+
+  if (!y || !m || !d) return String(dateInput);
+  return `${d} ${THAI_MONTHS[m - 1]} ${y + 543}`;
+}
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const date = url.searchParams.get("date");
@@ -176,6 +200,38 @@ export async function POST(request: Request) {
           { success: false, error: "คุณได้ทำการจองในช่วงเวลานี้แล้ว" },
           { status: 400 }
         );
+      }
+
+      // ✅ ใหม่: ตรวจสอบเพิ่มเติมว่า HN นี้จองคิว (กับผู้ให้บริการ/เวลาอื่นใดก็ตาม) ไว้แล้วในวันเดียวกันหรือไม่
+      // ยกเว้นคิวที่ถูกยกเลิกแล้ว (status != 'ยกเลิก') — ตรวจสอบเฉพาะกรณีมี hn เท่านั้น
+      // (ผู้รับบริการรายใหม่ที่ยังไม่มี HN จะไม่ถูกเช็คเงื่อนไขนี้ ทำงานตาม logic เดิมทุกประการ)
+      // หมายเหตุ: เช็คนี้ทำงาน "ต่อจาก" เงื่อนไขเดิมด้านบน จึงไม่กระทบผลลัพธ์/ข้อความ error เดิมของกรณีที่ตรวจจับได้อยู่แล้ว
+      if (hn) {
+        const [dupHnRows]: any = await conn.query(
+          `
+          SELECT b.id, b.date, b.time_slot, b.therapist, b.therapist_id, t.name AS therapist_name
+          FROM bookings b
+          LEFT JOIN therapist t ON t.id = b.therapist_id
+          WHERE b.hn = ? AND b.date = ? AND b.status != 'ยกเลิก'
+          LIMIT 1
+          `,
+          [hn, date]
+        );
+
+        if (dupHnRows && dupHnRows.length > 0) {
+          const dupBooking = dupHnRows[0];
+          // ใช้ชื่อจากตาราง therapist ผ่าน therapist_id ก่อน ถ้าไม่มีค่อย fallback เป็นชื่อข้อความเดิมที่เก็บไว้ใน bookings.therapist
+          const therapistDisplayName = dupBooking.therapist_name || dupBooking.therapist || "ไม่ระบุ";
+          // ✅ ใหม่: แปลงวันที่จาก bookings.date เป็นรูปแบบไทย พ.ศ. สำหรับแสดงในข้อความแจ้งเตือน
+          const thaiDate = formatThaiDate(dupBooking.date);
+          return NextResponse.json(
+            {
+              success: false,
+              error: `HN นี้ได้ทำการจองคิวกับ ${therapistDisplayName} ไว้แล้วในวันที่ ${thaiDate} ช่วงเวลา ${dupBooking.time_slot} กรุณายกเลิกคิวเดิมก่อน หากต้องการจองคิวใหม่`,
+            },
+            { status: 400 }
+          );
+        }
       }
 
       // ✅ ใหม่: หา therapist_id จากชื่อที่เลือก (best-effort) เพื่อบันทึกไว้ควบคู่กับชื่อเดิม

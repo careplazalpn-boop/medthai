@@ -20,6 +20,9 @@ export default function ConfirmPage() {
   const [success, setSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [loading, setLoading] = useState(false);
+  // ✅ ใหม่: ล็อกปุ่ม "ยืนยันการจอง" เมื่อพบว่าเป็นการจองซ้ำในวันเดียวกัน (จาก backend)
+  // ป้องกันไม่ให้กดยืนยันซ้ำด้วยข้อมูลชุดเดิม ต้องกลับไปเลือกคิวใหม่เท่านั้น
+  const [isDuplicateBooking, setIsDuplicateBooking] = useState(false);
 
   useEffect(() => {
     // เช็คแค่กรณีมี HN เท่านั้น
@@ -33,6 +36,8 @@ export default function ConfirmPage() {
 const handleConfirm = async () => {
   setLoading(true);
   setErrorMsg("");
+  // ✅ ใหม่: รีเซ็ตสถานะจองซ้ำทุกครั้งที่เริ่มยืนยันใหม่ (เผื่อกรณีแก้ไขข้อมูลแล้วลองใหม่)
+  setIsDuplicateBooking(false);
   try {
     const isNewUser = !hn;
     const endpoint = isNewUser ? "/api/new-user" : "/api/bookings";
@@ -61,7 +66,13 @@ const handleConfirm = async () => {
 
     setSuccess(true);
   } catch (err: any) {
-    setErrorMsg(err.message || "เกิดข้อผิดพลาดจากระบบ");
+    const message = err.message || "เกิดข้อผิดพลาดจากระบบ";
+    setErrorMsg(message);
+    // ✅ ใหม่: ตรวจสอบว่าเป็นกรณี "จองซ้ำในวันเดียวกัน / ช่วงเวลาเดียวกัน" หรือไม่
+    // (ข้อความคงที่จากฝั่ง backend ที่ตรวจสอบเงื่อนไขนี้) ถ้าใช่ ให้ล็อกปุ่มยืนยันการจองไว้
+    if (message.includes("จองคิวกับ") || message.includes("ทำการจองในช่วงเวลานี้แล้ว")) {
+      setIsDuplicateBooking(true);
+    }
   } finally {
     setLoading(false);
   }
@@ -74,6 +85,25 @@ const handleConfirm = async () => {
       {value}
     </li>
   );
+
+  // ✅ ใหม่: แสดงข้อความ error ปกติเหมือนเดิมทุกกรณี ยกเว้นกรณี "จองซ้ำ" ที่มีชื่อผู้ให้บริการ (therapist.name)
+  // อยู่ในข้อความ — จะทำให้ชื่อผู้ให้บริการส่วนนั้นเด่นแตกต่างจากข้อความส่วนอื่น (ตัวหนา+ขีดเส้นใต้+สีเข้มขึ้น)
+  const renderErrorMessage = (msg: string) => {
+    const match = msg.match(/^(.*จองคิวกับ )(.+?)( ไว้แล้วในวันที่.*)$/);
+    if (match) {
+      const [, before, therapistName, after] = match;
+      return (
+        <>
+          {before}
+          <span className="font-extrabold text-red-800 underline decoration-2 underline-offset-2">
+            {therapistName}
+          </span>
+          {after}
+        </>
+      );
+    }
+    return msg;
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-emerald-50 flex items-center justify-center p-6">
@@ -108,14 +138,21 @@ const handleConfirm = async () => {
             {errorMsg && (
               <div className="mb-6 flex items-center justify-center gap-2 text-red-600 font-semibold">
                 <XCircle className="w-6 h-6" />
-                <span>{errorMsg}</span>
+                <span>{renderErrorMessage(errorMsg)}</span>
               </div>
             )}
             <div className="flex gap-4 justify-center">
               <button onClick={() => router.push("/booking")} className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-emerald-800 bg-emerald-100 shadow-sm hover:bg-emerald-200">
                 <ArrowLeft className="w-5 h-5" /> กลับหน้าจองคิว
               </button>
-              <button onClick={handleConfirm} disabled={loading} className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-white shadow-sm transition ${loading ? "bg-emerald-300 cursor-not-allowed" : "bg-emerald-600 hover:bg-emerald-700"}`}>
+              <button
+                onClick={handleConfirm}
+                disabled={loading || isDuplicateBooking}
+                title={isDuplicateBooking ? "มีการจองซ้ำในวันนี้แล้ว กรุณากลับไปเลือกคิวใหม่" : undefined}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-white shadow-sm transition ${
+                  loading || isDuplicateBooking ? "bg-emerald-300 cursor-not-allowed" : "bg-emerald-600 hover:bg-emerald-700"
+                }`}
+              >
                 {loading ? <><Loader2 className="animate-spin w-5 h-5" /> กำลังบันทึก...</> : <><CheckCircle2 className="w-5 h-5" /> ยืนยันการจอง</>}
               </button>
             </div>

@@ -6,6 +6,7 @@ import {
   Pencil,
   Trash2,
   UserPlus,
+  Search,
   X,
   Menu,
   LogOut,
@@ -613,6 +614,13 @@ const renderTable = (data: Person[], type: "therapist" | "med_staff") => (
                   <BarChart3 className="w-4 h-4 text-purple-100" />
                   <span>รายงานการปฎิบัติงาน</span>
                 </div>
+                <div
+                  onClick={() => router.push("/check-que")}
+                  className="flex items-center gap-3 px-5 py-3 text-white hover:bg-blue-600 transition cursor-pointer"
+                >
+                  <Search className="w-4 h-4 text-purple-100" />
+                  <span>ค้นหาข้อมูลผู้รับบริการ</span>
+                </div>
               </>
             )}
 
@@ -626,8 +634,8 @@ const renderTable = (data: Person[], type: "therapist" | "med_staff") => (
                 </div>
 
                 <div
-                  onClick={() => router.push("/manage-therapists")}
-                  className="flex items-center gap-3 px-5 py-3 text-white hover:bg-amber-600 transition cursor-pointer"
+                  onClick={() => router.push("/manage-therapists")}                  
+                  className="flex items-center gap-3 px-5 py-3 text-white bg-amber-600/40 transition cursor-pointer"
                 >
                   <Users className="w-4 h-4 text-rose-400" />
                   <span>จัดการบุคลากร</span>

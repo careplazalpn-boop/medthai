@@ -1128,8 +1128,16 @@ export default function BookingPage() {
                       <span className="flex flex-col items-start text-left">
                         <span className="font-medium">{u.name}</span>
                         {/* ✅ ใหม่: แสดง HN เพิ่มเติมใต้ชื่อ (แสดงเฉพาะเมื่อมีค่า HN เท่านั้น) */}
-                        {u.hn && (
+                        {u.hn ? (
                           <span className="text-xs text-gray-500">HN: {u.hn}</span>
+                        ) : (
+                          // ✅ ใหม่: ถ้ายังไม่มี HN ให้แจ้งว่าเป็นข้อมูลชั่วคราว/ยังไม่สมบูรณ์ แทนบรรทัด HN
+                          <span
+                            className="text-xs font-medium text-amber-600"
+                            title="ยังไม่มี HN — รอเจ้าหน้าที่บันทึกข้อมูลให้สมบูรณ์"
+                          >
+                            ⚠ ข้อมูลชั่วคราว ยังไม่มี HN
+                          </span>
                         )}
                       </span>
                       <span className="text-sm text-gray-500 text-right">{u.phone || "ไม่มีเบอร์"}</span>

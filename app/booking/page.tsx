@@ -1125,7 +1125,13 @@ export default function BookingPage() {
                 <div className="border p-2 rounded max-h-40 overflow-y-auto mb-3">
                   {searchResults.map(u => (
                     <button key={u.hn || u.name} onClick={() => handleSelectUser(u)} className="w-full flex justify-between items-center px-2 py-1 hover:bg-emerald-100 rounded text-gray-900 cursor-pointer">
-                      <span className="font-medium text-left">{u.name}</span>
+                      <span className="flex flex-col items-start text-left">
+                        <span className="font-medium">{u.name}</span>
+                        {/* ✅ ใหม่: แสดง HN เพิ่มเติมใต้ชื่อ (แสดงเฉพาะเมื่อมีค่า HN เท่านั้น) */}
+                        {u.hn && (
+                          <span className="text-xs text-gray-500">HN: {u.hn}</span>
+                        )}
+                      </span>
                       <span className="text-sm text-gray-500 text-right">{u.phone || "ไม่มีเบอร์"}</span>
                     </button>
                   ))}

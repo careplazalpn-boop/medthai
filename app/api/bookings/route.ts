@@ -190,6 +190,31 @@ export async function POST(request: Request) {
 
     const conn = await pool.getConnection();
     try {
+      // ✅ ใหม่: ถ้ามี HN ส่งมา (ผู้รับบริการเดิม) ต้องตรวจสอบว่า HN + ชื่อ ตรงกับข้อมูลจริง
+      // ในตาราง med_user เท่านั้น เพื่อป้องกันกรณีผู้ใช้พิมพ์ข้อมูลเองโดยไม่ได้กดค้นหา/เลือก
+      // รายชื่อจากระบบ ทำให้ HN หรือชื่อไม่ตรงกับความเป็นจริง — ถ้าไม่พบให้ reject ทันที
+      // ก่อนถึงขั้นตอนอื่นใดๆ (TRIM ตัดช่องว่างหัว-ท้ายกันกรณีพิมพ์เว้นวรรคเกินมา)
+      //
+      // กรณีไม่มี HN (ผู้รับบริการรายใหม่จริง ๆ ที่ยังไม่มีประวัติ) ไม่ถูกเช็คเงื่อนไขนี้
+      // ยังคง logic เดิมทั้งหมดด้านล่าง (เช็ค/บันทึกลง new_user เป็นข้อมูลชั่วคราวรอฝ่าย
+      // เวชระเบียนทำประวัติที่สมบูรณ์และ sync มาที่ med_user ภายหลัง)
+      if (hn) {
+        const [medUserRows]: any = await conn.query(
+          "SELECT id FROM med_user WHERE TRIM(hn) = TRIM(?) AND TRIM(name) = TRIM(?) LIMIT 1",
+          [hn, name]
+        );
+        if (!medUserRows || medUserRows.length === 0) {
+          return NextResponse.json(
+            {
+              success: false,
+              error:
+                "ไม่พบข้อมูลผู้รับบริการ (HN และชื่อ) นี้ในระบบ กรุณากดค้นหาและเลือกรายชื่อผู้รับบริการจากระบบก่อนทำการจอง",
+            },
+            { status: 400 }
+          );
+        }
+      }
+
       const [existing] = await conn.query(
         "SELECT * FROM bookings WHERE hn = ? AND therapist = ? AND time_slot = ? AND date = ? AND status != 'ยกเลิก'",
         [hn || null, therapist, time, date]

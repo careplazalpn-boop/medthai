@@ -78,7 +78,11 @@ export default function HamburgerMenu({ rightSlot }: HamburgerMenuProps) {
   const handleLogout = async () => {
     await logout();
     router.push("/login");
-    router.refresh();
+    // ✅ เอา router.refresh() ออก — เดิมเรียกต่อจาก router.push() ทันที
+    // ทำให้แข่งกับการนำทางที่ยังไม่เสร็จ (refresh ข้อมูลของหน้าเดิมที่ user เป็น null แล้ว
+    // ในจังหวะที่กำลังจะเปลี่ยนหน้า) ทำให้ค้างอยู่หน้าเดิมแทนที่จะไป /login จนกว่าจะ refresh มือ
+    // แอปนี้ fetch ข้อมูลผ่าน client-side (useEffect/fetch) เป็นหลัก ไม่ได้พึ่ง Server Component
+    // ที่ต้อง refresh จึงไม่จำเป็นต้องเรียกเลย
   };
 
   return (

@@ -4,31 +4,15 @@ import { useState, useEffect, useContext, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { AuthContext } from "@/context/AuthContext";
-import { CalendarIcon, UserIcon, Clock, AlertCircle, UserCheck, UserX, BedDouble, Search } from "lucide-react";
+import { CalendarIcon, UserIcon, Clock, AlertCircle, UserCheck, UserX, Search } from "lucide-react";
 import { ImSpinner2 } from "react-icons/im";
-import { FaCheck, FaSpa, FaTimes, FaBars, FaSignOutAlt, FaSignInAlt, FaCalendarAlt, FaHistory, FaChartBar, FaUsersCog, FaFacebook, FaHospital} from "react-icons/fa";
-import { HiChevronDown, HiChevronUp } from "react-icons/hi";
+import { FaCheck, FaTimes } from "react-icons/fa";
 import * as Dialog from "@radix-ui/react-dialog";
-import { FaClipboardList } from "react-icons/fa";
-import {
-   Loader2,
-  Check,
-  CheckCircle2,
-  Sparkles,
-  X,
-  Menu,
-  LogOut,
-  LogIn,
-  Calendar,
-  History,
-  BarChart3,
-  Users,
-  Facebook,
-  Building2,
-  ChevronDown,
-  ChevronUp,
-  ClipboardList
-} from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
+// ❌ ไม่ import/render <HamburgerMenu /> ในหน้านี้ เพราะ app/layout.tsx render ให้ทุกหน้าอยู่แล้ว
+// (ดู layout.tsx: <AuthProvider><HamburgerMenu />{children}</AuthProvider>)
+// การ import ซ้ำในหน้านี้จะทำให้เมนูขึ้นซ้อนกัน 2 แถบ — เมนูเดิมของหน้านี้ (ทั้ง state/JSX
+// แถบเมนูบนสุด + แผง dropdown) จึงถูกลบออกทั้งหมด ให้ใช้เมนูกลางจาก HamburgerMenu.tsx แทน
 
 interface UserInfo {
   hn?: string;
@@ -56,11 +40,10 @@ interface MedStaff {
 
 export default function BookingPage() {
   const router = useRouter();
-  const { user, logout } = useContext(AuthContext);
+  const { user } = useContext(AuthContext);
   const isReadOnly = true;
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isGuest = !user;
-  const [menuOpen, setMenuOpen] = useState(false); // state สำหรับ hamburger
   const [idCardNumber, setIdCardNumber] = useState("");
   const [therapists, setTherapists] = useState<Therapist[]>([]);
   const [medStaff, setMedStaff] = useState<MedStaff[]>([]);
@@ -86,30 +69,7 @@ export default function BookingPage() {
   const [patientFirstName, setPatientFirstName] = useState("");
   const [patientLastName, setPatientLastName] = useState("");
   const [patientPhone, setPatientPhone] = useState("");
-  const [contactOpen, setContactOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
   
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
-    };
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setMenuOpen(false);
-      }
-    };
-    if (menuOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-      document.addEventListener("keydown", handleEsc);
-    }
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("keydown", handleEsc);
-    };
-  }, [menuOpen]);
-
   useEffect(() => {
     if (!showAlert) return;
     const timer = setTimeout(() => setShowAlert(false), 2000);
@@ -217,19 +177,6 @@ export default function BookingPage() {
     setSelectedTime(time);
   };
 
-  const handleBookingClick = () => {
-    if (!user) {
-      setShowAlert(true);
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      timeoutRef.current = setTimeout(() => {
-        setShowAlert(false);
-        timeoutRef.current = null;
-      }, 5000);
-      return;
-    }
-    router.push("/booking");
-  };
-
   const handleBedsClick = () => {
     if (!user) {
       setShowAlert(true);
@@ -243,12 +190,7 @@ export default function BookingPage() {
     router.push("/beds-special");
   };  
   
-  const handleLogout = () => {
-    logout();
-    router.push("/login");
-  };
-      
-const handleSubmit = () => {
+  const handleSubmit = () => {
    if (isReadOnly) {
     alert("โหมดดูอย่างเดียว ไม่สามารถบันทึกการจองได้");
     return;
@@ -474,330 +416,124 @@ const filteredTherapists = therapists;
           <ImSpinner2 className="w-12 h-12 text-white animate-spin" />
         </div>
       )}
-      {/* แถบเมนูบนสุด */}
-      <div className="fixed top-0 left-0 w-full z-50 bg-gray-700 shadow-md flex justify-between items-center px-2 sm:px-4 py-2 sm:py-2">
-        <div className="flex items-center gap-2 sm:gap-13">
-          {/* Hamburger */}
-          <button
-            onClick={() => setMenuOpen(!menuOpen)}
-            className="text-white text-xl sm:text-2xl"
-            title="เมนู"
-          >
-            {menuOpen ? <FaTimes /> : <FaBars />}
-          </button>
-
-          {/* Logo */}
-          <div
-            className="ml-3 sm:ml-3 text-white font-bold text-base sm:text-lg flex items-center gap-1 cursor-pointer"
-            onClick={() => router.push("/")}
-            title="หน้าหลัก"
-          >
-            <FaSpa className="text-sm sm:text-base" /> แพทย์แผนไทย
-          </div>
-        </div>
-        <div className="flex gap-2 sm:gap-3 flex-wrap sm:flex-nowrap">
-          {user?.role === "admin" && (
-            <>
-              <button
-                onClick={() => setAddPatientDialog(true)}
-                className="flex items-center gap-1 sm:gap-2 px-3 py-3 sm:px-3 sm:py-3 rounded-lg bg-white text-emerald-700 font-semibold shadow text-xs sm:text-sm transition hover:bg-gray-300"
-                title="คนไข้มี HN แต่หาไม่เจอ"
-              >
-                HN ?
-              </button>
-              <Dialog.Root
-                open={addPatientDialog}
-                onOpenChange={(open) => {
-                  setAddPatientDialog(open);
-                  if (!open) {
-                    // รีเซ็ตค่าเมื่อ dialog ปิด
-                    setHn("");
-                    setPatientPrefix("");
-                    setPatientFirstName("");
-                    setPatientLastName("");
-                    setPatientPhone("");
-                  }
-                }}
-              >
-                <Dialog.Portal>
-                  <Dialog.Overlay className="fixed inset-0 bg-black/30 z-40" />
-                  <Dialog.Content className="fixed z-50 left-1/2 top-1/2 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white p-6 shadow-lg">
-                    <Dialog.Title className="text-xl font-bold mb-4 text-emerald-700">เพิ่มข้อมูลคนไข้ (เพิ่มเสร็จแล้วให้จองใหม่)</Dialog.Title>
-
-                    {/* HN */}
-                    <label className="block mb-3">
-                      <span className="text-sm font-medium text-emerald-800">HN</span>
-                      <input
-                        type="text"
-                        value={hn}
-                        onChange={e => setHn(e.target.value.replace(/\D/g, "").slice(0, 9))}
-                        placeholder="กรอก HN"
-                        maxLength={9}
-                        className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900"
-                      />
-                    </label>
-
-                    {/* ชื่อ */}
-                    <div className="flex gap-2 mb-3">
-                      <label className="flex flex-col w-20">
-                        <span className="text-sm font-medium text-emerald-800">คำนำหน้า</span>
-                        <input
-                          type="text"
-                          value={patientPrefix}
-                          onChange={e => setPatientPrefix(e.target.value)}
-                          placeholder="คำย่อ"
-                          className="mt-1 w-full border border-gray-300 rounded-md px-2 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900"
-                        />
-                      </label>
-                      <label className="flex-1 flex flex-col">
-                        <span className="text-sm font-medium text-emerald-800">ชื่อจริง</span>
-                        <input
-                          type="text"
-                          value={patientFirstName}
-                          onChange={e => setPatientFirstName(e.target.value)}
-                          placeholder="ชื่อ"
-                          className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900"
-                        />
-                      </label>
-                      <label className="flex-1 flex flex-col">
-                        <span className="text-sm font-medium text-emerald-800">นามสกุล</span>
-                        <input
-                          type="text"
-                          value={patientLastName}
-                          onChange={e => setPatientLastName(e.target.value)}
-                          placeholder="นามสกุล"
-                          className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900"
-                        />
-                      </label>
-                    </div>
-
-                    {/* เบอร์โทร */}
-                    <label className="block mb-3">
-                      <span className="text-sm font-medium text-emerald-800">เบอร์โทร</span>
-                      <input
-                        type="text"
-                        value={patientPhone}
-                        onChange={e => {
-                          let digits = e.target.value.replace(/\D/g, "");
-                          if (digits.length > 3) {
-                            digits = digits.slice(0, 3) + "-" + digits.slice(3, 10);
-                          }
-                          setPatientPhone(digits.slice(0, 11));
-                        }}
-                        placeholder="กรอกเบอร์โทร"
-                        maxLength={11}
-                        className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900"
-                      />
-                    </label>
-
-                    {/* ปุ่มยืนยัน/ยกเลิก */}
-                    <div className="mt-4 flex justify-end gap-2">
-                      <button
-                        onClick={handleAddPatient}
-                        className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white"
-                      >
-                        ยืนยัน
-                      </button>
-                      <Dialog.Close asChild>
-                        <button className="px-4 py-2 rounded-lg bg-gray-300 hover:bg-gray-400 text-gray-800">
-                          ยกเลิก
-                        </button>
-                      </Dialog.Close>
-                    </div>
-                  </Dialog.Content>
-                </Dialog.Portal>
-              </Dialog.Root>
-            </>
-          )}
-          {/* User Buttons */}
-          <div className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
-            {user ? (
-              <>
-                <span className="text-white font-semibold text-xs sm:text-sm">
-                คุณคือ {user.name || "ผู้ใช้"}
-                </span>
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center gap-1 px-2 py-3 sm:px-4 sm:py-3 bg-red-600 text-white rounded-lg shadow font-semibold transition hover:bg-red-700 text-xs sm:text-sm"
-                  title="ลงชื่อออก"
-                >
-                  <FaSignOutAlt className="w-3 h-3 sm:w-5 sm:h-5" />
-                  <span>ลงชื่อออก</span>
-                </button>
-              </>
-            ) : (
-              <button
-                onClick={() => router.push("/login")}
-                className="flex items-center gap-1 px-2 py-3 sm:px-4 sm:py-3 rounded-lg bg-white text-emerald-700 font-semibold shadow transition hover:bg-gray-300 text-xs sm:text-sm"
-                title="ลงชื่อเข้าใช้"
-              >
-                <FaSignInAlt className="w-3 h-3 sm:w-5 sm:h-5" />
-                <span>สำหรับบุคลากร</span>
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-      {/* Hamburger Menu */}
-      <AnimatePresence>
-        {menuOpen && (
-          <motion.div
-            ref={menuRef}
-            initial={{ x: -300, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: -300, opacity: 0 }}
-            transition={{ duration: 0.3 }}
-            className="fixed top-0 left-0 w-72 h-full bg-slate-800/95 backdrop-blur-md z-40 flex flex-col pt-16 overflow-y-auto shadow-2xl text-white"
-          >
-            {/* Header */}
-            <div className="px-5 pb-4 border-b border-slate-600">
-              <div className="flex items-center gap-2 text-xl font-bold text-white">
-                <Sparkles className="text-emerald-400 w-5 h-5" />
-                ระบบแพทย์แผนไทย
-              </div>
-
-              {user && (
-                <div className="mt-2 text-sm text-slate-300">
-                  ผู้ใช้งาน : <span className="font-semibold">{user.name}</span>
-                </div>
-              )}
-            </div>
-
-            {/* ===================== เมนูหลัก ===================== */}
-            <div className="py-2">
-              <div
-                onClick={user ? handleBookingClick : () => router.push("/booking")}
-                className="flex items-center gap-3 px-5 py-3 text-white hover:bg-emerald-600 transition cursor-pointer"
-              >
-                <Calendar className="w-4 h-4 text-emerald-400" />
-                <span>
-                  {user ? "จองคิวนวดแผนไทย" : "ดูคิวจองนวดแผนไทย"}
-                </span>
-              </div>
-
-              <div
-                onClick={() => router.push("/booking-audit")}
-                className="flex items-center gap-3 px-5 py-3 text-white bg-emerald-600/30 hover:bg-emerald-600 transition cursor-pointer"
-              >
-                <ClipboardList className="w-4 h-4 text-blue-400" />
-                <span>ดูคิวนวดทั้งหมด</span>
-              </div>
-            </div>
-                          <div
-                onClick={() => router.push("/beds-special")}
-                className="flex items-center gap-3 px-5 py-3 text-white hover:bg-emerald-600 transition cursor-pointer"
-              >
-                <BedDouble className="w-4 h-4 text-emerald-300" />
-                <span>จองเตียงพิเศษ</span>
-              </div>
-
-            {/* ===================== เจ้าหน้าที่ ===================== */}
-            {user && (
-              <>
-                <div className="border-t border-slate-600 my-2" />
-
-                <div className="px-5 py-2 text-xs font-semibold uppercase tracking-widest text-slate-400">
-                  สำหรับเจ้าหน้าที่
-                </div>
-
-                <div
-                  onClick={() => router.push("/all-bookings")}
-                  className="flex items-center gap-3 px-5 py-3 text-white hover:bg-blue-600 transition cursor-pointer"
-                >
-                  <History className="w-4 h-4 text-amber-400" />
-                  <span>ประวัติการจอง</span>
-                </div>
-
-                <div
-                  onClick={() => router.push("/summary-history")}
-                  className="flex items-center gap-3 px-5 py-3 text-white hover:bg-blue-600 transition cursor-pointer"
-                >
-                  <BarChart3 className="w-4 h-4 text-purple-400" />
-                  <span>สรุปรายงาน</span>
-                </div>
-                <div
-                  onClick={() => router.push("/summary-therapists")}
-                  className="flex items-center gap-3 px-5 py-3 text-white hover:bg-blue-600 transition cursor-pointer"
-                >
-                  <BarChart3 className="w-4 h-4 text-purple-100" />
-                  <span>รายงานการปฎิบัติงาน</span>
-                </div>
-                <div
-                  onClick={() => router.push("/check-que")}
-                  className="flex items-center gap-3 px-5 py-3 text-white hover:bg-blue-600 transition cursor-pointer"
-                >
-                  <Search className="w-4 h-4 text-purple-100" />
-                  <span>ค้นหาข้อมูลผู้รับบริการ</span>
-                </div>
-              </>
-            )}
-
-            {/* ===================== Admin ===================== */}
-            {user?.role === "admin" && (
-              <>
-                <div className="border-t border-slate-600 my-2" />
-
-                <div className="px-5 py-2 text-xs font-semibold uppercase tracking-widest text-amber-300">
-                  จัดการระบบ
-                </div>
-
-                <div
-                  onClick={() => router.push("/manage-therapists")}
-                  className="flex items-center gap-3 px-5 py-3 text-white hover:bg-amber-600 transition cursor-pointer"
-                >
-                  <Users className="w-4 h-4 text-rose-400" />
-                  <span>จัดการบุคลากร</span>
-                </div>
-              </>
-            )}
-
-            {/* ===================== ติดต่อ ===================== */}
-            <div className="border-t border-slate-600 my-2" />
-
-            <div
-              onClick={() => setContactOpen(!contactOpen)}
-              className="flex items-center gap-3 px-5 py-3 text-white hover:bg-slate-700 transition cursor-pointer"
-            >
-              <Building2 className="w-4 h-4 text-teal-400" />
-
-              <span className="flex-1">
-                ช่องทางติดต่อ
-              </span>
-
-              {contactOpen ? (
-                <ChevronUp className="w-5 h-5" />
-              ) : (
-                <ChevronDown className="w-5 h-5" />
-              )}
-            </div>
-
-            {contactOpen && (
-              <div className="bg-slate-900">
-                <a
-                  href="https://m.me/100070719421986"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 px-9 py-3 text-slate-200 hover:bg-blue-700 transition"
-                >
-                  <Facebook className="w-4 h-4 text-blue-400" />
-                  Facebook (จองคิว)
-                </a>
-
-                <a
-                  href="https://www.lmwcc.com/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 px-9 py-3 text-slate-200 hover:bg-emerald-700 transition"
-                >
-                  <Building2 className="w-4 h-4 text-emerald-400" />
-                  เว็บไซต์ศูนย์บริการ
-                </a>
-              </div>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* ✅ แถบเมนูบนสุด + แผงเมนู hamburger ถูกลบออก เพราะ app/layout.tsx render
+          <HamburgerMenu /> ให้ทุกหน้าอยู่แล้ว (ดูคอมเมนต์ที่ import ด้านบนของไฟล์)
+          ปุ่ม "HN ?" ซึ่งเป็นฟีเจอร์เฉพาะหน้านี้ (เฉพาะแอดมิน) ถูกย้ายไปไว้ในพื้นที่เนื้อหา
+          ด้านล่างแทน โดย state/handler/Dialog ทั้งหมดยังเหมือนเดิมทุกประการ ไม่มีการแก้ไข logic */}
       <div className="max-w-6xl mx-auto p-6 pt-27 relative z-10">
+        {user?.role === "admin" && (
+          <div className="flex justify-end mb-4">
+            <button
+              onClick={() => setAddPatientDialog(true)}
+              className="flex items-center gap-1 sm:gap-2 px-3 py-2 rounded-lg bg-emerald-700 text-white font-semibold shadow text-xs sm:text-sm transition hover:bg-emerald-800 cursor-pointer"
+              title="คนไข้มี HN แต่หาไม่เจอ"
+            >
+              HN ?
+            </button>
+            <Dialog.Root
+              open={addPatientDialog}
+              onOpenChange={(open) => {
+                setAddPatientDialog(open);
+                if (!open) {
+                  // รีเซ็ตค่าเมื่อ dialog ปิด
+                  setHn("");
+                  setPatientPrefix("");
+                  setPatientFirstName("");
+                  setPatientLastName("");
+                  setPatientPhone("");
+                }
+              }}
+            >
+              <Dialog.Portal>
+                <Dialog.Overlay className="fixed inset-0 bg-black/30 z-40" />
+                <Dialog.Content className="fixed z-50 left-1/2 top-1/2 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white p-6 shadow-lg">
+                  <Dialog.Title className="text-xl font-bold mb-4 text-emerald-700">เพิ่มข้อมูลคนไข้ (เพิ่มเสร็จแล้วให้จองใหม่)</Dialog.Title>
+
+                  {/* HN */}
+                  <label className="block mb-3">
+                    <span className="text-sm font-medium text-emerald-800">HN</span>
+                    <input
+                      type="text"
+                      value={hn}
+                      onChange={e => setHn(e.target.value.replace(/\D/g, "").slice(0, 9))}
+                      placeholder="กรอก HN"
+                      maxLength={9}
+                      className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900"
+                    />
+                  </label>
+
+                  {/* ชื่อ */}
+                  <div className="flex gap-2 mb-3">
+                    <label className="flex flex-col w-20">
+                      <span className="text-sm font-medium text-emerald-800">คำนำหน้า</span>
+                      <input
+                        type="text"
+                        value={patientPrefix}
+                        onChange={e => setPatientPrefix(e.target.value)}
+                        placeholder="คำย่อ"
+                        className="mt-1 w-full border border-gray-300 rounded-md px-2 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900"
+                      />
+                    </label>
+                    <label className="flex-1 flex flex-col">
+                      <span className="text-sm font-medium text-emerald-800">ชื่อจริง</span>
+                      <input
+                        type="text"
+                        value={patientFirstName}
+                        onChange={e => setPatientFirstName(e.target.value)}
+                        placeholder="ชื่อ"
+                        className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900"
+                      />
+                    </label>
+                    <label className="flex-1 flex flex-col">
+                      <span className="text-sm font-medium text-emerald-800">นามสกุล</span>
+                      <input
+                        type="text"
+                        value={patientLastName}
+                        onChange={e => setPatientLastName(e.target.value)}
+                        placeholder="นามสกุล"
+                        className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900"
+                      />
+                    </label>
+                  </div>
+
+                  {/* เบอร์โทร */}
+                  <label className="block mb-3">
+                    <span className="text-sm font-medium text-emerald-800">เบอร์โทร</span>
+                    <input
+                      type="text"
+                      value={patientPhone}
+                      onChange={e => {
+                        let digits = e.target.value.replace(/\D/g, "");
+                        if (digits.length > 3) {
+                          digits = digits.slice(0, 3) + "-" + digits.slice(3, 10);
+                        }
+                        setPatientPhone(digits.slice(0, 11));
+                      }}
+                      placeholder="กรอกเบอร์โทร"
+                      maxLength={11}
+                      className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-gray-900"
+                    />
+                  </label>
+
+                  {/* ปุ่มยืนยัน/ยกเลิก */}
+                  <div className="mt-4 flex justify-end gap-2">
+                    <button
+                      onClick={handleAddPatient}
+                      className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white"
+                    >
+                      ยืนยัน
+                    </button>
+                    <Dialog.Close asChild>
+                      <button className="px-4 py-2 rounded-lg bg-gray-300 hover:bg-gray-400 text-gray-800">
+                        ยกเลิก
+                      </button>
+                    </Dialog.Close>
+                  </div>
+                </Dialog.Content>
+              </Dialog.Portal>
+            </Dialog.Root>
+          </div>
+        )}
         <h1
           className="text-2xl sm:text-4xl font-extrabold text-emerald-800 mb-2 text-center"
         >

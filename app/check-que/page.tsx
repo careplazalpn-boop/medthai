@@ -1,25 +1,11 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  FaSignOutAlt,
-  FaSignInAlt,
-} from "react-icons/fa";
-import {
-  Menu,
-  X,
-  Sparkles,
   Calendar,
   ClipboardList,
   BedDouble,
-  History,
-  BarChart3,
-  Users,
-  Building2,
-  ChevronDown,
-  ChevronUp,
-  Facebook,
   Search,
   User,
   Phone,
@@ -30,7 +16,6 @@ import {
   XCircle,
   ArrowLeft,
 } from "lucide-react";
-import { AnimatePresence, motion } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
 
 // ---------------- Types ----------------
@@ -102,11 +87,7 @@ function getPaymentLabel(paymentStatus: string) {
 
 export default function CheckQuePage() {
   const router = useRouter();
-  const { user, logout } = useAuth();
-
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const [contactOpen, setContactOpen] = useState(false);
+  const { user } = useAuth();
 
   // ---------------- ค้นหา / ผลลัพธ์ ----------------
   const [keyword, setKeyword] = useState("");
@@ -133,34 +114,6 @@ export default function CheckQuePage() {
       router.push("/login");
     }
   }, [user, router]);
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
-    };
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setMenuOpen(false);
-    };
-    if (menuOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-      document.addEventListener("keydown", handleEsc);
-    }
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("keydown", handleEsc);
-    };
-  }, [menuOpen]);
-
-  const handleLogout = () => {
-    logout();
-    router.push("/login");
-  };
-
-  const handleBookingClick = () => {
-    router.push("/booking");
-  };
 
   // ---------------- โหลดรายละเอียด + ประวัติ ของ HN ที่เลือก (รองรับแบ่งหน้า) ----------------
   const loadPatientDetail = async (hn: string, targetPage: number = 1, targetLimit: number = limit) => {
@@ -276,205 +229,6 @@ export default function CheckQuePage() {
 
   return (
     <div className="min-h-screen bg-gray-50 text-emerald-700">
-      {/* Header */}
-      <div className="fixed top-0 left-0 w-full z-50 bg-gray-700 shadow-md flex justify-between items-center px-2 sm:px-4 py-2 sm:py-2">
-        <div className="flex items-center gap-2 sm:gap-13">
-          <button
-            onClick={() => setMenuOpen(!menuOpen)}
-            className="text-white text-xl sm:text-2xl cursor-pointer"
-            title="เมนู"
-          >
-            {menuOpen ? <X /> : <Menu />}
-          </button>
-
-          <div
-            className="ml-3 sm:ml-3 text-white font-bold text-base sm:text-lg flex items-center gap-1 cursor-pointer"
-            onClick={() => router.push("/")}
-            title="หน้าหลัก"
-          >
-            <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" /> แพทย์แผนไทย
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3 sm:gap-3 text-xs sm:text-sm">
-          {user ? (
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-1 px-2 py-3 sm:px-4 sm:py-3 bg-red-600 text-white rounded-lg shadow font-semibold transition hover:bg-red-700 text-xs sm:text-sm"
-              title="ลงชื่อออก"
-            >
-              <FaSignOutAlt className="w-3 h-3 sm:w-5 sm:h-5" />
-              <span>ลงชื่อออก</span>
-            </button>
-          ) : (
-            <button
-              onClick={() => router.push("/login")}
-              className="flex items-center gap-1 px-2 py-1 sm:px-4 sm:py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow transition hover:bg-gray-300 text-xs sm:text-sm"
-              title="ลงชื่อเข้าใช้"
-            >
-              <FaSignInAlt className="w-3 h-3 sm:w-5 sm:h-5" />
-              <span>สำหรับบุคลากร</span>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Hamburger Menu */}
-      <AnimatePresence>
-        {menuOpen && (
-          <motion.div
-            ref={menuRef}
-            initial={{ x: -300, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: -300, opacity: 0 }}
-            transition={{ duration: 0.3 }}
-            className="fixed top-0 left-0 w-72 h-full bg-slate-800/95 backdrop-blur-md z-40 flex flex-col pt-16 overflow-y-auto shadow-2xl text-white"
-          >
-            {/* Header */}
-            <div className="px-5 pb-4 border-b border-slate-600">
-              <div className="flex items-center gap-2 text-xl font-bold text-white">
-                <Sparkles className="text-emerald-400 w-5 h-5" />
-                ระบบแพทย์แผนไทย
-              </div>
-              {user && (
-                <div className="mt-2 text-sm text-slate-300">
-                  ผู้ใช้งาน : <span className="font-semibold">{user.name}</span>
-                </div>
-              )}
-            </div>
-
-            {/* ===================== เมนูหลัก ===================== */}
-            <div className="py-2">
-              <div
-                onClick={handleBookingClick}
-                className="flex items-center gap-3 px-5 py-3 text-white hover:bg-emerald-600 transition cursor-pointer"
-              >
-                <Calendar className="w-4 h-4 text-emerald-400" />
-                <span>จองคิวนวดแผนไทย</span>
-              </div>
-
-              <div
-                onClick={() => router.push("/booking-audit")}
-                className="flex items-center gap-3 px-5 py-3 text-white hover:bg-emerald-600 transition cursor-pointer"
-              >
-                <ClipboardList className="w-4 h-4 text-blue-400" />
-                <span>ดูคิวนวดทั้งหมด</span>
-              </div>
-              <div
-                onClick={() => router.push("/beds-special")}
-                className="flex items-center gap-3 px-5 py-3 text-white hover:bg-emerald-600 transition cursor-pointer"
-              >
-                <BedDouble className="w-4 h-4 text-emerald-300" />
-                <span>จองเตียงพิเศษ</span>
-              </div>
-            </div>
-
-            {/* ===================== เจ้าหน้าที่ ===================== */}
-            {user && (
-              <>
-                <div className="border-t border-slate-600 my-2" />
-
-                <div className="px-5 py-2 text-xs font-semibold uppercase tracking-widest text-slate-400">
-                  สำหรับเจ้าหน้าที่
-                </div>
-
-                <div
-                  onClick={() => router.push("/all-bookings")}
-                  className="flex items-center gap-3 px-5 py-3 text-white hover:bg-blue-600 transition cursor-pointer"
-                >
-                  <History className="w-4 h-4 text-amber-400" />
-                  <span>ประวัติการจอง</span>
-                </div>
-
-                <div
-                  onClick={() => router.push("/summary-history")}
-                  className="flex items-center gap-3 px-5 py-3 text-white hover:bg-blue-600 transition cursor-pointer"
-                >
-                  <BarChart3 className="w-4 h-4 text-purple-400" />
-                  <span>สรุปรายงาน</span>
-                </div>
-                <div
-                  onClick={() => router.push("/summary-therapists")}
-                  className="flex items-center gap-3 px-5 py-3 text-white hover:bg-blue-600 transition cursor-pointer"
-                >
-                  <BarChart3 className="w-4 h-4 text-purple-400" />
-                  <span>รายงานการปฎิบัติงาน</span>
-                </div>
-                {/* ✅ ใหม่: เมนูหน้าค้นหาข้อมูลผู้รับบริการ (ไฮไลต์ว่าอยู่หน้านี้) */}
-                <div
-                  onClick={() => router.push("/check-que")}
-                  className="flex items-center gap-3 px-5 py-3 text-white bg-blue-600/40 transition cursor-pointer"
-                >
-                  <Search className="w-4 h-4 text-purple-100" />
-                  <span>ค้นหาข้อมูลผู้รับบริการ</span>
-                </div>
-              </>
-            )}
-
-            {/* ===================== Admin ===================== */}
-            {user?.role === "admin" && (
-              <>
-                <div className="border-t border-slate-600 my-2" />
-
-                <div className="px-5 py-2 text-xs font-semibold uppercase tracking-widest text-amber-300">
-                  จัดการระบบ
-                </div>
-
-                <div
-                  onClick={() => router.push("/manage-therapists")}
-                  className="flex items-center gap-3 px-5 py-3 text-white hover:bg-amber-600 transition cursor-pointer"
-                >
-                  <Users className="w-4 h-4 text-rose-400" />
-                  <span>จัดการบุคลากร</span>
-                </div>
-              </>
-            )}
-
-            {/* ===================== ติดต่อ ===================== */}
-            <div className="border-t border-slate-600 my-2" />
-
-            <div
-              onClick={() => setContactOpen(!contactOpen)}
-              className="flex items-center gap-3 px-5 py-3 text-white hover:bg-slate-700 transition cursor-pointer"
-            >
-              <Building2 className="w-4 h-4 text-teal-400" />
-
-              <span className="flex-1">ช่องทางติดต่อ</span>
-
-              {contactOpen ? (
-                <ChevronUp className="w-5 h-5" />
-              ) : (
-                <ChevronDown className="w-5 h-5" />
-              )}
-            </div>
-
-            {contactOpen && (
-              <div className="bg-slate-900">
-                <a
-                  href="https://m.me/100070719421986"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 px-9 py-3 text-slate-200 hover:bg-blue-700 transition"
-                >
-                  <Facebook className="w-4 h-4 text-blue-400" />
-                  Facebook (จองคิว)
-                </a>
-
-                <a
-                  href="https://www.lmwcc.com/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 px-9 py-3 text-slate-200 hover:bg-emerald-700 transition"
-                >
-                  <Building2 className="w-4 h-4 text-emerald-400" />
-                  เว็บไซต์ศูนย์บริการ
-                </a>
-              </div>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* เนื้อหา */}
       <div className="max-w-5xl mx-auto p-6 pt-27">
         <h1 className="text-4xl font-extrabold text-emerald-700 mb-8 text-center drop-shadow-sm">

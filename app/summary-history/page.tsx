@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { useEffect, useState } from "react";
 import {
   BarChart,
   Bar,
@@ -14,29 +13,15 @@ import {
   LabelList,
 } from "recharts";
 import {
-  BedDouble,
-  Search,
   CreditCard,
-  Building2,
   CheckCircle2,
   Clock,
   XCircle,
   ShieldCheck,
   Wallet,
   Receipt,
-  Calendar,
-  History,
-  BarChart3,
   Users,
-  Facebook,
-  X,
-  Menu,
-  LogOut,
-  LogIn,
-  Sparkles,
-  ClipboardList,
-  ChevronDown,
-  ChevronUp,
+  BedDouble,
   Bed,
 } from "lucide-react";
 
@@ -93,7 +78,7 @@ interface SpecialBed {
 
 export default function SummaryHistoryPage() {
   const router = useRouterHook();
-  const { user, logout } = useAuthHook();
+  const { user } = useAuthHook();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [specialBeds, setSpecialBeds] = useState<SpecialBed[]>([]);
   const [therapists, setTherapists] = useState<Therapist[]>([]);
@@ -103,11 +88,6 @@ export default function SummaryHistoryPage() {
   const [month] = useState<number | "all">("all");
   const [statusFilter, setStatusFilter] = useState<"success" | "pending" | "cancelled">("success");
   const monthNames = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const [, setShowAlert] = useState(false);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const [contactOpen, setContactOpen] = useState(false);
   const [windowWidth, setWindowWidth] = useState(0);
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
@@ -118,27 +98,6 @@ export default function SummaryHistoryPage() {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
-    };
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setMenuOpen(false);
-      }
-    };
-    if (menuOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-      document.addEventListener("keydown", handleEsc);
-    }
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("keydown", handleEsc);
-    };
-  }, [menuOpen]);
 
   useEffect(() => {
     if (!user) {
@@ -374,226 +333,9 @@ export default function SummaryHistoryPage() {
     };
   });
 
-  const handleLogout = () => {
-    logout();
-    router.push("/login");
-  };
-
-  const handleBookingClick = () => {
-    if (!user) {
-      setShowAlert(true);
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      timeoutRef.current = setTimeout(() => {
-        setShowAlert(false);
-        timeoutRef.current = null;
-      }, 5000);
-      return;
-    }
-    router.push("/booking");
-  };
-
-  const handleBedsClick = () => {
-    if (!user) {
-      setShowAlert(true);
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      timeoutRef.current = setTimeout(() => {
-        setShowAlert(false);
-        timeoutRef.current = null;
-      }, 5000);
-      return;
-    }
-    router.push("/beds-special");
-  };
-
   return (
     <div className="min-h-screen bg-gray-50 pt-28 pb-12">
-      {/* Header Bar */}
-      <div className="fixed top-0 left-0 w-full z-50 bg-gray-700 shadow-md flex justify-between items-center px-2 sm:px-4 py-2 sm:py-2">
-        <div className="flex items-center gap-2 sm:gap-13">
-          <button
-            onClick={() => setMenuOpen(!menuOpen)}
-            className="text-white text-xl sm:text-2xl cursor-pointer"
-            title="เมนู"
-          >
-            {menuOpen ? <X className="w-5 h-5 sm:w-6 sm:h-6" /> : <Menu className="w-5 h-5 sm:w-6 sm:h-6" />}
-          </button>
-
-          <div
-            className="ml-3 sm:ml-3 text-white font-bold text-base sm:text-lg flex items-center gap-1 cursor-pointer"
-            onClick={() => router.push("/")}
-            title="หน้าหลัก"
-          >
-            <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" /> แพทย์แผนไทย
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3 sm:gap-3 text-xs sm:text-sm">
-          {user ? (
-            <>
-              <span className="text-white font-semibold text-xs sm:text-sm">
-                คุณคือ {user.name || "ผู้ใช้"}
-              </span>
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-1 px-2 py-3 sm:px-4 sm:py-3 bg-red-600 text-white rounded-lg shadow font-semibold transition hover:bg-red-700 text-xs sm:text-sm cursor-pointer"
-                title="ลงชื่อออก"
-              >
-                <LogOut className="w-3 h-3 sm:w-5 sm:h-5" />
-                <span>ลงชื่อออก</span>
-              </button>
-            </>
-          ) : (
-            <button
-              onClick={() => router.push("/login")}
-              className="flex items-center gap-1 px-2 py-1 sm:px-4 sm:py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow transition hover:bg-gray-300 text-xs sm:text-sm"
-              title="ลงชื่อเข้าใช้"
-            >
-              <LogIn className="w-3 h-3 sm:w-5 sm:h-5" />
-              <span>สำหรับบุคลากร</span>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Hamburger Drawer */}
-      <AnimatePresence>
-        {menuOpen && (
-          <motion.div
-            ref={menuRef}
-            initial={{ x: -300, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: -300, opacity: 0 }}
-            transition={{ duration: 0.3 }}
-            className="fixed top-0 left-0 w-72 h-full bg-slate-800/95 backdrop-blur-md z-40 flex flex-col pt-16 overflow-y-auto shadow-2xl text-white"
-          >
-            <div className="px-5 pb-4 border-b border-slate-600">
-              <div className="flex items-center gap-2 text-xl font-bold text-white">
-                <Sparkles className="w-5 h-5 text-emerald-400" />
-                ระบบแพทย์แผนไทย
-              </div>
-              {user && (
-                <div className="mt-2 text-sm text-slate-300">
-                  ผู้ใช้งาน : <span className="font-semibold text-white">{user.name}</span>
-                </div>
-              )}
-            </div>
-
-            <div className="py-2">
-              <div
-                onClick={user ? handleBookingClick : () => router.push("/booking")}
-                className="flex items-center gap-3 px-5 py-3 text-white hover:bg-emerald-600 transition cursor-pointer"
-              >
-                <Calendar className="w-4 h-4 text-emerald-400" />
-                <span>{user ? "จองคิวนวดแผนไทย" : "ดูคิวจองนวดแผนไทย"}</span>
-              </div>
-
-              <div
-                onClick={() => router.push("/booking-audit")}
-                className="flex items-center gap-3 px-5 py-3 text-white hover:bg-emerald-600 transition cursor-pointer"
-              >
-                <ClipboardList className="w-4 h-4 text-sky-400" />
-                <span>ดูคิวนวดทั้งหมด</span>
-              </div>
-              
-              <div
-                onClick={user ? handleBedsClick : () => router.push("/beds-special")}
-                className="flex items-center gap-3 px-5 py-3 text-white hover:bg-emerald-600 transition cursor-pointer"
-              >
-                <BedDouble className="w-4 h-4 text-teal-300" />
-                <span>{user ? "การจองเตียงพิเศษ" : "การจองเตียงพิเศษ"}</span>
-              </div>
-            </div>
-
-            {user && (
-              <>
-                <div className="border-t border-slate-600 my-2" />
-                <div className="px-5 py-2 text-xs font-semibold uppercase tracking-widest text-slate-400">
-                  สำหรับเจ้าหน้าที่
-                </div>
-                <div
-                  onClick={() => router.push("/all-bookings")}
-                  className="flex items-center gap-3 px-5 py-3 text-white hover:bg-blue-600 transition cursor-pointer"
-                >
-                  <History className="w-4 h-4 text-amber-400" />
-                  <span>ประวัติการจอง</span>
-                </div>
-                <div
-                  onClick={() => router.push("/summary-history")}
-                  className="flex items-center gap-3 px-5 py-3 text-white bg-blue-600/30 hover:bg-blue-600 transition cursor-pointer"
-                >
-                  <BarChart3 className="w-4 h-4 text-purple-400" />
-                  <span>สรุปรายงาน</span>
-                </div>
-                <div
-                  onClick={() => router.push("/summary-therapists")}
-                  className="flex items-center gap-3 px-5 py-3 text-white hover:bg-blue-600 transition cursor-pointer"
-                >
-                  <BarChart3 className="w-4 h-4 text-purple-100" />
-                  <span>รายงานการปฎิบัติงาน</span>
-                </div>
-                <div
-                  onClick={() => router.push("/check-que")}
-                  className="flex items-center gap-3 px-5 py-3 text-white hover:bg-blue-600 transition cursor-pointer"
-                >
-                  <Search className="w-4 h-4 text-purple-100" />
-                  <span>ค้นหาข้อมูลผู้รับบริการ</span>
-                </div>
-                
-              </>
-            )}
-
-            {user?.role === "admin" && (
-              <>
-                <div className="border-t border-slate-600 my-2" />
-                <div className="px-5 py-2 text-xs font-semibold uppercase tracking-widest text-amber-300">
-                  จัดการระบบ
-                </div>
-                <div
-                  onClick={() => router.push("/manage-therapists")}
-                  className="flex items-center gap-3 px-5 py-3 text-white hover:bg-amber-600 transition cursor-pointer"
-                >
-                  <Users className="w-4 h-4 text-rose-400" />
-                  <span>จัดการบุคลากร</span>
-                </div>
-              </>
-            )}
-
-            <div className="border-t border-slate-600 my-2" />
-            <div
-              onClick={() => setContactOpen(!contactOpen)}
-              className="flex items-center gap-3 px-5 py-3 text-white hover:bg-slate-700 transition cursor-pointer"
-            >
-              <Building2 className="w-4 h-4 text-teal-400" />
-              <span className="flex-1">ช่องทางติดต่อ</span>
-              {contactOpen ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-            </div>
-
-            {contactOpen && (
-              <div className="bg-slate-900">
-                <a
-                  href="https://m.me/100070719421986"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 px-9 py-3 text-slate-200 hover:bg-blue-700 transition"
-                >
-                  <Facebook className="w-4 h-4 text-sky-400" />
-                  <span>Facebook (จองคิว)</span>
-                </a>
-                <a
-                  href="https://www.lmwcc.com/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 px-9 py-3 text-slate-200 hover:bg-emerald-700 transition"
-                >
-                  <Building2 className="w-4 h-4 text-emerald-400" />
-                  <span>เว็บไซต์ศูนย์บริการ</span>
-                </a>
-              </div>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
+      {/* เนื้อหา */}
       <h1 className="text-3xl font-bold text-emerald-800 mb-6 text-center">
         📊 สรุปประวัติ
       </h1>

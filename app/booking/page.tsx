@@ -77,6 +77,19 @@ interface MedStaff {
   role_id: number;
 }
 
+// 🌟 ฟังก์ชันคำนวณวันที่ (Local Time) ป้องกันปฏิทินค้าง
+const getLocalDateStr = (addDays = 0) => {
+  const d = new Date();
+  d.setDate(d.getDate() + addDays);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+const MIN_DATE_STR = getLocalDateStr(0);
+const MAX_DATE_STR = getLocalDateStr(30);
+
+
 export default function BookingPage() {
   const router = useRouterHook();
   const { user, logout } = (useContext(AuthContext) || {}) as { user: any; logout: () => void };
@@ -598,7 +611,8 @@ export default function BookingPage() {
           <input
             type="date"
             value={date || ""}
-            min={new Date().toISOString().split("T")[0]}
+            min={MIN_DATE_STR}
+            max={MAX_DATE_STR}
             onChange={e => {
               const val = e.target.value;
               setDate(val);

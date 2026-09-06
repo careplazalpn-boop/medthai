@@ -55,6 +55,15 @@ function formatDateTimeToMySQL(input) {
   return isNaN(d.getTime()) ? null : d.toISOString().slice(0, 19).replace('T', ' ');
 }
 
+// แปลงค่าพิกัดจาก house (varchar) ให้เป็นตัวเลข ถ้าแปลงไม่ได้หรือไม่ใช่ตัวเลขจริงจะคืนค่า null
+function toCoordinateOrNull(value) {
+  if (value === null || value === undefined) return null;
+  const trimmed = String(value).trim();
+  if (trimmed === "") return null;
+  const num = Number(trimmed);
+  return Number.isFinite(num) ? num : null;
+}
+
 async function runSync() {
   if (isSyncing) {
     logPts("[WARN] งานรอบเก่ายังไม่เสร็จ ข้ามรอบนี้ไป...");
@@ -144,10 +153,94 @@ async function runSync() {
       }
       logPts("=== Sync Completed ===");
     }
+
+    // 🔹 ต่อท้าย sync patient หลัก: sync พิกัดบ้าน (house -> patient.home_latitude/home_longitude)
+    await syncHomeCoordinates();
   } catch (err) {
     logPtsError(`General error: ${err.message}`);
   } finally {
     isSyncing = false;
+  }
+}
+
+// 🔹 3. Sync พิกัดบ้าน (home_latitude / home_longitude) จาก house (DB1) -> patient (DB3)
+// เงื่อนไข:
+//   1) patient.tmbpart = '01' AND patient.amppart = '01' AND patient.chwpart = '51' เท่านั้น
+//   2) จับคู่ patient.village_id (ผ่าน person.village_id) = house.village_id
+//      AND patient.addrpart = house.address AND patient.road = house.road
+//   3) อัปเดตเฉพาะแถวที่ home_latitude/home_longitude ใน DB3 ยังเป็น NULL หรือค่าต่างจาก house เท่านั้น
+//      (เช็คในเงื่อนไข WHERE ของคำสั่ง UPDATE โดยตรง ไม่ต้อง SELECT มาเทียบก่อน)
+const GEO_TARGET = { tmbpart: "01", amppart: "01", chwpart: "51" };
+
+async function syncHomeCoordinates() {
+  logPts("=== Start Sync Home Coordinates (house -> patient.home_latitude/home_longitude) ===");
+  try {
+    // ดึงคู่ hn + พิกัดบ้านจากฝั่งต้นทาง (DB1) ตามเงื่อนไขที่กำหนด
+    const [rows] = await db1Pool.execute(
+      `SELECT p.hn, h.latitude AS house_lat, h.longitude AS house_lng
+       FROM patient p
+       INNER JOIN person per ON p.cid = per.cid
+       INNER JOIN house h
+         ON h.village_id = per.village_id
+        AND h.address = p.addrpart
+        AND h.road = p.road
+       WHERE p.tmbpart = ?
+         AND p.amppart = ?
+         AND p.chwpart = ?
+         AND h.latitude IS NOT NULL AND h.latitude <> ''
+         AND h.longitude IS NOT NULL AND h.longitude <> ''`,
+      [GEO_TARGET.tmbpart, GEO_TARGET.amppart, GEO_TARGET.chwpart]
+    );
+
+    if (rows.length === 0) {
+      logPts("Home coordinates: ไม่พบข้อมูลที่ตรงเงื่อนไข");
+      return;
+    }
+
+    logPts(`Home coordinates: พบ ${rows.length} แถวที่เข้าเงื่อนไข กำลังตรวจสอบ/อัปเดต...`);
+
+    let updatedCount = 0;
+    let skippedInvalidCount = 0;
+    let errorCount = 0;
+
+    for (const row of rows) {
+      const lat = toCoordinateOrNull(row.house_lat);
+      const lng = toCoordinateOrNull(row.house_lng);
+
+      // ข้ามแถวที่ house.latitude/longitude ไม่ใช่ตัวเลขที่ใช้ได้
+      if (lat === null || lng === null) {
+        skippedInvalidCount++;
+        continue;
+      }
+
+      try {
+        // อัปเดตเฉพาะกรณี home_latitude/home_longitude ยังเป็น NULL หรือค่าต่างจาก house เท่านั้น
+        const [result] = await db3Pool.execute(
+          `UPDATE patient
+           SET home_latitude = ?, home_longitude = ?
+           WHERE hn = ?
+             AND (
+               home_latitude IS NULL OR home_latitude <> ?
+               OR home_longitude IS NULL OR home_longitude <> ?
+             )`,
+          [lat, lng, row.hn, lat, lng]
+        );
+
+        if (result.affectedRows > 0) updatedCount++;
+      } catch (rowErr) {
+        // กันพังทั้ง batch เช่นกรณีค่าพิกัดเกิน range ของ decimal(10,8) (เกิน 2 หลักหน้าจุด)
+        errorCount++;
+        logPtsError(`Home coordinates: อัปเดต hn=${row.hn} ไม่สำเร็จ (${rowErr.message})`);
+      }
+    }
+
+    logPts(
+      `Home coordinates: อัปเดตจริง ${updatedCount} แถว` +
+      (skippedInvalidCount ? `, ข้ามค่าพิกัดไม่ถูกต้อง ${skippedInvalidCount} แถว` : "") +
+      (errorCount ? `, ผิดพลาด ${errorCount} แถว (ดู sync-pts-error.log)` : "")
+    );
+  } catch (err) {
+    logPtsError(`Home coordinates sync error: ${err.message}`);
   }
 }
 

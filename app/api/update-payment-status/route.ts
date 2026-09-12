@@ -48,9 +48,11 @@ export async function POST(req: Request) {
 
     // ✅ เดิม: เช็คสถานะปัจจุบันของ booking ก่อน — ถ้า "สำเร็จ" แล้ว ห้ามแก้ไข payment_status อีก
     // (กันกรณีมีการเรียก API นี้ตรงๆ โดยไม่ผ่านหน้าเว็บ ซึ่งฝั่ง UI ถูกล็อกไว้แล้ว)
-    // ✅ ใหม่: ดึง therapist มาด้วย เพื่อใช้เช็คความเป็นเจ้าของรายการ
+    // ✅ ใหม่: ดึง therapist และ date มาด้วย — date ใช้เช็คว่าเป็นข้อมูลย้อนหลังหรือไม่
+    // (คำนวณ is_past_date ที่ฝั่ง SQL ด้วย CURDATE() ให้ตรงกับเวลาของฐานข้อมูลเสมอ
+    // สอดคล้องกับ logic การเทียบวันที่แบบ CONCAT(date, ...) <= NOW() ที่ใช้อยู่แล้วในระบบจุดอื่น)
     const [rows]: any = await pool.execute(
-      "SELECT status, therapist FROM bookings WHERE id = ?",
+      "SELECT status, therapist, date, (date < CURDATE()) AS is_past_date FROM bookings WHERE id = ?",
       [id]
     );
     const booking = rows[0];
@@ -69,10 +71,14 @@ export async function POST(req: Request) {
       }
     }
 
-    if (booking.status === "สำเร็จ") {
+    // ✅ ใหม่: อนุญาตให้แก้ไขได้ถ้า "สำเร็จ" แล้วแต่ตรงกับวันที่ปัจจุบัน
+    // จะบล็อกเฉพาะกรณี "สำเร็จ" แล้ว "และ" เป็นข้อมูลย้อนหลัง (วันที่ผ่านมาแล้ว) เท่านั้น
+    // — ให้ตรงกับเงื่อนไขฝั่ง frontend (isLockedCompleted) ทุกประการ
+    const isPastDate = Number(booking.is_past_date) === 1;
+    if (booking.status === "สำเร็จ" && isPastDate) {
       return NextResponse.json({
         success: false,
-        error: "รายการนี้สำเร็จแล้ว ไม่สามารถแก้ไขสถานะการจ่ายเงินได้",
+        error: "รายการนี้สำเร็จแล้วและเป็นข้อมูลย้อนหลัง ไม่สามารถแก้ไขสถานะการจ่ายเงินได้",
       });
     }
 

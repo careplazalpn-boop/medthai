@@ -285,6 +285,72 @@ export async function DELETE(req: Request) {
   }
 }
 
+// 🔁 PATCH: แก้ไขสถานะ (status) ของ booking ที่ "สำเร็จ" แล้ว
+// ✅ ใหม่: ใช้สำหรับปุ่มสถานะแบบ "คลิกวนไปเรื่อยๆ" (ไม่มี Dropdown)
+// เงื่อนไข: 1) เฉพาะแอดมิน (role_id 909) เท่านั้น 2) แก้ไขได้เฉพาะ booking ที่วันที่ตรงกับวันปัจจุบันเท่านั้น
+// 3) แก้ไขได้เฉพาะรายการที่สถานะปัจจุบันเป็น "สำเร็จ" อยู่แล้วเท่านั้น (ตามที่ร้องขอ ไม่กระทบ flow ยืนยัน/ยกเลิกเดิม)
+export async function PATCH(req: Request) {
+  try {
+    const body = await req.json();
+    const { id, status, role_id } = body;
+
+    if (!id || !status) {
+      return NextResponse.json({ success: false, error: "ข้อมูลไม่ครบถ้วน" }, { status: 400 });
+    }
+
+    // ✅ 1. เฉพาะแอดมินเท่านั้นที่แก้ไขได้
+    if (role_id !== 909) {
+      return NextResponse.json(
+        { success: false, error: "ไม่มีสิทธิ์แก้ไขรายการนี้" },
+        { status: 403 }
+      );
+    }
+
+    const [bookingRows]: any = await pool.execute(
+      "SELECT id, date, status FROM bookings WHERE id = ?",
+      [id]
+    );
+    const booking = bookingRows[0];
+    if (!booking) {
+      return NextResponse.json(
+        { success: false, error: "ไม่พบรายการที่ต้องการแก้ไข" },
+        { status: 404 }
+      );
+    }
+
+    // ✅ 2. ต้องตรงกับวันที่ปัจจุบันเท่านั้นถึงจะแก้ไขได้ (เช็คฝั่ง server กันเหนียว)
+    const bookingDate = new Date(booking.date);
+    bookingDate.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (bookingDate.getTime() !== today.getTime()) {
+      return NextResponse.json(
+        { success: false, error: "ไม่สามารถแก้ไขได้ เนื่องจากวันที่ของรายการไม่ตรงกับวันที่ปัจจุบัน" },
+        { status: 403 }
+      );
+    }
+
+    // ✅ 3. แก้ไขได้เฉพาะรายการที่สถานะปัจจุบันเป็น "สำเร็จ" แล้วเท่านั้น
+    if (booking.status !== "สำเร็จ") {
+      return NextResponse.json(
+        { success: false, error: "สามารถแก้ไขได้เฉพาะรายการที่มีสถานะ 'สำเร็จ' แล้วเท่านั้น" },
+        { status: 403 }
+      );
+    }
+
+    await updateBookingStatus(status, id);
+
+    return NextResponse.json({ success: true, status });
+  } catch (error) {
+    console.error("Error updating booking status:", error);
+    return NextResponse.json(
+      { success: false, error: "ไม่สามารถอัปเดตสถานะได้" },
+      { status: 500 }
+    );
+  }
+}
+
 // 💳 POST: mark payment
 export async function POST(req: Request) {
   try {

@@ -318,6 +318,54 @@ export default function AllBookingsPage() {
     return bookingDate.getTime() > today.getTime();
   };
 
+  // ✅ ใหม่: ตรวจสอบว่าวันที่ของการจอง "ตรงกับวันปัจจุบัน" หรือไม่
+  // ใช้สำหรับควบคุมสิทธิ์การแก้ไขสถานะที่ "สำเร็จ" แล้ว (ต้องเป็นวันนี้เท่านั้นถึงจะแก้ไขได้)
+  const isTodayBookingDate = (dateStr: string) => {
+    const bookingDate = new Date(dateStr);
+    bookingDate.setHours(0, 0, 0, 0);
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    return bookingDate.getTime() === today.getTime();
+  };
+
+  // ✅ ใหม่: แอดมิน (909) เท่านั้นที่สามารถแก้ไขสถานะที่ "สำเร็จ" แล้วได้
+  const isAdmin = user?.role_id === 909;
+
+  // ✅ ใหม่: ลำดับการวนสถานะเมื่อคลิกปุ่ม (ไม่มี Dropdown ให้เลือก)
+  const statusCycle = ["รอดำเนินการ", "อยู่ในคิว", "สำเร็จ", "ยกเลิก"];
+
+  // ✅ ใหม่: คลิกปุ่มสถานะเพื่อวนสถานะไปเรื่อยๆ — ใช้เฉพาะกรณีรายการ "สำเร็จ" แล้ว
+  // และผ่านเงื่อนไข (แอดมิน + วันที่ตรงกับวันนี้) เท่านั้น ฝั่ง server จะตรวจซ้ำอีกชั้นเสมอ
+  const handleCycleStatus = async (b: Booking) => {
+    const currentIndex = statusCycle.indexOf(getStatusLabel(b));
+    const nextStatus = statusCycle[(currentIndex + 1) % statusCycle.length];
+
+    try {
+      const res = await fetch("/api/all-bookings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: b.id,
+          status: nextStatus,
+          userId: (user as any)?.id,
+          role_id: user?.role_id,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setBookings((prev) =>
+          prev.map((x) => (x.id === b.id ? { ...x, status: nextStatus } : x))
+        );
+      } else {
+        alert(data.error || "อัปเดตสถานะไม่สำเร็จ");
+      }
+    } catch (err) {
+      alert("เกิดข้อผิดพลาด: " + err);
+    }
+  };
+
   const selectedBooking = bookings.find(b => b.id === selectedId);
 
   const handleBookingAction = async (action: "confirm"|"cancel") => {
@@ -534,6 +582,10 @@ export default function AllBookingsPage() {
             // ผู้ใช้ทั่วไปแก้ไขได้เฉพาะรายการของตนเอง (อิงจาก therapist ที่ผูกกับบัญชีผู้ใช้ เหมือนปุ่มยืนยัน/ยกเลิกเดิม)
             const canManageBooking =
               user?.role_id === 909 || (!!b?.therapist && b.therapist === user?.name);
+            // ✅ ใหม่: อนุญาตให้แก้ไขรายการที่ "สำเร็จ" แล้วได้ เฉพาะกรณี
+            // (1) เป็นแอดมินเท่านั้น และ (2) วันที่ของ booking ตรงกับวันปัจจุบันเท่านั้น
+            // ถ้าไม่เข้าเงื่อนไขนี้ พฤติกรรมเดิมทั้งหมดจะไม่เปลี่ยนแปลง
+            const canEditCompleted = isCompleted && isAdmin && isTodayBookingDate(b.date);
             return (
             <li
               key={b.id}
@@ -602,11 +654,12 @@ export default function AllBookingsPage() {
 
                   {/* ปุ่ม toggle การจ่ายเงิน */}
                   <button
-                    disabled={isCompleted || !canManageBooking}
+                    disabled={(isCompleted && !canEditCompleted) || !canManageBooking}
                     onClick={async () => {
                       // ✅ ใหม่: กันเหนียวอีกชั้น ไม่ให้แก้ไขได้เมื่อ booking นี้ "สำเร็จ" แล้ว
                       // (ปุ่มถูก disable อยู่แล้ว แต่กันไว้เผื่อกรณี event หลุดผ่านมา)
-                      if (isCompleted) return;
+                      // ยกเว้น: แอดมินแก้ไขได้ ถ้าวันที่ของ booking ตรงกับวันปัจจุบัน (canEditCompleted)
+                      if (isCompleted && !canEditCompleted) return;
                       // ✅ ใหม่: กันเหนียวอีกชั้น ไม่ให้แก้ไขรายการของผู้อื่นได้ (เฉพาะแอดมิน หรือเจ้าของรายการเท่านั้น)
                       if (!canManageBooking) return;
 
@@ -641,14 +694,14 @@ export default function AllBookingsPage() {
                       }
                     }}
                     title={
-                      isCompleted
+                      isCompleted && !canEditCompleted
                         ? "รายการนี้สำเร็จแล้ว ไม่สามารถแก้ไขสถานะการจ่ายเงินได้"
                         : !canManageBooking
                         ? "ไม่สามารถแก้ไขได้ เนื่องจากไม่ใช่รายการของคุณ"
                         : undefined
                     }
                     className={`mt-1 px-2 py-1 text-xs rounded transition w-28 text-white font-bold ${
-                      isCompleted || !canManageBooking
+                      (isCompleted && !canEditCompleted) || !canManageBooking
                         ? "opacity-60 cursor-not-allowed"
                         : ""
                     } ${
@@ -885,13 +938,31 @@ export default function AllBookingsPage() {
       )}
 
                 {getStatusLabel(b) === "สำเร็จ" && (
-                  <button
-                    disabled
-                    className="px-4 py-2 rounded-md text-gray-600 flex items-center gap-2 bg-gray-300"
-                  >
-                    <FaCheck className="text-emerald-600" />
-                    สำเร็จแล้ว
-                  </button>
+                  canEditCompleted ? (
+                    // ✅ ใหม่: แอดมิน + วันที่ตรงกับวันนี้ — คลิกปุ่มเพื่อวนสถานะไปเรื่อยๆ (ไม่มี Dropdown)
+                    <button
+                      onClick={() => handleCycleStatus(b)}
+                      title="คลิกเพื่อเปลี่ยนสถานะ (แก้ไขได้เฉพาะแอดมิน และเฉพาะวันนี้เท่านั้น)"
+                      className="px-4 py-2 rounded-md text-white flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 transition"
+                    >
+                      <FaCheck className="text-white" />
+                      สำเร็จแล้ว
+                    </button>
+                  ) : (
+                    // เดิม: ไม่เข้าเงื่อนไขแก้ไข (ไม่ใช่แอดมิน หรือวันที่ไม่ตรงกับวันนี้) — คงพฤติกรรมเดิมทุกประการ
+                    <button
+                      disabled
+                      title={
+                        isAdmin
+                          ? "ไม่สามารถแก้ไขสถานะได้ เนื่องจากวันที่ของรายการไม่ตรงกับวันที่ปัจจุบัน"
+                          : undefined
+                      }
+                      className="px-4 py-2 rounded-md text-gray-600 flex items-center gap-2 bg-gray-300"
+                    >
+                      <FaCheck className="text-emerald-600" />
+                      สำเร็จแล้ว
+                    </button>
+                  )
                 )}
               </div>
             </li>

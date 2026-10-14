@@ -86,7 +86,7 @@ export default function BookingPage() {
 
       if (selected.getTime() < todayLocal.getTime()) {
         localStorage.removeItem("selectedDate");
-        setDate("");
+        setDate(getLocalDateStr(0));
       } else {
         setDate(savedDate);
       }

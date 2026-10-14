@@ -69,6 +69,16 @@ export default function BookingPage() {
   const [patientFirstName, setPatientFirstName] = useState("");
   const [patientLastName, setPatientLastName] = useState("");
   const [patientPhone, setPatientPhone] = useState("");
+
+  const getLocalDateStr = (addDays = 0) => {
+  const d = new Date();
+  d.setDate(d.getDate() + addDays);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+  };
+
   
   useEffect(() => {
     if (!showAlert) return;

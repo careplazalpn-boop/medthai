@@ -248,3 +248,5 @@ async function syncHomeCoordinatesAll() {
     logPtsError(`>> ขัดข้องระหว่าง Sync พิกัดบ้าน: ${err.message}`);
   }
 }
+
+runFullSyncOnce();

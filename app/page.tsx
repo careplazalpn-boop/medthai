@@ -1,40 +1,31 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { useState, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { AnimatePresence } from "framer-motion";
 import {
-  Sparkles,
   Calendar,
-  Search,
   Clock,
   Phone,
   Mail,
   Globe,
-  CreditCard,
   Building2,
   BedDouble,
   ClipboardList,
-  History,
-  BarChart3,
-  Users,
-  Menu,
-  X,
   LogOut,
   LogIn,
-  ChevronDown,
-  ChevronUp,
-  Facebook,
   AlertCircle,
   MapPin,
   PhoneCall,
   ArrowRight,
-  HeartHandshake,
   Flower2,
   Stethoscope,
-  Activity,
   ShieldCheck,
   CheckCircle2
 } from "lucide-react";
+
+// === นำเข้า HamburgerMenu ที่ดึงมาจาก components ===
+import HamburgerMenu from "./components/HamburgerMenu";
 
 // === Hook การนำทางจริง / Mock สำรองสำหรับ Preview ===
 let useRouterHook: any;
@@ -67,34 +58,7 @@ export default function HomePage() {
   const { user, logout } = useAuthHook();
 
   const [showAlert, setShowAlert] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [contactOpen, setContactOpen] = useState(false);
-
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  const isUserAdmin = user?.isAdmin || user?.role_id === 909 || String(user?.role).toLowerCase() === "admin";
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
-    };
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setMenuOpen(false);
-      }
-    };
-    if (menuOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-      document.addEventListener("keydown", handleEsc);
-    }
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("keydown", handleEsc);
-    };
-  }, [menuOpen]);
 
   const handleBookingClick = () => {
     if (!user) {
@@ -126,24 +90,49 @@ export default function HomePage() {
     router.push("/login");
   };
 
+  // ✅ สร้างปุ่ม Login/Logout เพื่อส่งไปเป็น rightSlot ใน HamburgerMenu
+  const rightSlotContent = (
+    <div className="flex items-center gap-3">
+      {user ? (
+        <>
+          <span className="text-slate-200 text-xs sm:text-sm font-extrabold hidden sm:inline">
+            สวัสดี <strong className="text-emerald-400 font-black">{user.name || "ผู้ใช้"}</strong>
+          </span>
+          <button
+            onClick={handleLogoutNavigation}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl shadow font-black text-xs transition cursor-pointer"
+          >
+            <LogOut className="w-4 h-4" />
+            <span>ลงชื่อออก</span>
+          </button>
+        </>
+      ) : (
+        <button
+          onClick={() => router.push("/login")}
+          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white hover:bg-emerald-50 text-emerald-900 font-black shadow-sm transition text-xs cursor-pointer border border-emerald-300"
+        >
+          <LogIn className="w-4 h-4 text-emerald-700" />
+          <span>สำหรับบุคลากร</span>
+        </button>
+      )}
+    </div>
+  );
+
   return (
     <div className="min-h-screen relative flex flex-col justify-between text-slate-950 bg-slate-100 overflow-x-hidden">
       
       {/* Background Layer */}
       <div className="fixed inset-0 -z-20 bg-slate-900/10">
-        {/* Desktop Image */}
         <img
           src="/แผนไทย.png"
           alt="พื้นหลัง"
           className="hidden sm:block absolute inset-0 w-full h-full object-cover object-center"
         />
-        {/* Mobile Portrait Image */}
         <img
           src="/mthai_mb.jpg"
           alt="พื้นหลังแนวตั้ง"
           className="block sm:hidden absolute inset-0 w-full h-full object-cover object-center portrait:block landscape:hidden"
         />
-        {/* Mobile Landscape Image */}
         <img
           src="/แผนไทยมือถือแนวนอน.png"
           alt="พื้นหลังแนวนอน"
@@ -152,237 +141,21 @@ export default function HomePage() {
         <div className="absolute inset-0 bg-gradient-to-b from-slate-950/80 via-slate-900/40 to-slate-950/80 backdrop-blur-[2px]" />
       </div>
 
-      {/* Navbar บนสุด */}
-      <div className="fixed top-0 left-0 w-full z-50 bg-slate-900/90 backdrop-blur-md shadow-md flex justify-between items-center px-4 py-3 border-b border-slate-800 h-16">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setMenuOpen(!menuOpen)}
-            className="text-white p-1.5 hover:bg-slate-800 rounded-xl transition cursor-pointer"
-            title="เมนู"
-          >
-            {menuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-          </button>
-          <div
-            className="text-white font-black text-base sm:text-lg flex items-center gap-2 cursor-pointer hover:text-emerald-400 transition"
-            onClick={() => router.push("/")}
-          >
-            <Flower2 className="w-5 h-5 text-emerald-400" />
-            <span>แพทย์แผนไทย</span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          {user ? (
-            <>
-              <span className="text-slate-200 text-xs sm:text-sm font-extrabold hidden sm:inline">
-                สวัสดี <strong className="text-emerald-400 font-black">{user.name || "ผู้ใช้"}</strong>
-              </span>
-              <button
-                onClick={handleLogoutNavigation}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl shadow font-black text-xs transition cursor-pointer"
-              >
-                <LogOut className="w-4 h-4" />
-                <span>ลงชื่อออก</span>
-              </button>
-            </>
-          ) : (
-            <button
-              onClick={() => router.push("/login")}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white hover:bg-emerald-50 text-emerald-900 font-black shadow-sm transition text-xs cursor-pointer border border-emerald-300"
-            >
-              <LogIn className="w-4 h-4 text-emerald-700" />
-              <span>สำหรับบุคลากร</span>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Hamburger Drawer เมนูด้านซ้าย */}
-      <AnimatePresence>
-        {menuOpen && (
-          <motion.div
-            ref={menuRef}
-            initial={{ x: -300, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: -300, opacity: 0 }}
-            transition={{ duration: 0.25 }}
-            className="fixed top-0 left-0 w-72 h-full bg-slate-900/98 backdrop-blur-md z-50 flex flex-col pt-16 border-r border-slate-800 text-white shadow-2xl"
-          >
-            {/* Header */}
-            <div className="px-5 pb-4 border-b border-slate-800">
-              <div className="flex items-center gap-2 text-xl font-black text-white">
-                <Flower2 className="text-emerald-400 w-5 h-5" />
-                ระบบแพทย์แผนไทย
-              </div>
-
-              {user && (
-                <div className="mt-2 text-sm text-slate-300 font-semibold">
-                  ผู้ใช้งาน : <span className="font-bold text-white">{user.name}</span>
-                </div>
-              )}
-            </div>
-
-            {/* ===================== เมนูหลัก ===================== */}
-            <div className="py-2">
-              <div
-                onClick={() => {
-                  setMenuOpen(false);
-                  user ? handleBookingClick() : router.push("/booking");
-                }}
-                className="flex items-center gap-3 px-5 py-3 text-white hover:bg-emerald-600 transition cursor-pointer text-sm font-bold"
-              >
-                <Calendar className="w-5 h-5 text-emerald-400" />
-                <span>{user ? "จองคิวนวดแผนไทย" : "ดูคิวจองนวดแผนไทย"}</span>
-              </div>
-
-              <div
-                onClick={() => {
-                  setMenuOpen(false);
-                  router.push("/booking-audit");
-                }}
-                className="flex items-center gap-3 px-5 py-3 text-white hover:bg-emerald-600 transition cursor-pointer text-sm font-bold"
-              >
-                <ClipboardList className="w-5 h-5 text-sky-400" />
-                <span>ดูคิวนวดทั้งหมด</span>
-              </div>
-
-              <div
-                onClick={() => {
-                  setMenuOpen(false);
-                  user ? handleBedsClick() : router.push("/beds-special");
-                }}
-                className="flex items-center gap-3 px-5 py-3 text-white hover:bg-emerald-600 transition cursor-pointer text-sm font-bold"
-              >
-                <BedDouble className="w-5 h-5 text-teal-300" />
-                <span>การจองเตียงพิเศษ</span>
-              </div>
-            </div>
-
-            {/* ===================== เจ้าหน้าที่ ===================== */}
-            {user && (
-              <>
-                <div className="border-t border-slate-800 my-2" />
-
-                <div className="px-5 py-2 text-xs font-black uppercase tracking-widest text-slate-400">
-                  สำหรับเจ้าหน้าที่
-                </div>
-
-                <div
-                  onClick={() => {
-                    setMenuOpen(false);
-                    router.push("/all-bookings");
-                  }}
-                  className="flex items-center gap-3 px-5 py-3 text-white hover:bg-blue-600 transition cursor-pointer text-sm font-bold"
-                >
-                  <History className="w-5 h-5 text-amber-400" />
-                  <span>ประวัติการจอง</span>
-                </div>
-
-                <div
-                  onClick={() => {
-                    setMenuOpen(false);
-                    router.push("/summary-history");
-                  }}
-                  className="flex items-center gap-3 px-5 py-3 text-white hover:bg-blue-600 transition cursor-pointer text-sm font-bold"
-                >
-                  <BarChart3 className="w-5 h-5 text-purple-400" />
-                  <span>สรุปรายงาน</span>
-                </div>
-                <div
-                  onClick={() => router.push("/summary-therapists")}
-                  className="flex items-center gap-3 px-5 py-3 text-white hover:bg-blue-600 transition cursor-pointer"
-                >
-                  <BarChart3 className="w-4 h-4 text-purple-100" />
-                  <span>รายงานการปฎิบัติงาน</span>
-                </div>
-                <div
-                  onClick={() => router.push("/check-que")}
-                  className="flex items-center gap-3 px-5 py-3 text-white hover:bg-blue-600 transition cursor-pointer"
-                >
-                  <Search className="w-4 h-4 text-purple-100" />
-                  <span>ค้นหาข้อมูลผู้รับบริการ</span>
-                </div>
-              </>
-            )}
-
-            {/* ===================== Admin ===================== */}
-            {isUserAdmin && (
-              <>
-                <div className="border-t border-slate-800 my-2" />
-
-                <div className="px-5 py-2 text-xs font-black uppercase tracking-widest text-amber-300">
-                  จัดการระบบ
-                </div>
-
-                <div
-                  onClick={() => {
-                    setMenuOpen(false);
-                    router.push("/manage-therapists");
-                  }}
-                  className="flex items-center gap-3 px-5 py-3 text-white hover:bg-amber-600 transition cursor-pointer text-sm font-bold"
-                >
-                  <Users className="w-5 h-5 text-rose-400" />
-                  <span>จัดการบุคลากร</span>
-                </div>
-              </>
-            )}
-
-            {/* ===================== ติดต่อ ===================== */}
-            <div className="border-t border-slate-800 my-2" />
-
-            <div
-              onClick={() => setContactOpen(!contactOpen)}
-              className="flex items-center gap-3 px-5 py-3 text-white hover:bg-slate-800 transition cursor-pointer text-sm font-bold"
-            >
-              <Building2 className="w-5 h-5 text-teal-400" />
-              <span className="flex-1">ช่องทางติดต่อ</span>
-              {contactOpen ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-            </div>
-
-            {contactOpen && (
-              <div className="bg-slate-950/80 text-slate-300 text-xs font-bold">
-                <a
-                  href="https://m.me/100070719421986"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 px-9 py-3 hover:bg-slate-800 transition"
-                >
-                  <Facebook className="w-4 h-4 text-sky-400" />
-                  <span>Facebook (จองคิว)</span>
-                </a>
-
-                <a
-                  href="https://www.lmwcc.com/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 px-9 py-3 hover:bg-slate-800 transition"
-                >
-                  <Building2 className="w-4 h-4 text-emerald-400" />
-                  <span>เว็บไซต์ศูนย์บริการ</span>
-                </a>
-              </div>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* 🌟 ดึง HamburgerMenu มาแสดงตรงนี้แทน Navbar เดิม */}
+      <HamburgerMenu rightSlot={rightSlotContent} />
 
       {/* 🌟 คอนเทนต์หลักกลางหน้าจอ */}
       <main className="max-w-4xl mx-auto px-4 sm:px-6 pt-24 pb-12 my-auto z-10 w-full">
-        
-        {/* Main Card Container */}
         <div className="bg-white/98 backdrop-blur-md rounded-3xl shadow-2xl p-6 sm:p-10 border-2 border-emerald-200 text-slate-950">
           
           {/* Header Title with Logo */}
           <div className="text-center border-b-2 pb-6 border-slate-200">
-            
-            {/* 🌟 โลโก้หน่วยงานด้านบนสุด */}
             <div className="mb-4 flex justify-center">
               <img
                 src="/logo.png"
                 alt="โลโก้ศูนย์บริการสาธารณสุขเทศบาลเมืองลำพูน"
                 className="h-20 sm:h-24 w-auto object-contain drop-shadow-md"
                 onError={(e) => {
-                  // Fallback กรณีหาภาพไม่เจอ
                   (e.target as HTMLElement).style.display = "none";
                 }}
               />
@@ -425,38 +198,36 @@ export default function HomePage() {
             </div>
 
             {/* สิทธิการรักษา */}
-<div className="bg-emerald-50/80 p-5 rounded-2xl border-2 border-emerald-300">
-  <h3 className="font-black text-emerald-950 text-base mb-3 flex items-center gap-2 border-b pb-2 border-emerald-200">
-    <ShieldCheck className="w-5 h-5 text-emerald-700" />
-    <span>สิทธิการเบิกจ่ายการรักษา</span>
-  </h3>
+            <div className="bg-emerald-50/80 p-5 rounded-2xl border-2 border-emerald-300">
+              <h3 className="font-black text-emerald-950 text-base mb-3 flex items-center gap-2 border-b pb-2 border-emerald-200">
+                <ShieldCheck className="w-5 h-5 text-emerald-700" />
+                <span>สิทธิการเบิกจ่ายการรักษา</span>
+              </h3>
 
-  <div className="space-y-3">
-    {/* หัวข้อที่ 1: สิทธิเบิกตรง */}
-    <div className="bg-white p-3.5 rounded-xl border-2 border-emerald-300 shadow-2xs">
-      <div className="flex items-center gap-1.5 text-xs sm:text-sm font-black text-emerald-950 mb-1">
-        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-        <span>สิทธิเบิกตรง:</span>
-      </div>
-      <p className="text-xs sm:text-sm text-slate-800 font-extrabold leading-relaxed pl-5">
-        <strong className="text-emerald-950 font-black">ข้าราชการ</strong> /{" "}
-        <strong className="text-emerald-950 font-black">องค์กรปกครองส่วนท้องถิ่น (อปท.)</strong> /{" "}
-        <strong className="text-emerald-950 font-black">การรถไฟแห่งประเทศไทย</strong> สามารถใช้สิทธิเบิกตรงได้ตามระเบียบ
-      </p>
-    </div>
+              <div className="space-y-3">
+                <div className="bg-white p-3.5 rounded-xl border-2 border-emerald-300 shadow-2xs">
+                  <div className="flex items-center gap-1.5 text-xs sm:text-sm font-black text-emerald-950 mb-1">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>สิทธิเบิกตรง:</span>
+                  </div>
+                  <p className="text-xs sm:text-sm text-slate-800 font-extrabold leading-relaxed pl-5">
+                    <strong className="text-emerald-950 font-black">ข้าราชการ</strong> /{" "}
+                    <strong className="text-emerald-950 font-black">องค์กรปกครองส่วนท้องถิ่น (อปท.)</strong> /{" "}
+                    <strong className="text-emerald-950 font-black">การรถไฟแห่งประเทศไทย</strong> สามารถใช้สิทธิเบิกตรงได้ตามระเบียบ
+                  </p>
+                </div>
 
-    {/* หัวข้อที่ 2: สิทธิหลักประกันสุขภาพแห่งชาติ */}
-    <div className="bg-white p-3.5 rounded-xl border-2 border-emerald-300 shadow-2xs">
-      <div className="flex items-center gap-1.5 text-xs sm:text-sm font-black text-emerald-950 mb-1">
-        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-        <span>สิทธิหลักประกันสุขภาพแห่งชาติ:</span>
-      </div>
-      <p className="text-xs sm:text-sm text-slate-800 font-extrabold leading-relaxed pl-5">
-        <strong className="text-emerald-950 font-black">สิทธิบัตรทอง</strong> สามารถใช้บริการได้ตามเงื่อนไขและระเบียบของ สปสช.
-      </p>
-    </div>
-  </div>
-</div>
+                <div className="bg-white p-3.5 rounded-xl border-2 border-emerald-300 shadow-2xs">
+                  <div className="flex items-center gap-1.5 text-xs sm:text-sm font-black text-emerald-950 mb-1">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>สิทธิหลักประกันสุขภาพแห่งชาติ:</span>
+                  </div>
+                  <p className="text-xs sm:text-sm text-slate-800 font-extrabold leading-relaxed pl-5">
+                    <strong className="text-emerald-950 font-black">สิทธิบัตรทอง</strong> สามารถใช้บริการได้ตามเงื่อนไขและระเบียบของ สปสช.
+                  </p>
+                </div>
+              </div>
+            </div>
 
           </div>
 

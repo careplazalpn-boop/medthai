@@ -426,22 +426,7 @@ export default function BedsSpecialPage() {
 
   return (
     <div className="min-h-screen bg-white text-slate-950 pb-16" style={{ backgroundColor: '#ffffff', color: '#020617' }}>
-      {loading && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-xs flex items-center justify-center z-[1000]">
-          <Loader2 className="w-12 h-12 text-emerald-600 animate-spin" />
-        </div>
-      )}
-
-      <HamburgerMenu
-        rightSlot={
-          <span className="text-slate-100 text-xs sm:text-sm font-bold hidden sm:inline">
-            ผู้ลงบันทึก: <strong className="text-emerald-400 font-black">{user?.name}</strong>
-          </span>
-        }
-      />
-
-      <div className="max-w-6xl mx-auto p-4 sm:p-6 pt-28 sm:pt-36">
-        
+      <div className="max-w-6xl mx-auto p-4 sm:p-6 pt-28 sm:pt-36">        
         <div className="text-center mb-8 bg-slate-50 p-6 sm:p-8 rounded-3xl border-2 border-slate-300 shadow-2xs" style={{ backgroundColor: '#f8fafc', borderColor: '#cbd5e1' }}>
           <h1 className="text-2xl sm:text-4xl font-black flex items-center justify-center gap-3 tracking-tight" style={{ color: '#0f172a' }}>
             <BedDouble className="w-7 h-7 sm:w-8 sm:h-8 flex-shrink-0" style={{ color: '#047857' }} />

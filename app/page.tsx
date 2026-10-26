@@ -93,28 +93,7 @@ export default function HomePage() {
   // ✅ สร้างปุ่ม Login/Logout เพื่อส่งไปเป็น rightSlot ใน HamburgerMenu
   const rightSlotContent = (
     <div className="flex items-center gap-3">
-      {user ? (
-        <>
-          <span className="text-slate-200 text-xs sm:text-sm font-extrabold hidden sm:inline">
-            สวัสดี <strong className="text-emerald-400 font-black">{user.name || "ผู้ใช้"}</strong>
-          </span>
-          <button
-            onClick={handleLogoutNavigation}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl shadow font-black text-xs transition cursor-pointer"
-          >
-            <LogOut className="w-4 h-4" />
-            <span>ลงชื่อออก</span>
-          </button>
-        </>
-      ) : (
-        <button
-          onClick={() => router.push("/login")}
-          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white hover:bg-emerald-50 text-emerald-900 font-black shadow-sm transition text-xs cursor-pointer border border-emerald-300"
-        >
-          <LogIn className="w-4 h-4 text-emerald-700" />
-          <span>สำหรับบุคลากร</span>
-        </button>
-      )}
+      
     </div>
   );
 

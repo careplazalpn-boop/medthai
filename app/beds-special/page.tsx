@@ -152,11 +152,6 @@ const isDatePassed = (dateStr: string | Date | undefined | null) => {
 
 export default function BedsSpecialPage() {
   const router = useRouterHook();
-  const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-  const paramDate = searchParams?.get('date');
-  const paramTime = searchParams?.get('time');
-  const paramHn = searchParams?.get('hn');
-  const paramCid = searchParams?.get('cid');
   
   const { user } = (useContext(AuthContext) || {}) as {
     user: any;
@@ -167,7 +162,8 @@ export default function BedsSpecialPage() {
   const isUserAdmin = user?.isAdmin || user?.role_id === 909 || String(user?.role).toLowerCase() === "admin";
 
   const todayStr = getTodayLocalDateStr();
-  const [date, setDate] = useState<string>(paramDate || todayStr);
+
+  const [date, setDate] = useState<string>(todayStr);
   const isPastDate = isDatePassed(date);
   
   const [timeSlots, setTimeSlots] = useState<string[]>([
@@ -178,7 +174,7 @@ export default function BedsSpecialPage() {
     "14:30-16:00",
     "16:00-17:30"
   ]);
-  const [selectedSlot, setSelectedSlot] = useState<string>(paramTime || "16:00-17:30");
+  const [selectedSlot, setSelectedSlot] = useState<string>("16:00-17:30");
   
   const [specialBeds, setSpecialBeds] = useState<SpecialBed[]>([]);
   const [bedBookings, setBedBookings] = useState<SpecialBedBooking[]>([]);
@@ -190,9 +186,7 @@ export default function BedsSpecialPage() {
 
   const [loading, setLoading] = useState<boolean>(false);
   const [bookingDialogOpen, setBookingDialogOpen] = useState<boolean>(false);
-  
-  // 🌟 ตั้งค่าค้นหาตั้งต้นจาก HN หรือ CID ที่ส่งมาจากหน้า Confirm
-  const [searchTerm, setSearchTerm] = useState<string>(paramHn || paramCid || "");
+  const [searchTerm, setSearchTerm] = useState<string>("");
 
   useEffect(() => {
     fetchTimeSlots();
@@ -205,33 +199,13 @@ export default function BedsSpecialPage() {
     }
   }, [date, isAuthenticated, user]);
 
-  // 🌟 [ปรับปรุงใหม่] เพิ่ม useEffect สำหรับตั้งค่า selectedQueue อัตโนมัติ หากมีพารามิเตอร์ HN/CID ส่งมาจาก URL
-  useEffect(() => {
-    if (availableBookings.length > 0 && searchTerm) {
-      // ค้นหาคิวคนไข้ที่ตรงกับช่วงเวลา (selectedSlot) และตรงกับ HN หรือ CID (searchTerm)
-      const autoMatchedQueue = availableBookings.find(
-        (q) => 
-          normalizeSlot(q.time_slot) === normalizeSlot(selectedSlot) &&
-          (q.hn === searchTerm || q.name.includes(searchTerm))
-      );
-
-      // ถ้าเจอคนไข้ที่ตรงกัน ให้ตั้งเป็น selectedQueue อัตโนมัติรอไว้เลย
-      if (autoMatchedQueue) {
-        setSelectedQueue(autoMatchedQueue);
-      }
-    }
-  }, [availableBookings, selectedSlot, searchTerm]);
-
-
   const fetchTimeSlots = async () => {
     try {
       const res = await fetch("/api/time-slots");
       const data = await res.json();
       if (data?.success && Array.isArray(data.timeSlots) && data.timeSlots.length > 0) {
         setTimeSlots(data.timeSlots);
-        
-        // ถ้าไม่มี paramTime ส่งมา และ selectedSlot ปัจจุบันไม่ได้อยู่ในลิสต์ที่โหลดมา ให้ใช้ค่าแรกสุด
-        if (!paramTime && !data.timeSlots.includes(selectedSlot)) {
+        if (!data.timeSlots.includes(selectedSlot)) {
           setSelectedSlot(data.timeSlots[0]);
         }
       }
@@ -440,7 +414,7 @@ export default function BedsSpecialPage() {
   const filteredSlotQueues = slotMatchingQueues.filter(
     (q) =>
       q.name.includes(searchTerm) ||
-      (q.hn && q.hn.includes(searchTerm)) || // ป้องกัน Error ถ้า hn เป็น null
+      q.hn.includes(searchTerm) ||
       q.therapist.includes(searchTerm)
   );
 
@@ -452,8 +426,7 @@ export default function BedsSpecialPage() {
 
     setSelectedBed(bed);
     setNote("");
-    
-    // 🌟 [ปรับปรุงใหม่] ลบ setSearchTerm("") ออก เพื่อคงค่า HN/CID ที่ส่งมาจาก URL ไว้ให้ช่องค้นหา
+    setSearchTerm("");
 
     if (slotMatchingQueues.length === 0) {
       alert(
@@ -462,18 +435,10 @@ export default function BedsSpecialPage() {
       return;
     }
 
-    // 🌟 [ปรับปรุงใหม่] ตรวจสอบว่าระบบได้ Auto-select ให้แล้วหรือยังจาก useEffect
-    // ถ้ายังไม่ได้เลือก (selectedQueue ยังเป็น null) ค่อยใช้ Logic เดิม
-    if (!selectedQueue) {
-      // ตรวจสอบจากผลลัพธ์การค้นหาปัจจุบัน (filteredSlotQueues) แทนการดูทั้งหมด (slotMatchingQueues)
-      if (filteredSlotQueues.length === 1) {
-        setSelectedQueue(filteredSlotQueues[0]);
-      } else if (slotMatchingQueues.length === 1 && !searchTerm) {
-        // Fallback เดิม: ถ้ามีแค่คนเดียวในช่วงเวลานั้นและไม่ได้ค้นหา ให้เลือกอัตโนมัติ
-        setSelectedQueue(slotMatchingQueues[0]);
-      } else {
-        setSelectedQueue(null);
-      }
+    if (slotMatchingQueues.length === 1) {
+      setSelectedQueue(slotMatchingQueues[0]);
+    } else {
+      setSelectedQueue(null);
     }
 
     setBookingDialogOpen(true);

@@ -234,7 +234,7 @@ export default function HamburgerMenu({ rightSlot }: HamburgerMenuProps) {
                   }`}
                 >
                   <History className="w-4 h-4 text-amber-400" />
-                  <span>ประวัติการจอง</span>
+                  <span>จัดการข้อมูลบริการ</span>
                 </div>
 
                 <div

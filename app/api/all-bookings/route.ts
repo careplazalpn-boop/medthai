@@ -29,6 +29,13 @@ export async function GET(req: Request) {
     // ✅ ใหม่: กรองเฉพาะคิวที่มีการจองเตียงพิเศษ
     const filterSpecialBed = url.searchParams.get("specialBed") === "true";
 
+    // ✅ ใหม่: ข้อมูลผู้ใช้ที่ login (ส่งมาจากหน้าเว็บ) ใช้เพื่อ "จัดลำดับการแสดงผล" เท่านั้น
+    // ไม่ได้ใช้กรองหรือจำกัดสิทธิ์ข้อมูล — ถ้าไม่ส่งมา หรือไม่ใช่ role=user ลำดับเดิมทุกประการ
+    const viewerRole = (url.searchParams.get("role") || "").toLowerCase().trim();
+    const viewerRoleId = Number(url.searchParams.get("role_id") || 0);
+    const isUserViewer =
+      viewerRole === "user" && Number.isInteger(viewerRoleId) && viewerRoleId > 0 && viewerRoleId !== 909;
+
     // ✅ ถ้ามีการกรองค่าใด ๆ ให้รีเซ็ต page = 1
 
     const offset = (page - 1) * limit;
@@ -157,16 +164,43 @@ export async function GET(req: Request) {
       countQuery += ` AND sbb.id IS NOT NULL`;
     }
 
+    // ✅ ใหม่: ถ้าผู้ใช้เป็น role=user ให้คิวของตัวเอง (พนักงานนวดคนนั้น) แสดงก่อน
+    // จับคู่ด้วย bookings.therapist_id = users.role_id (รหัสในตาราง therapist)
+    // และสำรองด้วยชื่อ (name/fname) เฉพาะคิวเก่าที่ therapist_id ยังเป็น NULL
+    // เป็นแค่คีย์เรียงลำดับแรก คีย์เดิมทั้งหมดยังทำงานต่อเป็นลำดับรอง
+    let ownFirstOrder = "";
+    const ownFirstParams: any[] = [];
+    if (isUserViewer && !isExport) {
+      let ownNames: string[] = [];
+      try {
+        const [tRows]: any = await pool.execute(
+          "SELECT name, fname FROM therapist WHERE id = ? LIMIT 1",
+          [viewerRoleId]
+        );
+        ownNames = [tRows?.[0]?.name, tRows?.[0]?.fname].filter((n: any) => !!n);
+      } catch (e) {
+        console.error("หาชื่อหมอนวดของผู้ใช้ไม่สำเร็จ (ไม่กระทบการแสดงผล ใช้ therapist_id อย่างเดียว):", e);
+      }
+      ownFirstParams.push(viewerRoleId);
+      let nameCond = "";
+      if (ownNames.length > 0) {
+        nameCond = ` OR (b.therapist_id IS NULL AND b.therapist IN (${ownNames.map(() => "?").join(", ")}))`;
+        ownFirstParams.push(...ownNames);
+      }
+      ownFirstOrder = `(CASE WHEN b.therapist_id = ?${nameCond} THEN 0 ELSE 1 END) ASC,`;
+    }
+
     if (!isExport) { // 🎯 ใช้ LIMIT และ OFFSET เมื่อ 'ไม่ใช่' โหมด Export เท่านั้น
         query += `
             ORDER BY 
+              ${ownFirstOrder}
               (CASE WHEN b.hn IS NULL OR b.hn = '' THEN 0 ELSE 1 END) ASC,
               b.date ASC,
               STR_TO_DATE(SUBSTRING_INDEX(b.time_slot, '-', 1), '%H:%i') ASC,
               b.name ASC
             LIMIT ? OFFSET ?
         `;
-        queryParams.push(limit, offset);
+        queryParams.push(...ownFirstParams, limit, offset);
     } else {
         query += `
             ORDER BY 

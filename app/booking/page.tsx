@@ -62,6 +62,7 @@ interface BookingInfo {
   bookedbyrole?: string;
   has_special_bed?: number | boolean;
   bed_name?: string;
+  status?: string; // ✅ ใหม่: สถานะคิวจาก bookings.status (เช่น "สำเร็จ" = ให้บริการเสร็จแล้ว)
 }
 
 interface Therapist {
@@ -235,7 +236,8 @@ export default function BookingPage() {
             has_confirmed_hn: b.has_confirmed_hn,
             bookedbyrole: b.bookedbyrole,
             has_special_bed: b.has_special_bed,
-            bed_name: b.bed_name
+            bed_name: b.bed_name,
+            status: b.status
           });
         });
         setBookedSlots(grouped);
@@ -431,6 +433,12 @@ export default function BookingPage() {
 
     const slotInfo = bookedSlots[therapist]?.find(b => b.time_slot === slot);
     const hasSpecialBed = !!slotInfo?.has_special_bed;
+
+    // ✅ ใหม่: ถ้าคิวในช่วงเวลานี้ให้บริการสำเร็จไปแล้ว ห้ามเปิด/ปิดช่วงเวลา
+    if (slotInfo?.status === "สำเร็จ") {
+      alert(`ไม่สามารถเปิด/ปิดช่วงเวลา ${slot} ได้!\n\nเนื่องจากการให้บริการ "${slotInfo?.name}" ในช่วงเวลานี้สำเร็จไปแล้ว`);
+      return;
+    }
 
     // ถ้ามีการจองเตียงพิเศษอยู่ จะไม่อนุญาตให้ปิดหรือยกเลิกการให้บริการ
     if (hasSpecialBed) {
@@ -685,6 +693,8 @@ export default function BookingPage() {
                   const isActive = isSelected && selectedTime === slot;
                   const isSlotDisabled = disabled.includes(slot);
                   const hasSpecialBed = !!slotInfo?.has_special_bed;
+                  // ✅ ใหม่: คิวในช่วงเวลานี้ให้บริการสำเร็จแล้ว (bookings.status = "สำเร็จ")
+                  const isServiceDone = isBooked && slotInfo?.status === "สำเร็จ";
                   // 📌 ผู้มารับบริการรายใหม่ที่จองโดยยังไม่มี HN (รอเจ้าหน้าที่บันทึกข้อมูลให้สมบูรณ์ในตาราง new_user)
                   // 📌 "รอบันทึก HN" = ตรงกับข้อมูลใน new_user (เบอร์โทร) และยังไม่พบว่ามี HN ยืนยันแล้วใน med_user
                   // (ไม่พึ่งพา bookings.hn อย่างเดียว เพราะอาจไม่ได้ถูกบันทึกไว้ครบทุกกรณี)
@@ -694,6 +704,9 @@ export default function BookingPage() {
 
                   if (!isGuest && slotInfo?.bookedbyrole === "admin") {
                     bookedBg = "bg-purple-50 text-purple-700 border-purple-300";
+                  }
+                  if (!isGuest && isServiceDone) {
+                    bookedBg = "bg-blue-50 text-blue-700 border-blue-300";
                   }
                   if (!isGuest && isPendingHN) {
                     bookedBg = "bg-amber-50 text-amber-700 border-amber-300";
@@ -732,6 +745,16 @@ export default function BookingPage() {
                                 <span className="hidden sm:inline">รอบันทึก HN</span>
                               </span>
                             )}
+                            {/* ✅ ใหม่: สัญลักษณ์ว่าบริการช่วงเวลานี้สำเร็จแล้ว (แสดงเฉพาะเจ้าหน้าที่ที่ login) */}
+                            {!isGuest && isServiceDone && (
+                              <span
+                                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-bold rounded bg-blue-100 text-blue-800 border border-blue-300"
+                                title="ให้บริการในช่วงเวลานี้สำเร็จแล้ว"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5 text-blue-700" />
+                                <span>สำเร็จแล้ว</span>
+                              </span>
+                            )}
                             {/* แสดงสัญลักษณ์ไอคอนเตียงพิเศษ */}
                             {hasSpecialBed && (
                               <span
@@ -739,7 +762,8 @@ export default function BookingPage() {
                                 title={slotInfo?.bed_name ? `เตียงพิเศษ: ${slotInfo.bed_name}` : "ใช้เตียงพิเศษ"}
                               >
                                 <BedDouble className="w-3.5 h-3.5 text-emerald-700" />
-                                <span className="hidden sm:inline">เตียงพิเศษ</span>
+                                {/* แสดงชื่อ/หมายเลขเตียงจาก special_beds.bed_name แทนข้อความ "เตียงพิเศษ" */}
+                                {slotInfo?.bed_name && <span>{slotInfo.bed_name}</span>}
                               </span>
                             )}
                           </div>
@@ -758,16 +782,19 @@ export default function BookingPage() {
                       {date && !isGuest && (
                         <button
                           onClick={() => toggleSlot(t.name, slot)}
+                          disabled={isServiceDone}
                           className={`px-2 rounded-xl text-white cursor-pointer transition flex items-center justify-center ${
-                            isOff
+                            isServiceDone
+                              ? "bg-blue-400 opacity-70 cursor-not-allowed"
+                              : isOff
                               ? "bg-gray-400 cursor-not-allowed"
                               : isSlotDisabled
                               ? "bg-red-500 hover:bg-red-600"
                               : "bg-emerald-500 hover:bg-emerald-600"
                           } ${hasSpecialBed ? "opacity-60 cursor-not-allowed" : ""}`}
-                          title={hasSpecialBed ? "ไม่สามารถปิดช่องเวลานี้ได้เนื่องจากมีการจองเตียงพิเศษแล้ว" : "เปิด/ปิด การให้บริการช่องเวลานี้"}
+                          title={isServiceDone ? "ให้บริการสำเร็จแล้ว ไม่สามารถเปิด/ปิดช่องเวลานี้ได้" : hasSpecialBed ? "ไม่สามารถปิดช่องเวลานี้ได้เนื่องจากมีการจองเตียงพิเศษแล้ว" : "เปิด/ปิด การให้บริการช่องเวลานี้"}
                         >
-                          {isSlotDisabled ? <X className="w-3.5 h-3.5" /> : <Check className="w-3.5 h-3.5" />}
+                          {isServiceDone ? <CheckCircle2 className="w-3.5 h-3.5" /> : isSlotDisabled ? <X className="w-3.5 h-3.5" /> : <Check className="w-3.5 h-3.5" />}
                         </button>
                       )}
                     </div>

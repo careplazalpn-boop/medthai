@@ -33,12 +33,21 @@ interface Booking {
   hn?: string | null;
   has_confirmed_hn?: number | boolean;
   is_new_user_pending?: number | boolean;
+  // ✅ ใหม่: API ส่งมาให้เฉพาะเมื่อผู้ใช้เป็น role=user — คิวนี้เป็นของพนักงานนวดคนที่ login อยู่หรือไม่
+  is_own_booking?: number | boolean;
 }
 
 interface Therapist {
   id: number;
   name: string;
 }
+
+// ✅ ใหม่: วันที่ปัจจุบันตามเวลาท้องถิ่นของเครื่องผู้ใช้ในรูปแบบ YYYY-MM-DD
+// ไม่ใช้ toISOString() เพราะแปลงเป็น UTC ก่อน ทำให้ช่วง 00:00–07:00 (เวลาไทย) ได้วันที่ของเมื่อวาน
+const getTodayLocal = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
 
 const getStatusLabel = (b: Booking) => {
   return b.status || "รอดำเนินการ";
@@ -112,6 +121,13 @@ export default function AllBookingsPage() {
     }
   }, [user, router]);
 
+  // ✅ ใหม่: ตั้งค่าเริ่มต้นของตัวกรองวันที่เป็น "วันนี้" ตอนเปิดหน้าครั้งแรก
+  // ตั้งหลัง mount (ไม่ใส่ใน useState โดยตรง) เพื่อกันค่าวันที่ฝั่งเซิร์ฟเวอร์กับเบราว์เซอร์ไม่ตรงกัน
+  // ผู้ใช้ยังเลือกวันอื่นหรือกด "รีเซ็ต" ได้ตามเดิม
+  useEffect(() => {
+    setFilterDate(getTodayLocal());
+  }, []);
+
   useEffect(() => {  
     if (!filterDate) {
       setBookings([]);
@@ -123,7 +139,7 @@ export default function AllBookingsPage() {
     (async () => {
       try {
         const res = await fetch(
-          `/api/all-bookings?date=${filterDate || ""}&provider=${filterProvider || ""}&therapist=${filterTherapist || ""}&timeSlots=${filterTimeSlot || ""}&status=${filterStatus || ""}&specialBed=${filterSpecialBed}&page=${page}&limit=${limit}`
+          `/api/all-bookings?date=${filterDate || ""}&provider=${filterProvider || ""}&therapist=${filterTherapist || ""}&timeSlots=${filterTimeSlot || ""}&status=${filterStatus || ""}&specialBed=${filterSpecialBed}&page=${page}&limit=${limit}&role=${encodeURIComponent(user?.role || "")}&role_id=${encodeURIComponent(user?.role_id || "")}`
         );
         const data = await res.json();
         if (!data.success) throw new Error(data.error || "เกิดข้อผิดพลาด");
@@ -146,7 +162,7 @@ export default function AllBookingsPage() {
         setLoading(false);
       }
     })();
-  }, [filterDate, filterProvider, filterTherapist, filterTimeSlot, filterStatus, filterSpecialBed, page, limit]);
+  }, [filterDate, filterProvider, filterTherapist, filterTimeSlot, filterStatus, filterSpecialBed, page, limit, user?.role, user?.role_id]);
       
   const handleNext = () => {
     if (page < totalPages) setPage((p) => p + 1);
@@ -302,6 +318,11 @@ export default function AllBookingsPage() {
     // ใช้ sort แบบ stable (JS การันตีความเสถียรของลำดับ) จึงไม่กระทบลำดับเดิม (วันที่/เวลา/ชื่อ จาก backend)
     // ของรายการที่เหลือ ไม่ว่าจะอยู่ในกลุ่ม pending HN ด้วยกัน หรือกลุ่มที่มี HN แล้วด้วยกัน
     .sort((a, b) => {
+      // ✅ ใหม่: ผู้ใช้ role=user ให้คิวของตัวเองขึ้นก่อน (ถ้าไม่มี is_own_booking เช่นแอดมิน
+      // ทั้งสองฝั่งจะเท่ากัน จึงข้ามไปใช้การเรียงเดิมทุกประการ)
+      const aOwn = a.is_own_booking ? 0 : 1;
+      const bOwn = b.is_own_booking ? 0 : 1;
+      if (aOwn !== bOwn) return aOwn - bOwn;
       const aPending = isBookingPendingHN(a) ? 0 : 1;
       const bPending = isBookingPendingHN(b) ? 0 : 1;
       return aPending - bPending;
@@ -430,7 +451,7 @@ export default function AllBookingsPage() {
       />
       
       <h1 className="text-3xl sm:text-4xl font-extrabold text-emerald-700 mb-8 sm:mb-12 pt-15 text-center drop-shadow-sm">
-        ประวัติการจอง
+        จัดการข้อมูลบริการ
       </h1>
 
       {/* ฟิลเตอร์ */}

@@ -1,0 +1,181 @@
+"use client";
+
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { 
+  CheckCircle2, XCircle, Loader2, ArrowLeft, Home, 
+  User, Phone, Calendar, Clock, UserCheck, CreditCard, 
+  BedDouble // 🌟 นำเข้า Icon เตียงเพิ่ม
+} from "lucide-react";
+
+export default function ConfirmPage() {
+  const router = useRouter();
+  const params = useSearchParams();
+
+  const hn = params.get("hn");
+  const name = params.get("name");
+  const phone = params.get("phone");
+  const idCard = params.get("idCard");
+  const date = params.get("date");
+  const therapist = params.get("therapist");
+  const time = params.get("time");
+  const provider = params.get("provider");
+  const bookedbyrole = params.get("bookedbyrole");
+  
+  const [success, setSuccess] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [isDuplicateBooking, setIsDuplicateBooking] = useState(false);
+
+  useEffect(() => {
+    const hasValidId = !hn || (hn && hn.length === 9);
+
+    if (!hasValidId || !name || !phone || !date || !therapist || !time) {
+      router.push("/booking");
+    }
+  }, [hn, idCard, name, phone, date, therapist, time, router]);
+
+  const handleConfirm = async () => {
+    setLoading(true);
+    setErrorMsg("");
+    setIsDuplicateBooking(false);
+    
+    try {
+      const isNewUser = !hn;
+      const endpoint = isNewUser ? "/api/new-user" : "/api/bookings";
+
+      const payload: any = isNewUser
+        ? { name, phone, idCard, therapist, time, date, provider, bookedbyrole }
+        : { hn, name, phone, therapist, time, date, provider, bookedbyrole };
+
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || "บันทึกไม่สำเร็จ");
+
+      if (!isNewUser && hn) {
+        await fetch("/api/update-user-phone", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ hn, phone }),
+        });
+      }
+
+      setSuccess(true);
+    } catch (err: any) {
+      const message = err.message || "เกิดข้อผิดพลาดจากระบบ";
+      setErrorMsg(message);
+      if (message.includes("จองคิวกับ") || message.includes("ทำการจองในช่วงเวลานี้แล้ว")) {
+        setIsDuplicateBooking(true);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const InfoItem = ({ icon: Icon, label, value }: { icon: any; label: string; value: string | null }) => (
+    <li className="flex items-center gap-3">
+      <Icon className="text-emerald-600 w-5 h-5" />
+      <span className="font-semibold text-emerald-600 min-w-[120px]">{label}</span>
+      {value}
+    </li>
+  );
+
+  const renderErrorMessage = (msg: string) => {
+    const match = msg.match(/^(.*จองคิวกับ )(.+?)( ไว้แล้วในวันที่.*)$/);
+    if (match) {
+      const [, before, therapistName, after] = match;
+      return (
+        <>
+          {before}
+          <span className="font-extrabold text-red-800 underline decoration-2 underline-offset-2">
+            {therapistName}
+          </span>
+          {after}
+        </>
+      );
+    }
+    return msg;
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-white to-emerald-50 flex items-center justify-center p-6">
+      <div className="max-w-md w-full bg-white rounded-3xl shadow-xl p-8 text-center border border-emerald-200">
+        <h2 className="text-3xl font-extrabold text-emerald-700 mb-6 tracking-wide">ข้อมูลการจอง</h2>
+        <ul className="text-gray-700 space-y-4 mb-8 text-left">
+          <InfoItem icon={UserCheck} label="ผู้ให้บริการ:" value={provider} />
+          {hn && <InfoItem icon={User} label="HN:" value={hn} />}
+          <InfoItem icon={User} label="ชื่อ-นามสกุล:" value={name} />
+          <InfoItem icon={Phone} label="เบอร์โทร:" value={phone} />
+          {idCard && <InfoItem icon={CreditCard} label="บัตรประชาชน:" value={idCard} />}
+          <InfoItem icon={Calendar} label="วันที่จอง:" value={date} />
+          <InfoItem icon={UserCheck} label="หมอนวด:" value={therapist} />
+          <InfoItem icon={Clock} label="ช่วงเวลา:" value={time} />
+        </ul>
+
+        {success ? (
+          <div className="flex flex-col items-center gap-6 text-emerald-700">
+            <CheckCircle2 className="w-12 h-12" />
+            <p className="text-2xl font-semibold">จองสำเร็จแล้ว</p>
+            
+            {/* 🌟 ปุ่มส่วน Action เมื่อจองสำเร็จ ปรับเปลี่ยนเป็นแนวตั้งให้สวยงาม */}
+            <div className="flex flex-col gap-3 mt-4 w-full">
+              
+              {/* 🌟 ปุ่มใหม่: ส่งไปยังหน้าจองเตียงพิเศษ พร้อมแนบวันที่ไปกับ URL */}
+              <button 
+                onClick={() => router.push(`/beds-special?date=${date}`)} 
+                className="flex items-center justify-center gap-2 w-full px-4 py-3.5 bg-teal-600 text-white rounded-xl font-bold shadow-md hover:bg-teal-700 hover:-translate-y-0.5 transition"
+              >
+                <BedDouble className="w-5 h-5 text-teal-100" /> ทำรายการจองเตียงพิเศษ
+              </button>
+
+              <div className="flex gap-3 w-full">
+                <button 
+                  onClick={() => router.push("/booking")} 
+                  className="flex flex-1 items-center justify-center gap-2 px-2 py-3 bg-emerald-100 text-emerald-800 rounded-xl font-bold shadow-sm hover:bg-emerald-200 transition"
+                >
+                  <ArrowLeft className="w-4 h-4" /> หน้าจองคิว
+                </button>
+                <button 
+                  onClick={() => router.push("/")} 
+                  className="flex flex-1 items-center justify-center gap-2 px-2 py-3 bg-emerald-600 text-white rounded-xl font-bold shadow-sm hover:bg-emerald-700 transition"
+                >
+                  <Home className="w-4 h-4" /> หน้าหลัก
+                </button>
+              </div>
+            </div>
+            
+          </div>
+        ) : (
+          <>
+            {errorMsg && (
+              <div className="mb-6 flex items-center justify-center gap-2 text-red-600 font-semibold">
+                <XCircle className="w-6 h-6" />
+                <span>{renderErrorMessage(errorMsg)}</span>
+              </div>
+            )}
+            <div className="flex gap-4 justify-center">
+              <button onClick={() => router.push("/booking")} className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-emerald-800 bg-emerald-100 shadow-sm hover:bg-emerald-200">
+                <ArrowLeft className="w-5 h-5" /> กลับหน้าจองคิว
+              </button>
+              <button
+                onClick={handleConfirm}
+                disabled={loading || isDuplicateBooking}
+                title={isDuplicateBooking ? "มีการจองซ้ำในวันนี้แล้ว กรุณากลับไปเลือกคิวใหม่" : undefined}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-white shadow-sm transition ${
+                  loading || isDuplicateBooking ? "bg-emerald-300 cursor-not-allowed" : "bg-emerald-600 hover:bg-emerald-700"
+                }`}
+              >
+                {loading ? <><Loader2 className="animate-spin w-5 h-5" /> กำลังบันทึก...</> : <><CheckCircle2 className="w-5 h-5" /> ยืนยันการจอง</>}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}

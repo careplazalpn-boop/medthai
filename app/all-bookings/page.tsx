@@ -1111,15 +1111,38 @@ function Toast({ message }: { message: string }) {
 
 function BookingDialog({ title, color, booking, onConfirm }: any) {
   if (!booking) return null;
+
+  // ✅ สร้าง Map ระบุชื่อ Class แบบเต็มคำ เพื่อป้องกัน Tailwind ลบ Class ทิ้งตอน Build ขึ้น Server
+  const colorStyles: Record<string, { text: string, bg: string }> = {
+    red: {
+      text: "text-red-600",
+      bg: "bg-red-600 hover:bg-red-700"
+    },
+    emerald: {
+      text: "text-emerald-600",
+      bg: "bg-emerald-600 hover:bg-emerald-700"
+    },
+    orange: {
+      text: "text-orange-600",
+      bg: "bg-orange-600 hover:bg-orange-700"
+    }
+  };
+
+  // ดึงสไตล์ตามค่า color ที่ส่งมา ถ้าไม่มีให้ใช้ emerald เป็นค่าเริ่มต้น
+  const selectedStyle = colorStyles[color] || colorStyles.emerald;
+
   return (
     <Dialog.Portal>
       <Dialog.Overlay className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 transition-opacity"/>
       <Dialog.Content asChild>
         <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white p-6 sm:p-8 rounded-2xl shadow-2xl z-50 w-[90%] max-w-md border border-gray-100">
-          <Dialog.Title className={`text-xl sm:text-2xl font-black text-${color}-600 mb-6 flex items-center gap-2`}>
+          
+          {/* ✅ เรียกใช้ class สีผ่าน selectedStyle.text */}
+          <Dialog.Title className={`text-xl sm:text-2xl font-black mb-6 flex items-center gap-2 ${selectedStyle.text}`}>
             {color === "red" ? <XCircle className="w-7 h-7"/> : <CheckCircle2 className="w-7 h-7"/>}
             {title}
           </Dialog.Title>
+
           <div className="mb-6 text-sm grid grid-cols-1 gap-3 bg-gray-50 p-4 rounded-xl border border-gray-200">
             {[
               {icon:<UserCheck className="w-4 h-4 text-emerald-600"/>, label:"ผู้จองคิว", value:booking.provider},
@@ -1135,15 +1158,18 @@ function BookingDialog({ title, color, booking, onConfirm }: any) {
               </div>
             ))}
           </div>
+
           <div className="flex justify-end gap-3">
             <Dialog.Close asChild>
               <button className="px-5 py-2.5 rounded-xl bg-gray-100 text-gray-700 font-bold hover:bg-gray-200 transition cursor-pointer">
                 ยกเลิก
               </button>
             </Dialog.Close>
+            
+            {/* ✅ เรียกใช้ class สีผ่าน selectedStyle.bg */}
             <button 
               onClick={onConfirm} 
-              className={`px-6 py-2.5 rounded-xl bg-${color}-600 text-white font-bold shadow-md hover:bg-${color}-700 transition hover:-translate-y-0.5 cursor-pointer`}
+              className={`px-6 py-2.5 rounded-xl text-white font-bold shadow-md transition hover:-translate-y-0.5 cursor-pointer ${selectedStyle.bg}`}
             >
               ยืนยันทำรายการ
             </button>

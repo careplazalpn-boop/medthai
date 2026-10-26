@@ -177,10 +177,15 @@ export async function POST(request: Request) {
 
       // 4. บันทึกการจองเตียงพิเศษลงตาราง (กำหนด status = 0 สำหรับการจองใหม่)
       await conn.query(
-        `INSERT INTO special_bed_bookings (bed_id, booking_id, date, time_slot, created_by, note, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [bed_id, booking_id, date, time_slot, created_by || "staff", note || null, status ?? 0]
-      );
+          `INSERT INTO special_bed_bookings (bed_id, booking_id, date, time_slot, created_by, note, status)
+           VALUES (?, ?, ?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE 
+             booking_id = VALUES(booking_id),
+             created_by = VALUES(created_by),
+             note = VALUES(note),
+             status = VALUES(status)`,
+          [bed_id, booking_id, date, time_slot, created_by || "staff", note || null, status ?? 0]
+        );
 
       return NextResponse.json({
         success: true,

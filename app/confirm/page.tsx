@@ -2,7 +2,11 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { CheckCircle2, XCircle, Loader2, ArrowLeft, Home, User, Phone, Calendar, Clock, UserCheck, CreditCard } from "lucide-react";
+import { 
+  CheckCircle2, XCircle, Loader2, ArrowLeft, Home, 
+  User, Phone, Calendar, Clock, UserCheck, CreditCard, 
+  BedDouble // 🌟 นำเข้า Icon เตียงเพิ่ม
+} from "lucide-react";
 
 export default function ConfirmPage() {
   const router = useRouter();
@@ -16,16 +20,14 @@ export default function ConfirmPage() {
   const therapist = params.get("therapist");
   const time = params.get("time");
   const provider = params.get("provider");
-  const bookedbyrole = params.get("bookedbyrole"); // เพิ่มตรงนี้
+  const bookedbyrole = params.get("bookedbyrole");
+  
   const [success, setSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [loading, setLoading] = useState(false);
-  // ✅ ใหม่: ล็อกปุ่ม "ยืนยันการจอง" เมื่อพบว่าเป็นการจองซ้ำในวันเดียวกัน (จาก backend)
-  // ป้องกันไม่ให้กดยืนยันซ้ำด้วยข้อมูลชุดเดิม ต้องกลับไปเลือกคิวใหม่เท่านั้น
   const [isDuplicateBooking, setIsDuplicateBooking] = useState(false);
 
   useEffect(() => {
-    // เช็คแค่กรณีมี HN เท่านั้น
     const hasValidId = !hn || (hn && hn.length === 9);
 
     if (!hasValidId || !name || !phone || !date || !therapist || !time) {
@@ -33,50 +35,47 @@ export default function ConfirmPage() {
     }
   }, [hn, idCard, name, phone, date, therapist, time, router]);
 
-const handleConfirm = async () => {
-  setLoading(true);
-  setErrorMsg("");
-  // ✅ ใหม่: รีเซ็ตสถานะจองซ้ำทุกครั้งที่เริ่มยืนยันใหม่ (เผื่อกรณีแก้ไขข้อมูลแล้วลองใหม่)
-  setIsDuplicateBooking(false);
-  try {
-    const isNewUser = !hn;
-    const endpoint = isNewUser ? "/api/new-user" : "/api/bookings";
+  const handleConfirm = async () => {
+    setLoading(true);
+    setErrorMsg("");
+    setIsDuplicateBooking(false);
+    
+    try {
+      const isNewUser = !hn;
+      const endpoint = isNewUser ? "/api/new-user" : "/api/bookings";
 
-  const payload: any = isNewUser
-    ? { name, phone, idCard, therapist, time, date, provider, bookedbyrole }
-    : { hn, name, phone, therapist, time, date, provider, bookedbyrole };
+      const payload: any = isNewUser
+        ? { name, phone, idCard, therapist, time, date, provider, bookedbyrole }
+        : { hn, name, phone, therapist, time, date, provider, bookedbyrole };
 
-    const res = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    const data = await res.json();
-    if (!data.success) throw new Error(data.error || "บันทึกไม่สำเร็จ");
-
-    // ถ้าเป็นผู้ใช้ที่มี HN ให้ไปอัปเดตเบอร์ใน med_user
-    if (!isNewUser && hn) {
-      await fetch("/api/update-user-phone", {
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ hn, phone }),
+        body: JSON.stringify(payload),
       });
-    }
 
-    setSuccess(true);
-  } catch (err: any) {
-    const message = err.message || "เกิดข้อผิดพลาดจากระบบ";
-    setErrorMsg(message);
-    // ✅ ใหม่: ตรวจสอบว่าเป็นกรณี "จองซ้ำในวันเดียวกัน / ช่วงเวลาเดียวกัน" หรือไม่
-    // (ข้อความคงที่จากฝั่ง backend ที่ตรวจสอบเงื่อนไขนี้) ถ้าใช่ ให้ล็อกปุ่มยืนยันการจองไว้
-    if (message.includes("จองคิวกับ") || message.includes("ทำการจองในช่วงเวลานี้แล้ว")) {
-      setIsDuplicateBooking(true);
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || "บันทึกไม่สำเร็จ");
+
+      if (!isNewUser && hn) {
+        await fetch("/api/update-user-phone", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ hn, phone }),
+        });
+      }
+
+      setSuccess(true);
+    } catch (err: any) {
+      const message = err.message || "เกิดข้อผิดพลาดจากระบบ";
+      setErrorMsg(message);
+      if (message.includes("จองคิวกับ") || message.includes("ทำการจองในช่วงเวลานี้แล้ว")) {
+        setIsDuplicateBooking(true);
+      }
+    } finally {
+      setLoading(false);
     }
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   const InfoItem = ({ icon: Icon, label, value }: { icon: any; label: string; value: string | null }) => (
     <li className="flex items-center gap-3">
@@ -86,8 +85,6 @@ const handleConfirm = async () => {
     </li>
   );
 
-  // ✅ ใหม่: แสดงข้อความ error ปกติเหมือนเดิมทุกกรณี ยกเว้นกรณี "จองซ้ำ" ที่มีชื่อผู้ให้บริการ (therapist.name)
-  // อยู่ในข้อความ — จะทำให้ชื่อผู้ให้บริการส่วนนั้นเด่นแตกต่างจากข้อความส่วนอื่น (ตัวหนา+ขีดเส้นใต้+สีเข้มขึ้น)
   const renderErrorMessage = (msg: string) => {
     const match = msg.match(/^(.*จองคิวกับ )(.+?)( ไว้แล้วในวันที่.*)$/);
     if (match) {
@@ -124,14 +121,42 @@ const handleConfirm = async () => {
           <div className="flex flex-col items-center gap-6 text-emerald-700">
             <CheckCircle2 className="w-12 h-12" />
             <p className="text-2xl font-semibold">จองสำเร็จแล้ว</p>
-            <div className="flex gap-4 mt-6">
-              <button onClick={() => router.push("/booking")} className="flex items-center gap-2 px-4 py-2 bg-emerald-100 text-emerald-700 rounded-lg font-semibold shadow-sm hover:bg-emerald-200">
-                <ArrowLeft className="w-5 h-5" /> กลับหน้าจองคิว
+            
+            {/* 🌟 ปุ่มส่วน Action เมื่อจองสำเร็จ ปรับเปลี่ยนเป็นแนวตั้งให้สวยงาม */}
+            <div className="flex flex-col gap-3 mt-4 w-full">
+              
+              {/* 🌟 ปุ่มใหม่: ส่งไปยังหน้าจองเตียงพิเศษ พร้อมแนบวันที่ไปกับ URL */}
+              <button 
+                onClick={() => {
+                  const queryParams = new URLSearchParams();
+                  if (date) queryParams.set("date", date);
+                  if (time) queryParams.set("time", time);
+                  if (hn) queryParams.set("hn", hn);
+                  if (idCard) queryParams.set("cid", idCard); // ใช้ชื่อตัวแปรที่รับมา
+                  
+                  router.push(`/beds-special?${queryParams.toString()}`);
+                }} 
+                className="flex items-center justify-center gap-2 w-full px-4 py-3.5 bg-teal-600 text-white rounded-xl font-bold shadow-md hover:bg-teal-700 hover:-translate-y-0.5 transition"
+              >
+                <BedDouble className="w-5 h-5 text-teal-100" /> ทำรายการจองเตียงพิเศษ
               </button>
-              <button onClick={() => router.push("/")} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg font-semibold shadow-sm hover:bg-emerald-700">
-                <Home className="w-5 h-5" /> กลับหน้าหลัก
-              </button>
+
+              <div className="flex gap-3 w-full">
+                <button 
+                  onClick={() => router.push("/booking")} 
+                  className="flex flex-1 items-center justify-center gap-2 px-2 py-3 bg-emerald-100 text-emerald-800 rounded-xl font-bold shadow-sm hover:bg-emerald-200 transition"
+                >
+                  <ArrowLeft className="w-4 h-4" /> หน้าจองคิว
+                </button>
+                <button 
+                  onClick={() => router.push("/")} 
+                  className="flex flex-1 items-center justify-center gap-2 px-2 py-3 bg-emerald-600 text-white rounded-xl font-bold shadow-sm hover:bg-emerald-700 transition"
+                >
+                  <Home className="w-4 h-4" /> หน้าหลัก
+                </button>
+              </div>
             </div>
+            
           </div>
         ) : (
           <>

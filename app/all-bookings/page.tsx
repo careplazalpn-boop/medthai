@@ -405,124 +405,125 @@ export default function AllBookingsPage() {
       </h1>
 
       {/* ✅ SUMMARY CARDS (Clickable Filters) */}
-      <div className="max-w-6xl mx-auto mb-8 grid grid-cols-2 md:grid-cols-5 gap-4">
+      {/* ✅ SUMMARY CARDS (Clickable Filters) - ดีไซน์กะทัดรัด (Compact Modern Dashboard) */}
+      <div className="max-w-6xl mx-auto mb-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         
-        {/* 1. การ์ดทั้งหมด (All) - โทนสีน้ำเงิน */}
+        {/* 1. การ์ดทั้งหมด (All) */}
         <div 
           onClick={() => { setFilterStatus("all"); setPage(1); }}
-          className={`relative overflow-hidden flex flex-col p-5 rounded-2xl border-2 cursor-pointer transition-all duration-300 
+          className={`relative overflow-hidden flex flex-col p-3.5 rounded-xl border-2 cursor-pointer transition-all duration-300 
             ${filterStatus === "all" 
-              ? 'border-blue-500 bg-gradient-to-br from-blue-100 to-blue-50 shadow-lg shadow-blue-500/20 transform scale-[1.03] ring-4 ring-blue-500/10' 
-              : 'border-blue-100 bg-gradient-to-br from-white to-blue-50/50 hover:border-blue-300 hover:shadow-md'}`}
+              ? 'border-blue-500 bg-gradient-to-br from-blue-100 to-blue-50 shadow-md shadow-blue-500/20 transform scale-[1.02] ring-2 ring-blue-500/10' 
+              : 'border-blue-100 bg-gradient-to-br from-white to-blue-50/50 hover:border-blue-300 hover:shadow-sm'}`}
         >
-          <ClipboardList className={`absolute -bottom-2 -right-2 w-20 h-20 opacity-10 ${filterStatus === "all" ? 'text-blue-700' : 'text-blue-500'}`} />
-          <div className="flex justify-between items-center mb-3 relative z-10">
-             <span className={`text-sm font-extrabold tracking-wide ${filterStatus === "all" ? 'text-blue-900' : 'text-blue-700'}`}>ทั้งหมด</span>
-             <div className={`p-2 rounded-xl shadow-sm ${filterStatus === "all" ? 'bg-blue-200 text-blue-700' : 'bg-blue-100 text-blue-500'}`}>
-               <ClipboardList className="w-5 h-5" />
+          <ClipboardList className={`absolute -bottom-2 -right-2 w-14 h-14 opacity-10 ${filterStatus === "all" ? 'text-blue-700' : 'text-blue-500'}`} />
+          <div className="flex justify-between items-center mb-1.5 relative z-10">
+             <span className={`text-xs font-extrabold tracking-wide ${filterStatus === "all" ? 'text-blue-900' : 'text-blue-700'}`}>ทั้งหมด</span>
+             <div className={`p-1.5 rounded-lg shadow-sm ${filterStatus === "all" ? 'bg-blue-200 text-blue-700' : 'bg-blue-100 text-blue-500'}`}>
+               <ClipboardList className="w-3.5 h-3.5" />
              </div>
           </div>
-          <div className="flex items-baseline gap-2 relative z-10">
-             <span className={`text-4xl font-black tracking-tight ${filterStatus === "all" ? 'text-blue-700' : 'text-blue-900'}`}>{totalBookings}</span>
-             <span className={`text-sm font-bold ${filterStatus === "all" ? 'text-blue-800' : 'text-blue-600/70'}`}>คน</span>
+          <div className="flex items-baseline gap-1.5 relative z-10">
+             <span className={`text-2xl sm:text-3xl font-black tracking-tight ${filterStatus === "all" ? 'text-blue-700' : 'text-blue-900'}`}>{totalBookings}</span>
+             <span className={`text-[11px] font-bold ${filterStatus === "all" ? 'text-blue-800' : 'text-blue-600/70'}`}>คน</span>
           </div>
-          <div className={`mt-2 text-xs font-bold relative z-10 ${filterStatus === "all" ? 'text-blue-800' : 'text-blue-500/70'}`}>
+          <div className={`mt-1 text-[10px] font-bold relative z-10 ${filterStatus === "all" ? 'text-blue-800' : 'text-blue-500/70'}`}>
             100% ของรายการทั้งหมด
           </div>
         </div>
 
-        {/* 2. การ์ดสำเร็จ (Past) - โทนสีเขียวมรกต */}
+        {/* 2. การ์ดสำเร็จ (Past) */}
         <div 
           onClick={() => { setFilterStatus("past"); setPage(1); }}
-          className={`relative overflow-hidden flex flex-col p-5 rounded-2xl border-2 cursor-pointer transition-all duration-300 
+          className={`relative overflow-hidden flex flex-col p-3.5 rounded-xl border-2 cursor-pointer transition-all duration-300 
             ${filterStatus === "past" 
-              ? 'border-emerald-500 bg-gradient-to-br from-emerald-100 to-emerald-50 shadow-lg shadow-emerald-500/20 transform scale-[1.03] ring-4 ring-emerald-500/10' 
-              : 'border-emerald-100 bg-gradient-to-br from-white to-emerald-50/50 hover:border-emerald-300 hover:shadow-md'}`}
+              ? 'border-emerald-500 bg-gradient-to-br from-emerald-100 to-emerald-50 shadow-md shadow-emerald-500/20 transform scale-[1.02] ring-2 ring-emerald-500/10' 
+              : 'border-emerald-100 bg-gradient-to-br from-white to-emerald-50/50 hover:border-emerald-300 hover:shadow-sm'}`}
         >
-          <CheckCircle2 className={`absolute -bottom-2 -right-2 w-20 h-20 opacity-10 ${filterStatus === "past" ? 'text-emerald-700' : 'text-emerald-500'}`} />
-          <div className="flex justify-between items-center mb-3 relative z-10">
-             <span className={`text-sm font-extrabold tracking-wide ${filterStatus === "past" ? 'text-emerald-900' : 'text-emerald-700'}`}>สำเร็จแล้ว</span>
-             <div className={`p-2 rounded-xl shadow-sm ${filterStatus === "past" ? 'bg-emerald-200 text-emerald-700' : 'bg-emerald-100 text-emerald-500'}`}>
-               <CheckCircle2 className="w-5 h-5" />
+          <CheckCircle2 className={`absolute -bottom-2 -right-2 w-14 h-14 opacity-10 ${filterStatus === "past" ? 'text-emerald-700' : 'text-emerald-500'}`} />
+          <div className="flex justify-between items-center mb-1.5 relative z-10">
+             <span className={`text-xs font-extrabold tracking-wide ${filterStatus === "past" ? 'text-emerald-900' : 'text-emerald-700'}`}>สำเร็จแล้ว</span>
+             <div className={`p-1.5 rounded-lg shadow-sm ${filterStatus === "past" ? 'bg-emerald-200 text-emerald-700' : 'bg-emerald-100 text-emerald-500'}`}>
+               <CheckCircle2 className="w-3.5 h-3.5" />
              </div>
           </div>
-          <div className="flex items-baseline gap-2 relative z-10">
-             <span className={`text-4xl font-black tracking-tight ${filterStatus === "past" ? 'text-emerald-700' : 'text-emerald-900'}`}>{summary.totalAttended}</span>
-             <span className={`text-sm font-bold ${filterStatus === "past" ? 'text-emerald-800' : 'text-emerald-600/70'}`}>คน</span>
+          <div className="flex items-baseline gap-1.5 relative z-10">
+             <span className={`text-2xl sm:text-3xl font-black tracking-tight ${filterStatus === "past" ? 'text-emerald-700' : 'text-emerald-900'}`}>{summary.totalAttended}</span>
+             <span className={`text-[11px] font-bold ${filterStatus === "past" ? 'text-emerald-800' : 'text-emerald-600/70'}`}>คน</span>
           </div>
-          <div className={`mt-2 text-xs font-bold relative z-10 ${filterStatus === "past" ? 'text-emerald-800' : 'text-emerald-500/70'}`}>
+          <div className={`mt-1 text-[10px] font-bold relative z-10 ${filterStatus === "past" ? 'text-emerald-800' : 'text-emerald-500/70'}`}>
             {getPercentage(summary.totalAttended)}% ของทั้งหมด
           </div>
         </div>
 
-        {/* 3. การ์ดรอดำเนินการ (Upcoming) - โทนสีม่วง (เปลี่ยนจากเทาให้ดูมีสีสันขึ้น) */}
+        {/* 3. การ์ดรอดำเนินการ (Upcoming) */}
         <div 
           onClick={() => { setFilterStatus("upcoming"); setPage(1); }}
-          className={`relative overflow-hidden flex flex-col p-5 rounded-2xl border-2 cursor-pointer transition-all duration-300 
+          className={`relative overflow-hidden flex flex-col p-3.5 rounded-xl border-2 cursor-pointer transition-all duration-300 
             ${filterStatus === "upcoming" 
-              ? 'border-violet-500 bg-gradient-to-br from-violet-100 to-violet-50 shadow-lg shadow-violet-500/20 transform scale-[1.03] ring-4 ring-violet-500/10' 
-              : 'border-violet-100 bg-gradient-to-br from-white to-violet-50/50 hover:border-violet-300 hover:shadow-md'}`}
+              ? 'border-violet-500 bg-gradient-to-br from-violet-100 to-violet-50 shadow-md shadow-violet-500/20 transform scale-[1.02] ring-2 ring-violet-500/10' 
+              : 'border-violet-100 bg-gradient-to-br from-white to-violet-50/50 hover:border-violet-300 hover:shadow-sm'}`}
         >
-          <Clock className={`absolute -bottom-2 -right-2 w-20 h-20 opacity-10 ${filterStatus === "upcoming" ? 'text-violet-700' : 'text-violet-500'}`} />
-          <div className="flex justify-between items-center mb-3 relative z-10">
-             <span className={`text-sm font-extrabold tracking-wide ${filterStatus === "upcoming" ? 'text-violet-900' : 'text-violet-700'}`}>รอดำเนินการ</span>
-             <div className={`p-2 rounded-xl shadow-sm ${filterStatus === "upcoming" ? 'bg-violet-200 text-violet-700' : 'bg-violet-100 text-violet-500'}`}>
-               <Clock className="w-5 h-5" />
+          <Clock className={`absolute -bottom-2 -right-2 w-14 h-14 opacity-10 ${filterStatus === "upcoming" ? 'text-violet-700' : 'text-violet-500'}`} />
+          <div className="flex justify-between items-center mb-1.5 relative z-10">
+             <span className={`text-xs font-extrabold tracking-wide ${filterStatus === "upcoming" ? 'text-violet-900' : 'text-violet-700'}`}>รอดำเนินการ</span>
+             <div className={`p-1.5 rounded-lg shadow-sm ${filterStatus === "upcoming" ? 'bg-violet-200 text-violet-700' : 'bg-violet-100 text-violet-500'}`}>
+               <Clock className="w-3.5 h-3.5" />
              </div>
           </div>
-          <div className="flex items-baseline gap-2 relative z-10">
-             <span className={`text-4xl font-black tracking-tight ${filterStatus === "upcoming" ? 'text-violet-700' : 'text-violet-900'}`}>{summary.totalPending}</span>
-             <span className={`text-sm font-bold ${filterStatus === "upcoming" ? 'text-violet-800' : 'text-violet-600/70'}`}>คน</span>
+          <div className="flex items-baseline gap-1.5 relative z-10">
+             <span className={`text-2xl sm:text-3xl font-black tracking-tight ${filterStatus === "upcoming" ? 'text-violet-700' : 'text-violet-900'}`}>{summary.totalPending}</span>
+             <span className={`text-[11px] font-bold ${filterStatus === "upcoming" ? 'text-violet-800' : 'text-violet-600/70'}`}>คน</span>
           </div>
-          <div className={`mt-2 text-xs font-bold relative z-10 ${filterStatus === "upcoming" ? 'text-violet-800' : 'text-violet-500/70'}`}>
+          <div className={`mt-1 text-[10px] font-bold relative z-10 ${filterStatus === "upcoming" ? 'text-violet-800' : 'text-violet-500/70'}`}>
             {getPercentage(summary.totalPending)}% ของทั้งหมด
           </div>
         </div>
 
-        {/* 4. การ์ดอยู่ในคิว (In Queue) - โทนสีส้ม/เหลือง */}
+        {/* 4. การ์ดอยู่ในคิว (In Queue) */}
         <div 
           onClick={() => { setFilterStatus("in_queue"); setPage(1); }}
-          className={`relative overflow-hidden flex flex-col p-5 rounded-2xl border-2 cursor-pointer transition-all duration-300 
+          className={`relative overflow-hidden flex flex-col p-3.5 rounded-xl border-2 cursor-pointer transition-all duration-300 
             ${filterStatus === "in_queue" 
-              ? 'border-amber-500 bg-gradient-to-br from-amber-100 to-amber-50 shadow-lg shadow-amber-500/20 transform scale-[1.03] ring-4 ring-amber-500/10' 
-              : 'border-amber-100 bg-gradient-to-br from-white to-amber-50/50 hover:border-amber-300 hover:shadow-md'}`}
+              ? 'border-amber-500 bg-gradient-to-br from-amber-100 to-amber-50 shadow-md shadow-amber-500/20 transform scale-[1.02] ring-2 ring-amber-500/10' 
+              : 'border-amber-100 bg-gradient-to-br from-white to-amber-50/50 hover:border-amber-300 hover:shadow-sm'}`}
         >
-          <Users className={`absolute -bottom-2 -right-2 w-20 h-20 opacity-10 ${filterStatus === "in_queue" ? 'text-amber-700' : 'text-amber-500'}`} />
-          <div className="flex justify-between items-center mb-3 relative z-10">
-             <span className={`text-sm font-extrabold tracking-wide ${filterStatus === "in_queue" ? 'text-amber-900' : 'text-amber-700'}`}>อยู่ในคิว</span>
-             <div className={`p-2 rounded-xl shadow-sm ${filterStatus === "in_queue" ? 'bg-amber-200 text-amber-700' : 'bg-amber-100 text-amber-500'}`}>
-               <Users className="w-5 h-5" />
+          <Users className={`absolute -bottom-2 -right-2 w-14 h-14 opacity-10 ${filterStatus === "in_queue" ? 'text-amber-700' : 'text-amber-500'}`} />
+          <div className="flex justify-between items-center mb-1.5 relative z-10">
+             <span className={`text-xs font-extrabold tracking-wide ${filterStatus === "in_queue" ? 'text-amber-900' : 'text-amber-700'}`}>อยู่ในคิว</span>
+             <div className={`p-1.5 rounded-lg shadow-sm ${filterStatus === "in_queue" ? 'bg-amber-200 text-amber-700' : 'bg-amber-100 text-amber-500'}`}>
+               <Users className="w-3.5 h-3.5" />
              </div>
           </div>
-          <div className="flex items-baseline gap-2 relative z-10">
-             <span className={`text-4xl font-black tracking-tight ${filterStatus === "in_queue" ? 'text-amber-700' : 'text-amber-900'}`}>{summary.totalInQueue}</span>
-             <span className={`text-sm font-bold ${filterStatus === "in_queue" ? 'text-amber-800' : 'text-amber-600/70'}`}>คน</span>
+          <div className="flex items-baseline gap-1.5 relative z-10">
+             <span className={`text-2xl sm:text-3xl font-black tracking-tight ${filterStatus === "in_queue" ? 'text-amber-700' : 'text-amber-900'}`}>{summary.totalInQueue}</span>
+             <span className={`text-[11px] font-bold ${filterStatus === "in_queue" ? 'text-amber-800' : 'text-amber-600/70'}`}>คน</span>
           </div>
-          <div className={`mt-2 text-xs font-bold relative z-10 ${filterStatus === "in_queue" ? 'text-amber-800' : 'text-amber-500/70'}`}>
+          <div className={`mt-1 text-[10px] font-bold relative z-10 ${filterStatus === "in_queue" ? 'text-amber-800' : 'text-amber-500/70'}`}>
             {getPercentage(summary.totalInQueue)}% ของทั้งหมด
           </div>
         </div>
 
-        {/* 5. การ์ดยกเลิก (Cancelled) - โทนสีแดง/ชมพู */}
+        {/* 5. การ์ดยกเลิก (Cancelled) */}
         <div 
           onClick={() => { setFilterStatus("cancelled"); setPage(1); }}
-          className={`relative overflow-hidden flex flex-col p-5 rounded-2xl border-2 cursor-pointer transition-all duration-300 
+          className={`relative overflow-hidden flex flex-col p-3.5 rounded-xl border-2 cursor-pointer transition-all duration-300 
             ${filterStatus === "cancelled" 
-              ? 'border-rose-500 bg-gradient-to-br from-rose-100 to-rose-50 shadow-lg shadow-rose-500/20 transform scale-[1.03] ring-4 ring-rose-500/10' 
-              : 'border-rose-100 bg-gradient-to-br from-white to-rose-50/50 hover:border-rose-300 hover:shadow-md'}`}
+              ? 'border-rose-500 bg-gradient-to-br from-rose-100 to-rose-50 shadow-md shadow-rose-500/20 transform scale-[1.02] ring-2 ring-rose-500/10' 
+              : 'border-rose-100 bg-gradient-to-br from-white to-rose-50/50 hover:border-rose-300 hover:shadow-sm'}`}
         >
-          <XCircle className={`absolute -bottom-2 -right-2 w-20 h-20 opacity-10 ${filterStatus === "cancelled" ? 'text-rose-700' : 'text-rose-500'}`} />
-          <div className="flex justify-between items-center mb-3 relative z-10">
-             <span className={`text-sm font-extrabold tracking-wide ${filterStatus === "cancelled" ? 'text-rose-900' : 'text-rose-700'}`}>ยกเลิก</span>
-             <div className={`p-2 rounded-xl shadow-sm ${filterStatus === "cancelled" ? 'bg-rose-200 text-rose-700' : 'bg-rose-100 text-rose-500'}`}>
-               <XCircle className="w-5 h-5" />
+          <XCircle className={`absolute -bottom-2 -right-2 w-14 h-14 opacity-10 ${filterStatus === "cancelled" ? 'text-rose-700' : 'text-rose-500'}`} />
+          <div className="flex justify-between items-center mb-1.5 relative z-10">
+             <span className={`text-xs font-extrabold tracking-wide ${filterStatus === "cancelled" ? 'text-rose-900' : 'text-rose-700'}`}>ยกเลิก</span>
+             <div className={`p-1.5 rounded-lg shadow-sm ${filterStatus === "cancelled" ? 'bg-rose-200 text-rose-700' : 'bg-rose-100 text-rose-500'}`}>
+               <XCircle className="w-3.5 h-3.5" />
              </div>
           </div>
-          <div className="flex items-baseline gap-2 relative z-10">
-             <span className={`text-4xl font-black tracking-tight ${filterStatus === "cancelled" ? 'text-rose-700' : 'text-rose-900'}`}>{summary.totalCancelled}</span>
-             <span className={`text-sm font-bold ${filterStatus === "cancelled" ? 'text-rose-800' : 'text-rose-600/70'}`}>คน</span>
+          <div className="flex items-baseline gap-1.5 relative z-10">
+             <span className={`text-2xl sm:text-3xl font-black tracking-tight ${filterStatus === "cancelled" ? 'text-rose-700' : 'text-rose-900'}`}>{summary.totalCancelled}</span>
+             <span className={`text-[11px] font-bold ${filterStatus === "cancelled" ? 'text-rose-800' : 'text-rose-600/70'}`}>คน</span>
           </div>
-          <div className={`mt-2 text-xs font-bold relative z-10 ${filterStatus === "cancelled" ? 'text-rose-800' : 'text-rose-500/70'}`}>
+          <div className={`mt-1 text-[10px] font-bold relative z-10 ${filterStatus === "cancelled" ? 'text-rose-800' : 'text-rose-500/70'}`}>
             {getPercentage(summary.totalCancelled)}% ของทั้งหมด
           </div>
         </div>

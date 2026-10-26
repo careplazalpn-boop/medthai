@@ -700,9 +700,8 @@ export default function AllBookingsPage() {
           {filteredBookings.map((b, idx) => {
             const isPendingHN = isBookingPendingHN(b);
             const isCompleted = getStatusLabel(b) === "สำเร็จ";
-            const canManageBooking =
-              user?.role_id === 909 || (!!b?.therapist && b.therapist === user?.name);
-            const canEditCompleted = isCompleted && isAdmin && isTodayBookingDate(b.date);
+            const canManageBooking = user?.role_id === 909 || (!!b?.therapist && b.therapist === user?.name);          
+            const canEditCompleted = isCompleted && (isAdmin || canManageBooking) && isTodayBookingDate(b.date);
             
             return (
             <li

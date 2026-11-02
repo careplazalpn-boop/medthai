@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { 
   CheckCircle2, XCircle, Loader2, ArrowLeft, Home, 
   User, Phone, Calendar, Clock, UserCheck, CreditCard, 
-  BedDouble // 🌟 นำเข้า Icon เตียงเพิ่ม
+  BedDouble 
 } from "lucide-react";
 
 export default function ConfirmPage() {
@@ -21,6 +21,7 @@ export default function ConfirmPage() {
   const time = params.get("time");
   const provider = params.get("provider");
   const bookedbyrole = params.get("bookedbyrole");
+  const sex = params.get("sex"); // 🌟 1. เพิ่มการรับค่า sex จาก URL
   
   const [success, setSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -45,8 +46,8 @@ export default function ConfirmPage() {
       const endpoint = isNewUser ? "/api/new-user" : "/api/bookings";
 
       const payload: any = isNewUser
-        ? { name, phone, idCard, therapist, time, date, provider, bookedbyrole }
-        : { hn, name, phone, therapist, time, date, provider, bookedbyrole };
+        ? { name, phone, idCard, therapist, time, date, provider, bookedbyrole, sex } // 🌟 แนบ sex กลับไปให้ API ด้วยเผื่อต้องใช้
+        : { hn, name, phone, therapist, time, date, provider, bookedbyrole, sex };
 
       const res = await fetch(endpoint, {
         method: "POST",
@@ -112,6 +113,8 @@ export default function ConfirmPage() {
           <InfoItem icon={User} label="ชื่อ-นามสกุล:" value={name} />
           <InfoItem icon={Phone} label="เบอร์โทร:" value={phone} />
           {idCard && <InfoItem icon={CreditCard} label="บัตรประชาชน:" value={idCard} />}
+          {/* 🌟 แสดงเพศให้ตรวจสอบในหน้า Confirm ได้เลย (ถ้ามี) */}
+          {sex && <InfoItem icon={User} label="เพศ:" value={String(sex) === "1" ? "ชาย" : "หญิง"} />}
           <InfoItem icon={Calendar} label="วันที่จอง:" value={date} />
           <InfoItem icon={UserCheck} label="หมอนวด:" value={therapist} />
           <InfoItem icon={Clock} label="ช่วงเวลา:" value={time} />
@@ -122,17 +125,17 @@ export default function ConfirmPage() {
             <CheckCircle2 className="w-12 h-12" />
             <p className="text-2xl font-semibold">จองสำเร็จแล้ว</p>
             
-            {/* 🌟 ปุ่มส่วน Action เมื่อจองสำเร็จ ปรับเปลี่ยนเป็นแนวตั้งให้สวยงาม */}
             <div className="flex flex-col gap-3 mt-4 w-full">
               
-              {/* 🌟 ปุ่มใหม่: ส่งไปยังหน้าจองเตียงพิเศษ พร้อมแนบวันที่ไปกับ URL */}
+              {/* 🌟 2. ปรับปรุง: ส่ง date, time, hn, cid และ sex ไปด้วย เพื่อให้หน้าเตียงรับรู้ทันที */}
               <button 
                 onClick={() => {
                   const queryParams = new URLSearchParams();
                   if (date) queryParams.set("date", date);
                   if (time) queryParams.set("time", time);
                   if (hn) queryParams.set("hn", hn);
-                  if (idCard) queryParams.set("cid", idCard); // ใช้ชื่อตัวแปรที่รับมา
+                  if (idCard) queryParams.set("cid", idCard); 
+                  if (sex) queryParams.set("sex", sex); // 🌟 ส่งต่อ sex ไปหน้า beds-special
                   
                   router.push(`/beds-special?${queryParams.toString()}`);
                 }} 

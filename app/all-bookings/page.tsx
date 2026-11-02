@@ -32,6 +32,7 @@ interface Booking {
   has_special_bed?: number | boolean;
   bed_name?: string;
   hn?: string | null;
+  sex?: string | number; // 🌟 1. เพิ่มฟิลด์ sex เข้ามาใน Interface Booking เพื่อรองรับค่าจาก API
   has_confirmed_hn?: number | boolean;
   is_new_user_pending?: number | boolean;
   is_own_booking?: number | boolean;
@@ -341,6 +342,9 @@ export default function AllBookingsPage() {
 
   const selectedBooking = bookings.find(b => b.id === selectedId);
 
+  // 🌟 2. ปรับปรุง handleBookingAction เพื่อส่งพารามิเตอร์ทั้งหมดไปยังหน้า Confirm แทน
+  // เนื่องจากฟังก์ชันนี้มีการทำ action "confirm" ซึ่งเราต้องการให้วิ่งไปที่หน้า confirm แทนการแค่ขึ้น Dialog
+  // (ถ้าคุณมี flow ที่จะส่งไปหน้า confirm ผ่านทางอื่น ให้ใช้ตามนั้นได้เลย)
   const handleBookingAction = async (action: "confirm"|"cancel") => {
     if (!selectedId) return;
     try {
@@ -977,7 +981,7 @@ export default function AllBookingsPage() {
                           )
                         )}
 
-                        {/* ปุ่มยกเลิก */}
+                        {/* 🌟 2. ปรับปรุงปุ่มจองเตียงพิเศษ ให้ส่งพารามิเตอร์ทั้งหมดไปยังหน้า Confirm แทน */}
                         {b.has_special_bed ? (
                           <button
                             disabled
@@ -991,22 +995,21 @@ export default function AllBookingsPage() {
                             <BedDouble className="text-gray-500 w-5 h-5" />
                           </button>
                         ) : (
-                          <Dialog.Root>
-                            <Dialog.Trigger asChild>
-                              <button
-                                onClick={() => setSelectedId(b.id)}
-                                className="flex items-center justify-center w-15 h-10 bg-red-500 rounded-md shadow hover:bg-red-600 transition"
-                              >
-                                <FaTimes className="text-white w-5 h-5" />
-                              </button>
-                            </Dialog.Trigger>
-                            <BookingDialog
-                              title="ต้องการยกเลิกรายการนี้หรือไม่?"
-                              color="red"
-                              booking={b}
-                              onConfirm={() => handleBookingAction("cancel")}
-                            />
-                          </Dialog.Root>
+                          <button
+                            onClick={() => {
+                              const queryParams = new URLSearchParams();
+                              if (b.date) queryParams.set("date", b.date);
+                              if (b.time_slot) queryParams.set("time", b.time_slot);
+                              if (b.hn) queryParams.set("hn", b.hn);
+                              if (b.sex) queryParams.set("sex", String(b.sex)); 
+                              
+                              router.push(`/beds-special?${queryParams.toString()}`);
+                            }}
+                            className="flex items-center justify-center w-15 h-10 bg-teal-600 text-white rounded-md shadow hover:bg-teal-700 transition"
+                            title="จองเตียงพิเศษสำหรับคิวนี้"
+                          >
+                            <BedDouble className="w-5 h-5 text-white" />
+                          </button>
                         )}
                       </>
                     )}

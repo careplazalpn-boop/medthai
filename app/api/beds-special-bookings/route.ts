@@ -1,273 +1,184 @@
 import { NextResponse } from "next/server";
-import pool from "../dbconnection/db";
+import pool from "../dbconnection/db"; // ⚠️ ตรวจสอบพาธนำเข้าฐานข้อมูลของคุณว่าตรงหรือไม่
 
-// 📌 GET: ดึงข้อมูลการจองเตียงพิเศษ และคิวนวดหลักที่พร้อมลงเตียงตามสิทธิ์ผู้ใช้งาน
-export async function GET(request: Request) {
-  const url = new URL(request.url);
-  const date = url.searchParams.get("date");
-  const roleId = url.searchParams.get("role_id") || "";
-  const isAdminParam = url.searchParams.get("is_admin") === "true" || roleId === "909";
-
-  if (!date) {
-    return NextResponse.json(
-      { success: false, error: "กรุณาระบุวันที่" },
-      { status: 400 }
-    );
-  }
-
+// GET: ดึงข้อมูลการจองเตียง (พร้อม Pagination) และคิวที่รอลงเตียง
+export async function GET(req: Request) {
   try {
-    const conn = await pool.getConnection();
+    const url = new URL(req.url);
+    const date = url.searchParams.get("date");
+    const roleId = Number(url.searchParams.get("role_id")) || 0;
+    const isAdmin = url.searchParams.get("is_admin") === "true";
+    const userName = url.searchParams.get("user_name") || ""; 
 
-    try {
-      // 1. ตรวจสอบชื่อหมอนวด/ผู้ให้บริการที่ผูกกับ role_id
-      let loggedInTherapistName = "";
-      if (!isAdminParam && roleId) {
-        const [therapistRows]: any = await conn.query(
-          "SELECT name FROM therapist WHERE id = ? AND status = 0",
+    // 🌟 รับค่า Pagination
+    const page = parseInt(url.searchParams.get("page") || "1", 10);
+    const limit = parseInt(url.searchParams.get("limit") || "10", 10);
+    const offset = (page - 1) * limit;
+
+    if (!date) {
+      return NextResponse.json({ success: false, error: "Missing date" }, { status: 400 });
+    }
+
+    // ==============================================================
+    // 1. ดึงคิวที่ลงเตียงไปแล้ว (bedBookings) แบบมี Pagination 
+    // ==============================================================
+    const [bedBookingRows]: any = await pool.execute(
+      `SELECT 
+         sbb.id AS special_booking_id, sbb.bed_id, sbb.booking_id, sbb.date, sbb.time_slot, sbb.note, sbb.created_by, sbb.status,
+         sb.bed_code, sb.bed_name, sb.room_name, sb.bed_type,
+         b.hn, b.name AS patient_name, b.phone AS patient_phone, b.therapist, b.provider, b.status AS booking_status,
+         u.sex
+       FROM special_bed_bookings sbb
+       INNER JOIN bookings b ON sbb.booking_id = b.id
+       INNER JOIN special_beds sb ON sbb.bed_id = sb.id
+       LEFT JOIN med_user u ON b.hn = u.hn
+       WHERE sbb.date = ?
+       ORDER BY sb.bed_name ASC
+       LIMIT ? OFFSET ?`,
+      [date, limit, offset]
+    );
+
+    // 1.1 นับจำนวนรายการเตียงทั้งหมดในวันนี้เพื่อทำ Pagination 
+    const [countRows]: any = await pool.execute(
+      `SELECT COUNT(*) AS total 
+       FROM special_bed_bookings sbb
+       WHERE sbb.date = ?`,
+      [date]
+    );
+    
+    const totalRecords = countRows[0]?.total || 0;
+    const totalPages = Math.ceil(totalRecords / limit);
+
+    // ==============================================================
+    // 2. ดึงคิวที่รอลงเตียง (availableBookings) ไม่ต้องทำ Pagination
+    // ==============================================================
+    let availableQuery = `
+      SELECT 
+         b.id AS booking_id, b.hn, b.name, b.phone, b.therapist, b.provider, b.time_slot, b.date, b.status,
+         u.sex
+       FROM bookings b
+       LEFT JOIN special_bed_bookings sbb ON b.id = sbb.booking_id
+       LEFT JOIN med_user u ON b.hn = u.hn
+       WHERE b.date = ? 
+         AND b.status != 'ยกเลิก' 
+         AND sbb.id IS NULL
+    `;
+    const availableParams: any[] = [date];
+
+    // ✅ ถ้าไม่ใช่ Admin ให้กรองเฉพาะคิวที่ตัวเองดูแล (เป็น Therapist หรือ Provider)
+    if (!isAdmin && roleId !== 909) {
+      let ownNames: string[] = [userName]; 
+      try {
+        const [tRows]: any = await pool.execute(
+          "SELECT name, fname FROM therapist WHERE id = ?",
           [roleId]
         );
-        if (therapistRows.length > 0) {
-          loggedInTherapistName = therapistRows[0].name;
+        if (tRows.length > 0) {
+          ownNames.push(tRows[0].name, tRows[0].fname);
         }
+      } catch (e) {
+        console.error("Error finding therapist name:", e);
       }
 
-      // 2. ดึงรายการเตียงพิเศษที่มีการจองในวันที่ระบุ (ดึง sbb.status ซึ่งเป็น INT(1) มาด้วย)
-      const [bedBookings] = await conn.query(
-        `SELECT 
-          sbb.id AS special_booking_id,
-          sbb.bed_id,
-          sbb.booking_id,
-          sbb.date,
-          sbb.time_slot,
-          sbb.note,
-          sbb.created_by,
-          sbb.status,
-          sb.bed_code,
-          sb.bed_name,
-          sb.room_name,
-          b.hn,
-          b.name AS patient_name,
-          b.phone AS patient_phone,
-          b.therapist,
-          b.provider,
-          b.status AS booking_status
-         FROM special_bed_bookings sbb
-         INNER JOIN special_beds sb ON sbb.bed_id = sb.id
-         INNER JOIN bookings b ON sbb.booking_id = b.id
-         WHERE sbb.date = ? AND b.status != 'ยกเลิก'
-         ORDER BY sb.id ASC, sbb.time_slot ASC`,
-        [date]
-      );
+      ownNames = [...new Set(ownNames)].filter(Boolean); // ตัดชื่อว่างและซ้ำ
 
-      // 3. ดึงรายการคิวนวดหลัก (bookings) ที่ยังไม่ได้ลงเตียงพิเศษ
-      let availableQuery = `
-        SELECT 
-          b.id AS booking_id,
-          b.hn,
-          b.name,
-          b.phone,
-          b.therapist,
-          b.provider,
-          b.time_slot,
-          b.date,
-          b.status
-         FROM bookings b
-         LEFT JOIN special_bed_bookings sbb ON b.id = sbb.booking_id
-         WHERE b.date = ? 
-           AND b.status != 'ยกเลิก' 
-           AND sbb.id IS NULL
-      `;
-
-      const availableParams: any[] = [date];
-
-      if (!isAdminParam && loggedInTherapistName) {
-        availableQuery += ` AND (b.therapist = ? OR b.provider = ?)`;
-        availableParams.push(loggedInTherapistName, loggedInTherapistName);
+      if (ownNames.length > 0) {
+        const placeholders = ownNames.map(() => "?").join(",");
+        availableQuery += ` AND (b.therapist IN (${placeholders}) OR b.provider IN (${placeholders}))`;
+        availableParams.push(...ownNames, ...ownNames);
+      } else {
+        availableQuery += ` AND b.therapist_id = ?`;
+        availableParams.push(roleId);
       }
-
-      availableQuery += ` ORDER BY b.time_slot ASC, b.id ASC`;
-
-      const [availableBookings] = await conn.query(availableQuery, availableParams);
-
-      return NextResponse.json({
-        success: true,
-        bedBookings: bedBookings,
-        availableBookings: availableBookings,
-        therapistName: loggedInTherapistName,
-      });
-    } finally {
-      conn.release();
     }
-  } catch (error: any) {
-    console.error("GET /api/beds-special-bookings error:", error);
-    return NextResponse.json(
-      { success: false, error: "เกิดข้อผิดพลาดในการดึงข้อมูลการจองเตียงพิเศษ" },
-      { status: 500 }
-    );
+
+    const [availableRows]: any = await pool.execute(availableQuery, availableParams);
+
+    // 3. ส่งข้อมูลทั้งหมดกลับไปพร้อมข้อมูลหน้า Pagination
+    return NextResponse.json({
+      success: true,
+      bedBookings: bedBookingRows,
+      availableBookings: availableRows,
+      pagination: {
+        page,
+        limit,
+        totalRecords,
+        totalPages
+      }
+    });
+
+  } catch (error) {
+    console.error("Error API beds-special-bookings:", error);
+    return NextResponse.json({ success: false, error: "Internal Server Error" }, { status: 500 });
   }
 }
 
-// 📌 POST: บันทึกการจองเตียงพิเศษลงฐานข้อมูล (บันทึก status = 0)
-export async function POST(request: Request) {
+
+// ==============================================================
+// POST: บันทึกการจองเตียง
+// ==============================================================
+export async function POST(req: Request) {
   try {
-    const { bed_id, booking_id, date, time_slot, created_by, note, status } = await request.json();
-
-    if (!bed_id || !booking_id || !date || !time_slot) {
-      return NextResponse.json(
-        { success: false, error: "ข้อมูลสำหรับการจองเตียงพิเศษไม่ครบถ้วน" },
-        { status: 400 }
-      );
-    }
-
-    const conn = await pool.getConnection();
-
-    try {
-      // 1. ✅ ใหม่: ตรวจสอบว่าคิวนวดนี้มี HN แล้วหรือยัง — ห้ามจองเตียงพิเศษให้คนไข้ที่ยังไม่มี HN
-      const [bookingRows]: any = await conn.query(
-        "SELECT hn FROM bookings WHERE id = ?",
-        [booking_id]
-      );
-
-      if (bookingRows.length === 0) {
-        return NextResponse.json(
-          { success: false, error: "ไม่พบข้อมูลคิวจองนวดนี้" },
-          { status: 404 }
-        );
-      }
-
-      const bookingHn = bookingRows[0]?.hn;
-      if (!bookingHn || !String(bookingHn).trim()) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: "ไม่สามารถจองเตียงพิเศษได้ เนื่องจากคนไข้รายนี้ยังไม่มี HN กรุณาให้เจ้าหน้าที่บันทึก HN ให้คนไข้ให้ครบถ้วนก่อน",
-          },
-          { status: 400 }
-        );
-      }
-
-      // 2. ตรวจสอบว่าเตียงนี้ในช่วงเวลานี้ถูกจองไปแล้วหรือไม่
-      const [existingBed]: any = await conn.query(
-        `SELECT sbb.id 
-         FROM special_bed_bookings sbb
-         INNER JOIN bookings b ON sbb.booking_id = b.id
-         WHERE sbb.bed_id = ? AND sbb.date = ? AND REPLACE(sbb.time_slot, ' ', '') = REPLACE(?, ' ', '') AND b.status != 'ยกเลิก'`,
-        [bed_id, date, time_slot]
-      );
-
-      if (existingBed.length > 0) {
-        return NextResponse.json(
-          { success: false, error: "เตียงพิเศษนี้ถูกจองในช่วงเวลาดังกล่าวไปแล้ว" },
-          { status: 400 }
-        );
-      }
-
-      // 3. ตรวจสอบว่าคิวจองนวดนี้ลงเตียงซ้ำหรือไม่
-      const [existingBooking]: any = await conn.query(
-        "SELECT id FROM special_bed_bookings WHERE booking_id = ?",
-        [booking_id]
-      );
-
-      if (existingBooking.length > 0) {
-        return NextResponse.json(
-          { success: false, error: "คิวนวดนี้ถูกจองเตียงพิเศษไปเรียบร้อยแล้ว" },
-          { status: 400 }
-        );
-      }
-
-      // 4. บันทึกการจองเตียงพิเศษลงตาราง (กำหนด status = 0 สำหรับการจองใหม่)
-      await conn.query(
-          `INSERT INTO special_bed_bookings (bed_id, booking_id, date, time_slot, created_by, note, status)
-           VALUES (?, ?, ?, ?, ?, ?, ?)
-           ON DUPLICATE KEY UPDATE 
-             booking_id = VALUES(booking_id),
-             created_by = VALUES(created_by),
-             note = VALUES(note),
-             status = VALUES(status)`,
-          [bed_id, booking_id, date, time_slot, created_by || "staff", note || null, status ?? 0]
-        );
-
-      return NextResponse.json({
-        success: true,
-        message: "บันทึกการจองเตียงพิเศษสำเร็จ",
-      });
-    } finally {
-      conn.release();
-    }
-  } catch (error: any) {
-    console.error("POST /api/beds-special-bookings error:", error);
-    return NextResponse.json(
-      { success: false, error: "เกิดข้อผิดพลาดในการบันทึกการจองเตียงพิเศษ" },
-      { status: 500 }
+    const body = await req.json();
+    const { bed_id, booking_id, date, time_slot, created_by, note, status } = body;
+    
+    // ใช้ ON DUPLICATE KEY UPDATE ป้องกันการ Error ทะลุ (Double Validation) 
+    await pool.execute(
+      `INSERT INTO special_bed_bookings (bed_id, booking_id, date, time_slot, created_by, note, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE 
+         booking_id = VALUES(booking_id),
+         created_by = VALUES(created_by),
+         note = VALUES(note),
+         status = VALUES(status)`,
+      [bed_id, booking_id, date, time_slot, created_by || "staff", note || null, status ?? 0]
     );
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error("POST special_bed_bookings error:", error);
+    return NextResponse.json({ success: false, error: "เกิดข้อผิดพลาดในการบันทึกการจองเตียง" }, { status: 500 });
   }
 }
 
-// 📌 PUT: อัปเดตสถานะการจองเตียงพิเศษ (เช่น ปรับเป็น status = 1 เมื่อบริการสำเร็จ)
-export async function PUT(request: Request) {
+// ==============================================================
+// DELETE: ยกเลิกการจองเตียง
+// ==============================================================
+export async function DELETE(req: Request) {
   try {
-    const { id, status } = await request.json();
+    const url = new URL(req.url);
+    const id = url.searchParams.get("id");
+    if (!id) return NextResponse.json({ success: false, error: "Missing ID" }, { status: 400 });
+
+    await pool.execute("DELETE FROM special_bed_bookings WHERE id = ?", [id]);
+    
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("DELETE special_bed_bookings error:", error);
+    return NextResponse.json({ success: false, error: "ลบข้อมูลไม่สำเร็จ" }, { status: 500 });
+  }
+}
+
+// ==============================================================
+// PUT: อัปเดตสถานะบริการสำเร็จ (status = 1) (หากมีการเรียกใช้)
+// ==============================================================
+export async function PUT(req: Request) {
+  try {
+    const body = await req.json();
+    const { id, status } = body;
 
     if (!id || status === undefined) {
-      return NextResponse.json(
-        { success: false, error: "กรุณาระบุ ID และสถานะที่ต้องการอัปเดต" },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, error: "Missing required fields" }, { status: 400 });
     }
 
-    const conn = await pool.getConnection();
-
-    try {
-      await conn.query(
-        "UPDATE special_bed_bookings SET status = ? WHERE id = ?",
-        [status, id]
-      );
-
-      return NextResponse.json({
-        success: true,
-        message: "อัปเดตสถานะการจองเตียงพิเศษสำเร็จ",
-      });
-    } finally {
-      conn.release();
-    }
-  } catch (error: any) {
-    console.error("PUT /api/beds-special-bookings error:", error);
-    return NextResponse.json(
-      { success: false, error: "เกิดข้อผิดพลาดในการอัปเดตสถานะการจองเตียงพิเศษ" },
-      { status: 500 }
+    await pool.execute(
+      `UPDATE special_bed_bookings SET status = ? WHERE id = ?`,
+      [status, id]
     );
-  }
-}
 
-// 📌 DELETE: ยกเลิกการจองเตียงพิเศษ
-export async function DELETE(request: Request) {
-  try {
-    const url = new URL(request.url);
-    const id = url.searchParams.get("id");
-
-    if (!id) {
-      return NextResponse.json(
-        { success: false, error: "กรุณาระบุ ID รายการจองเตียงพิเศษที่ต้องการยกเลิก" },
-        { status: 400 }
-      );
-    }
-
-    const conn = await pool.getConnection();
-
-    try {
-      await conn.query("DELETE FROM special_bed_bookings WHERE id = ?", [id]);
-      return NextResponse.json({
-        success: true,
-        message: "ยกเลิกการจองเตียงพิเศษเรียบร้อยแล้ว",
-      });
-    } finally {
-      conn.release();
-    }
-  } catch (error: any) {
-    console.error("DELETE /api/beds-special-bookings error:", error);
-    return NextResponse.json(
-      { success: false, error: "เกิดข้อผิดพลาดในการยกเลิกการจองเตียงพิเศษ" },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("PUT special_bed_bookings error:", error);
+    return NextResponse.json({ success: false, error: "อัปเดตข้อมูลไม่สำเร็จ" }, { status: 500 });
   }
 }

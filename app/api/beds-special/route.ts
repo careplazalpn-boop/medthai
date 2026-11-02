@@ -6,7 +6,7 @@ export async function GET() {
   try {
     const conn = await pool.getConnection();
     const [rows] = await conn.query(
-      "SELECT id, bed_code, bed_name, room_name, status FROM special_beds ORDER BY id ASC"
+      "SELECT id, bed_code, bed_name, room_name, bed_type, status FROM special_beds ORDER BY id ASC"
     );
     conn.release();
 

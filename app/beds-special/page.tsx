@@ -5,9 +5,7 @@ import {
   BedDouble,
   Calendar,
   Clock,
-  UserCheck,
   CheckCircle2,
-  XCircle,
   AlertCircle,
   Plus,
   Search,
@@ -19,7 +17,9 @@ import {
   Loader2,
   ShieldAlert,
   Info,
-  FileCheck
+  FileCheck,
+  ChevronLeft, // 🌟 สำหรับปุ่ม Pagination
+  ChevronRight
 } from "lucide-react";
 import * as Dialog from "@radix-ui/react-dialog";
 import HamburgerMenu from "@/app/components/HamburgerMenu";
@@ -50,7 +50,6 @@ interface AuthContextType {
   logout: () => void;
 }
 
-// === Context รับค่าผู้ใช้งานจริง ===
 let AuthContext: any;
 try {
   AuthContext = require("@/context/AuthContext").AuthContext;
@@ -61,14 +60,14 @@ try {
   });
 }
 
-// === Interface ข้อมูล ===
 interface SpecialBed {
   id: number;
   room_name: string;
   bed_code: string;
   bed_name: string;
   description?: string;
-  status: number; // 0 = เปิดใช้งาน, 1 = ปิดซ่อม
+  bed_type?: string; 
+  status: number; 
 }
 
 interface BookingRecord {
@@ -81,6 +80,7 @@ interface BookingRecord {
   time_slot: string;
   date: string;
   status: string;
+  sex?: string | number; 
 }
 
 interface SpecialBedBooking {
@@ -100,10 +100,15 @@ interface SpecialBedBooking {
   therapist: string;
   provider: string;
   booking_status: string;
-  status?: number; // 0 = จอง, 1 = เสร็จสิ้น
+  status?: number; 
 }
 
-const normalizeSlot = (slotStr: string) => (slotStr || "").replace(/\s+/g, "");
+const normalizeSlot = (slotStr: string) => {
+  if (!slotStr) return "";
+  let s = slotStr.replace(/\s+/g, "").replace(/–/g, "-");
+  s = s.replace(/(^|-)0+(\d)/g, "$1$2"); 
+  return s;
+};
 
 const getTodayLocalDateStr = () => {
   const d = new Date();
@@ -142,6 +147,18 @@ const isDatePassed = (dateStr: string | Date | undefined | null) => {
   const bookingDate = formatToLocalDateStr(dateStr);
   const today = getTodayLocalDateStr();
   return bookingDate < today;
+};
+
+const isGenderMismatch = (bedType?: string, patientSex?: string | number) => {
+  if (!bedType || !patientSex) return false; 
+  
+  const bType = String(bedType).toUpperCase();
+  const pSex = String(patientSex).trim(); 
+
+  if (bType === 'M' && pSex === '2') return true; 
+  if (bType === 'F' && pSex === '1') return true;
+  
+  return false;
 };
 
 export default function BedsSpecialPage() {
@@ -186,6 +203,13 @@ export default function BedsSpecialPage() {
   const [loading, setLoading] = useState<boolean>(false);
   const [bookingDialogOpen, setBookingDialogOpen] = useState<boolean>(false);
   const [searchTerm, setSearchTerm] = useState<string>(paramHn || paramCid || "");
+  const [hasAttemptedAutoSelect, setHasAttemptedAutoSelect] = useState(false);
+
+  // 🌟 State สำหรับ Pagination (ตารางด้านล่าง)
+  const [page, setPage] = useState<number>(1);
+  const [limit, setLimit] = useState<number>(10);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [totalRecords, setTotalRecords] = useState<number>(0);
 
   useEffect(() => {
     fetchTimeSlots();
@@ -196,21 +220,34 @@ export default function BedsSpecialPage() {
       fetchBeds();
       fetchBedBookings();
     }
-  }, [date, isAuthenticated, user]);
+    // 🌟 เพิ่ม page และ limit เป็น dependency ให้ดึงข้อมูลใหม่เมื่อมีการเปลี่ยนหน้า
+  }, [date, isAuthenticated, user, page, limit]); 
+
+  // ถ้าเปลี่ยนวัน ให้รีเซ็ตหน้าที่ 1 ใหม่เสมอ
+  useEffect(() => {
+    setPage(1);
+  }, [date]);
 
   useEffect(() => {
-    if (availableBookings.length > 0 && searchTerm) {
+    if (availableBookings.length > 0 && searchTerm && !hasAttemptedAutoSelect && !selectedQueue) {
       const autoMatchedQueue = availableBookings.find(
         (q) => 
           normalizeSlot(q.time_slot) === normalizeSlot(selectedSlot) &&
-          (q.hn === searchTerm || q.name.includes(searchTerm))
+          (q.hn === searchTerm || (q.name && q.name.includes(searchTerm)))
       );
 
-      if (autoMatchedQueue && !selectedQueue) {
+      if (autoMatchedQueue) {
+        if (selectedBed && isGenderMismatch(selectedBed.bed_type, autoMatchedQueue.sex)) {
+          alert(`ไม่สามารถจองเตียงนี้ได้!\n\nเตียงที่ท่านเลือก ("${selectedBed.bed_name}") เป็นประเภทที่อนุญาตให้ใช้งานได้เฉพาะบางเพศเท่านั้น ซึ่งไม่ตรงกับเพศของผู้รับบริการ\n\nระบบจะยกเลิกการเลือกคิวอัตโนมัติ กรุณาเลือกเตียงใหม่ให้ตรงกับเพศ`);
+          setHasAttemptedAutoSelect(true); 
+          return;
+        }
+
         setSelectedQueue(autoMatchedQueue);
+        setHasAttemptedAutoSelect(true); 
       }
     }
-  }, [availableBookings, selectedSlot, searchTerm, selectedQueue]);
+  }, [availableBookings, selectedSlot, searchTerm, selectedQueue, selectedBed, hasAttemptedAutoSelect]);
 
   const fetchTimeSlots = async () => {
     try {
@@ -248,7 +285,10 @@ export default function BedsSpecialPage() {
       const queryParams = new URLSearchParams({
         date: date,
         role_id: roleId,
-        is_admin: isUserAdmin ? "true" : "false"
+        is_admin: isUserAdmin ? "true" : "false",
+        user_name: user?.name || "",
+        page: page.toString(),    // 🌟 ส่ง page
+        limit: limit.toString()   // 🌟 ส่ง limit
       });
 
       const res = await fetch(`/api/beds-special-bookings?${queryParams.toString()}`);
@@ -256,6 +296,12 @@ export default function BedsSpecialPage() {
       if (data?.success) {
         setBedBookings(data.bedBookings || []);
         setAvailableBookings(data.availableBookings || []);
+        
+        // 🌟 เซ็ตค่า Pagination จาก API
+        if (data.pagination) {
+          setTotalPages(data.pagination.totalPages);
+          setTotalRecords(data.pagination.totalRecords);
+        }
       } else {
         setBedBookings([]);
         setAvailableBookings([]);
@@ -269,6 +315,9 @@ export default function BedsSpecialPage() {
   };
 
   const getBedReservation = (bedId: number, slot: string) => {
+    // เนื่องจากระบบแบ่งหน้า bedBookings อาจจะมาไม่ครบทุกเตียง
+    // 🌟 แนะนำ: สำหรับผังเตียงด้านบน ควรมี API แยกหรือ Query แยกที่ดึงข้อมูลเตียงทั้งวันมาโชว์ 
+    // โดยไม่สนเรื่องการแบ่งหน้า (Pagination) เพื่อให้ผังทำงานได้ 100%
     return bedBookings.find(
       (b) => b.bed_id === bedId && normalizeSlot(b.time_slot) === normalizeSlot(slot) && b.booking_status !== "ยกเลิก"
     );
@@ -295,14 +344,14 @@ export default function BedsSpecialPage() {
 
   const filteredSlotQueues = slotMatchingQueues.filter(
     (q) =>
-      q.name.includes(searchTerm) ||
+      (q.name && q.name.includes(searchTerm)) ||
       (q.hn && q.hn.includes(searchTerm)) ||
-      q.therapist.includes(searchTerm)
+      (q.therapist && q.therapist.includes(searchTerm))
   );
 
   const handleOpenBookingModal = (bed: SpecialBed) => {
     if (isPastDate) {
-      alert("ไม่อนุญาตให้ทำการจองเตียงพิเศษย้อนหลังได้\n\n(คุณสามารถเลือกดูประวัติการจองย้อนหลังได้เท่านั้น)");
+      alert("ไม่อนุญาตให้ทำการจองเตียงพิเศษย้อนหลังได้");
       return;
     }
 
@@ -310,17 +359,21 @@ export default function BedsSpecialPage() {
     setNote("");
 
     if (slotMatchingQueues.length === 0) {
-      alert(
-        `ไม่พบคนไข้ของคุณในตาราง Bookings สำหรับช่วงเวลา ${selectedSlot}\n\nหมายเหตุ: คุณสามารถเลือกเตียงได้เฉพาะคิวคนไข้ที่คุณเป็นผู้ดูแลเท่านั้น`
-      );
+      alert(`ไม่พบคนไข้ในตาราง Bookings สำหรับช่วงเวลา ${selectedSlot}\n\nสาเหตุที่เป็นไปได้:\n1. คุณไม่ได้เป็นผู้จองคิวนี้ หรือไม่ใช่หมอนวดในคิว\n2. คิวนี้ถูกลงเตียงไปแล้ว\n3. คิวถูกยกเลิกไปแล้ว`);
       return;
     }
 
-    if (!selectedQueue) {
-      if (filteredSlotQueues.length === 1) {
-        setSelectedQueue(filteredSlotQueues[0]);
-      } else if (slotMatchingQueues.length === 1 && !searchTerm) {
-        setSelectedQueue(slotMatchingQueues[0]);
+    if (selectedQueue && isGenderMismatch(bed.bed_type, selectedQueue.sex)) {
+      alert(`ไม่สามารถใช้เตียง "${bed.bed_name}" ได้!\n\nเพศของผู้รับบริการที่คุณเลือกรอไว้ (HN: ${selectedQueue.hn || '-'}) ไม่ตรงกับประเภทของเตียงนี้\n\nระบบจะทำการยกเลิกการเลือกคิวดังกล่าว กรุณาเลือกคิวใหม่ หรือเลือกเตียงใหม่ให้เหมาะสม`);
+      setSelectedQueue(null);
+    } else if (!selectedQueue) {
+      const validFiltered = filteredSlotQueues.filter(q => !isGenderMismatch(bed.bed_type, q.sex));
+      const validSlots = slotMatchingQueues.filter(q => !isGenderMismatch(bed.bed_type, q.sex));
+
+      if (validFiltered.length === 1) {
+        setSelectedQueue(validFiltered[0]);
+      } else if (validSlots.length === 1 && !searchTerm) {
+        setSelectedQueue(validSlots[0]);
       } else {
         setSelectedQueue(null);
       }
@@ -336,7 +389,12 @@ export default function BedsSpecialPage() {
     }
 
     if (!selectedBed || !selectedQueue) {
-      alert("กรุณาเลือกคิวจองคนไข้ที่ต้องการลงเตียงพิเศษ");
+      alert("กรุณาเลือกคิวจองคนไข้ที่ต้องการลงเตียงพิเศษก่อนกดยืนยัน");
+      return;
+    }
+
+    if (isGenderMismatch(selectedBed.bed_type, selectedQueue.sex)) {
+      alert("ไม่สามารถบันทึกได้ เนื่องจากประเภทเตียงไม่ตรงกับเพศของผู้รับบริการ");
       return;
     }
 
@@ -396,12 +454,6 @@ export default function BedsSpecialPage() {
     }
   };
 
-  const roomsGrouped = specialBeds.reduce((acc, bed) => {
-    if (!acc[bed.room_name]) acc[bed.room_name] = [];
-    acc[bed.room_name].push(bed);
-    return acc;
-  }, {} as Record<string, SpecialBed[]>);
-
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
@@ -426,7 +478,22 @@ export default function BedsSpecialPage() {
 
   return (
     <div className="min-h-screen bg-white text-slate-950 pb-16" style={{ backgroundColor: '#ffffff', color: '#020617' }}>
-      <div className="max-w-6xl mx-auto p-4 sm:p-6 pt-28 sm:pt-36">        
+      {loading && (
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-xs flex items-center justify-center z-[1000]">
+          <Loader2 className="w-12 h-12 text-emerald-600 animate-spin" />
+        </div>
+      )}
+
+      <HamburgerMenu
+        rightSlot={
+          <span className="text-slate-100 text-xs sm:text-sm font-bold hidden sm:inline">
+            ผู้ลงบันทึก: <strong className="text-emerald-400 font-black">{user?.name}</strong>
+          </span>
+        }
+      />
+
+      <div className="max-w-6xl mx-auto p-4 sm:p-6 pt-28 sm:pt-36">
+        
         <div className="text-center mb-8 bg-slate-50 p-6 sm:p-8 rounded-3xl border-2 border-slate-300 shadow-2xs" style={{ backgroundColor: '#f8fafc', borderColor: '#cbd5e1' }}>
           <h1 className="text-2xl sm:text-4xl font-black flex items-center justify-center gap-3 tracking-tight" style={{ color: '#0f172a' }}>
             <BedDouble className="w-7 h-7 sm:w-8 sm:h-8 flex-shrink-0" style={{ color: '#047857' }} />
@@ -466,7 +533,7 @@ export default function BedsSpecialPage() {
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
               {timeSlots.map((slot) => {
-                const isSelected = selectedSlot === slot;
+                const isSelected = normalizeSlot(selectedSlot) === normalizeSlot(slot);
                 const waitingCount = availableBookings.filter(
                   (q) => normalizeSlot(q.time_slot) === normalizeSlot(slot)
                 ).length;
@@ -520,133 +587,165 @@ export default function BedsSpecialPage() {
             </div>
           </div>
 
-          {Object.keys(roomsGrouped).map((roomName) => (
-            <div key={roomName} className="bg-white rounded-3xl shadow-2xs p-6 border-2 border-slate-300" style={{ backgroundColor: '#ffffff', borderColor: '#cbd5e1' }}>
-              <h3 className="text-base font-black mb-4 pb-2 border-b-2 border-slate-200 flex items-center gap-2" style={{ color: '#0f172a', borderColor: '#e2e8f0' }}>
-                <Building2 className="w-4 h-4" style={{ color: '#047857' }} /> {roomName}
-              </h3>
-
+          <div className="bg-white rounded-3xl shadow-2xs p-6 border-2 border-slate-300" style={{ backgroundColor: '#ffffff', borderColor: '#cbd5e1' }}>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                {roomsGrouped[roomName].map((bed) => {
-                  const reservation = getBedReservation(bed.id, selectedSlot);
-                  const isReserved = !!reservation;
-                  
-                  const isCompleted = isReserved && reservation.status === 1;
-                  const isPassed = isReserved && isDatePassed(reservation.date);
-                  const userCanCancel = isReserved && !isPassed && canCancelBooking(reservation);
+                {[...specialBeds]
+                  .sort((a, b) => (a.bed_type || "G").localeCompare(b.bed_type || "G"))
+                  .map((bed) => {
+                    const reservation = getBedReservation(bed.id, selectedSlot);
+                    const isReserved = !!reservation;
+                    const isPassed = isReserved && isDatePassed(reservation.date);
+                    const userCanCancel = isReserved && !isPassed && canCancelBooking(reservation);
 
-                  return (
-                    <div
-                      key={bed.id}
-                      className="border-2 rounded-3xl p-4 transition duration-200 relative overflow-hidden flex flex-col justify-between"
-                      style={{
-                        backgroundColor: isReserved ? (isCompleted ? '#f0fdfa' : '#fff1f2') : '#ecfdf5',
-                        borderColor: isReserved ? (isCompleted ? '#2dd4bf' : '#f43f5e') : '#34d399',
-                        color: '#0f172a'
-                      }}
-                    >
-                      <div>
-                        <div className="flex justify-between items-start mb-1">
-                          <span className="font-black text-base" style={{ color: '#0f172a' }}>{bed.bed_name}</span>
-                          <span
-                            className="text-[10px] px-2.5 py-0.5 rounded-full font-black border-2"
-                            style={{
-                              backgroundColor: isReserved ? (isCompleted ? '#ccfbf1' : '#ffe4e6') : '#d1fae5',
-                              color: isReserved ? (isCompleted ? '#115e59' : '#9f1239') : '#065f46',
-                              borderColor: isReserved ? (isCompleted ? '#2dd4bf' : '#f43f5e') : '#34d399'
-                            }}
-                          >
-                            {isReserved ? (isCompleted ? "เสร็จสิ้น" : "ไม่ว่าง") : "เตียงว่าง"}
-                          </span>
+                    let typeColor = { 
+                      bg: "#f8fafc", border: "#cbd5e1", text: "#334155", label: "ทั่วไป/รวม", badgeBg: "#e2e8f0", badgeText: "#475569", 
+                      btnClass: "bg-slate-600 border-slate-700 hover:bg-slate-700" 
+                    }; 
+                    const bType = bed.bed_type?.toUpperCase();
+
+                    if (bType === "M") {
+                      typeColor = { bg: "#eff6ff", border: "#bfdbfe", text: "#1e3a8a", label: "เตียงผู้ชาย", badgeBg: "#dbeafe", badgeText: "#1d4ed8", btnClass: "bg-blue-600 border-blue-700 hover:bg-blue-700" };
+                    } else if (bType === "F") {
+                      typeColor = { bg: "#fdf2f8", border: "#fbcfe8", text: "#831843", label: "เตียงผู้หญิง", badgeBg: "#fce7f3", badgeText: "#be185d", btnClass: "bg-pink-600 border-pink-700 hover:bg-pink-700" };
+                    } else if (bType === "D") {
+                      typeColor = { bg: "#ecfdf5", border: "#a7f3d0", text: "#064e3b", label: "เตียงผู้พิการ", badgeBg: "#d1fae5", badgeText: "#047857", btnClass: "bg-emerald-600 border-emerald-700 hover:bg-emerald-700" };
+                    } else if (bType === "G") {
+                      typeColor = { bg: "#fff7ed", border: "#fed7aa", text: "#7c2d12", label: "เตียงทั่วไป", badgeBg: "#ffedd5", badgeText: "#c2410c", btnClass: "bg-orange-500 border-orange-600 hover:bg-orange-600" };
+                    }
+
+                    const cardBg = typeColor.bg;
+                    const cardBorder = typeColor.border;
+                    const cardTextColor = typeColor.text;
+
+                    return (
+                      <div
+                        key={bed.id}
+                        className="border-2 rounded-3xl p-4 transition duration-200 relative overflow-hidden flex flex-col justify-between"
+                        style={{
+                          backgroundColor: cardBg,
+                          borderColor: cardBorder,
+                          color: cardTextColor
+                        }}
+                      >
+                        <div>
+                          <div className="absolute top-0 right-0 px-2 py-1 rounded-bl-xl font-bold text-[10px] shadow-sm" style={{ backgroundColor: typeColor.badgeBg, color: typeColor.badgeText }}>
+                            {typeColor.label}
+                          </div>
+
+                          <div className="flex justify-between items-start mb-1 mt-3">
+                            <span className="font-black text-base" style={{ color: cardTextColor }}>{bed.bed_name}</span>
+                          </div>
+                          
+                          <div className="flex justify-between items-center mb-3">
+                             <p className="text-[11px] font-black opacity-80">{bed.bed_code}</p>
+                             <span
+                                className="text-[10px] px-2.5 py-0.5 rounded-full font-black border-2"
+                                style={{
+                                  backgroundColor: isReserved ? '#fff1f2' : '#ecfdf5',
+                                  color: isReserved ? '#e11d48' : '#059669',
+                                  borderColor: isReserved ? '#fda4af' : '#6ee7b7'
+                                }}
+                              >
+                                {isReserved ? "ไม่ว่าง" : "ว่าง"}
+                              </span>
+                          </div>
+                          
+                          {isReserved ? (
+                            <div className="bg-white/80 p-3 rounded-2xl border-2 space-y-1.5 text-xs mb-3 shadow-xs" style={{ borderColor: isPassed ? '#cbd5e1' : '#fca5a5' }}>
+                              <p className="font-black truncate" style={{ color: '#e11d48' }}>
+                                คนไข้: {reservation.patient_name}
+                              </p>
+                              <p className="text-[11px] font-black text-slate-900">
+                                HN: <span className="font-black text-slate-900">{reservation.hn || "-"}</span>
+                              </p>
+                              <p className="text-[11px] font-black text-slate-900">
+                                ผู้ให้บริการ: <span className="font-black text-emerald-700">{reservation.therapist}</span>
+                              </p>
+                              {reservation.note && (
+                                <p className="text-[10px] italic border-t border-slate-200 pt-1.5 mt-1 font-bold text-slate-700">
+                                  หมายเหตุ: {reservation.note}
+                                </p>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="mb-4">
+                              <p className="text-[11px] font-bold opacity-80">
+                                <Building2 className="w-3 h-3 inline mr-1"/>{bed.room_name}
+                              </p>
+                              <p className="text-xs mt-1 italic font-bold">
+                                {bed.description || "พร้อมให้บริการ"}
+                              </p>
+                            </div>
+                          )}
                         </div>
-                        <p className="text-[11px] font-black mb-3" style={{ color: '#475569' }}>{bed.bed_code}</p>
 
                         {isReserved ? (
-                          <div className="bg-white p-3 rounded-2xl border-2 space-y-1.5 text-xs mb-3 shadow-2xs" style={{ backgroundColor: '#ffffff', borderColor: isCompleted ? '#99f6e4' : '#fca5a5' }}>
-                            <p className="font-black truncate" style={{ color: isCompleted ? '#115e59' : '#9f1239' }}>
-                              คนไข้: {reservation.patient_name}
-                            </p>
-                            <p className="text-[11px] font-black" style={{ color: '#0f172a' }}>
-                              HN: <span className="font-black" style={{ color: '#0f172a' }}>{reservation.hn || "-"}</span>
-                            </p>
-                            <p className="text-[11px] font-black" style={{ color: '#0f172a' }}>
-                              ผู้ให้บริการ: <span className="font-black" style={{ color: '#047857' }}>{reservation.therapist}</span>
-                            </p>
-                            {reservation.note && (
-                              <p className="text-[10px] italic border-t-2 pt-1.5 mt-1 font-bold" style={{ color: '#334155', borderColor: '#f1f5f9' }}>
-                                หมายเหตุ: {reservation.note}
-                              </p>
-                            )}
-                            <p className="text-[10px] pt-1 font-extrabold" style={{ color: '#0f172a' }}>
-                              สถานะ:{" "}
-                              <span className="font-black" style={{ color: isCompleted ? '#0f172a' : '#b45309' }}>
-                                {isCompleted ? "สำเร็จ (เสร็จสิ้น)" : "จองแล้ว"}
-                              </span>
-                            </p>
-                          </div>
+                            <div className="space-y-1.5 w-full">
+                              {userCanCancel ? (
+                                <button
+                                  onClick={() => handleCancelBedBooking(reservation)}
+                                  className="w-full py-2 font-black text-xs rounded-2xl border-2 transition flex items-center justify-center gap-1 cursor-pointer shadow-xs bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" /> ยกเลิกจองเตียงนี้
+                                </button>
+                              ) : (
+                                  <div className="w-full py-2 font-black text-[11px] rounded-2xl text-center border-2 bg-slate-50 text-slate-500 border-slate-200">
+                                    (จองโดยผู้อื่น)
+                                  </div>
+                              )}
+                            </div>
+                        ) : isPastDate ? (
+                          <button
+                            disabled
+                            className="w-full py-2 font-black text-xs rounded-2xl text-center cursor-not-allowed border-2 bg-slate-100 text-slate-500 border-slate-200"
+                          >
+                            ไม่อนุญาตให้จองย้อนหลัง
+                          </button>
                         ) : (
-                          <p className="text-xs mb-4 italic font-bold" style={{ color: '#334155' }}>
-                            {bed.description || "เตียงพร้อมให้บริการ"}
-                          </p>
+                          <button
+                            onClick={() => handleOpenBookingModal(bed)}
+                            className={`w-full py-2 font-black text-xs rounded-2xl transition flex items-center justify-center gap-1 border-2 shadow-xs cursor-pointer ${
+                              slotMatchingQueues.length > 0 
+                                ? `${typeColor.btnClass} text-white` 
+                                : "bg-slate-100 text-slate-500 border-slate-300 hover:bg-slate-200"
+                            }`}
+                          >
+                            <Plus className="w-4 h-4" /> เลือกจองเตียงนี้
+                          </button>
                         )}
                       </div>
-
-                      {isReserved ? (
-                        isCompleted ? (
-                          <div className="w-full py-2 font-black text-[11px] rounded-2xl text-center border-2" style={{ backgroundColor: '#ccfbf1', color: '#0f172a', borderColor: '#5eead4' }}>
-                            ✓ ให้บริการเสร็จสิ้น
-                          </div>
-                        ) : (
-                          <div className="space-y-1.5 w-full">
-                            {userCanCancel ? (
-                              <button
-                                onClick={() => handleCancelBedBooking(reservation)}
-                                className="w-full py-2 font-black text-xs rounded-2xl border-2 transition flex items-center justify-center gap-1 cursor-pointer shadow-2xs"
-                                style={{ backgroundColor: '#ffe4e6', color: '#9f1239', borderColor: '#fb7185' }}
-                              >
-                                <Trash2 className="w-3.5 h-3.5" style={{ color: '#9f1239' }} /> ยกเลิกการจองเตียงนี้
-                              </button>
-                            ) : (
-                              <div className="w-full py-2 font-black text-[11px] rounded-2xl text-center border-2" style={{ backgroundColor: '#f1f5f9', color: '#64748b', borderColor: '#cbd5e1' }}>
-                                (จองโดยผู้อื่น)
-                              </div>
-                            )}
-                          </div>
-                        )
-                      ) : isPastDate ? (
-                        <button
-                          disabled
-                          className="w-full py-2 font-black text-xs rounded-2xl text-center cursor-not-allowed border-2"
-                          style={{ backgroundColor: '#e2e8f0', color: '#64748b', borderColor: '#cbd5e1' }}
-                        >
-                          ไม่อนุญาตให้จองย้อนหลัง
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handleOpenBookingModal(bed)}
-                          className="w-full py-2 font-black text-xs rounded-2xl transition flex items-center justify-center gap-1 border-2 shadow-2xs cursor-pointer"
-                          style={{
-                            backgroundColor: slotMatchingQueues.length > 0 ? '#047857' : '#f1f5f9',
-                            color: slotMatchingQueues.length > 0 ? '#ffffff' : '#334155',
-                            borderColor: slotMatchingQueues.length > 0 ? '#065f46' : '#cbd5e1'
-                          }}
-                        >
-                          <Plus className="w-4 h-4" /> เลือกจองเตียงนี้
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
+                    );
+                  })}
               </div>
-            </div>
-          ))}
+          </div>
         </div>
 
         <div className="bg-white rounded-3xl shadow-xs p-6 border-2 border-slate-300" style={{ backgroundColor: '#ffffff', borderColor: '#cbd5e1' }}>
-          <h2 className="text-lg font-black mb-4 flex items-center gap-2 border-b-2 border-slate-200 pb-3" style={{ color: '#0f172a', borderColor: '#e2e8f0' }}>
-            <ClipboardList className="w-5 h-5" style={{ color: '#047857' }} />
-            ตารางเตียงพิเศษที่มีการจองประจำวันที่ {date}
-          </h2>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4 border-b-2 border-slate-200 pb-3" style={{ borderColor: '#e2e8f0' }}>
+            <h2 className="text-lg font-black flex items-center gap-2" style={{ color: '#0f172a' }}>
+              <ClipboardList className="w-5 h-5" style={{ color: '#047857' }} />
+              ตารางเตียงพิเศษที่มีการจองประจำวันที่ {date}
+            </h2>
+            
+            {/* 🌟 2. ตัวควบคุมจำนวนรายการต่อหน้า (Limit) */}
+            <div className="flex items-center gap-2 text-sm font-bold text-slate-700">
+              <span>แสดง:</span>
+              <select
+                value={limit}
+                onChange={(e) => {
+                  setLimit(Number(e.target.value));
+                  setPage(1); // เปลี่ยนจำนวนแสดง ต้องกลับไปหน้าแรกเสมอ
+                }}
+                className="border-2 border-slate-300 rounded-xl px-2 py-1 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              >
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={30}>30</option>
+                <option value={50}>50</option>
+              </select>
+              <span>รายการ</span>
+            </div>
+          </div>
 
           <div className="overflow-x-auto rounded-2xl border-2 border-slate-300" style={{ borderColor: '#cbd5e1' }}>
             <table className="min-w-full divide-y-2 divide-slate-200 text-sm">
@@ -662,62 +761,64 @@ export default function BedsSpecialPage() {
                 </tr>
               </thead>
               <tbody className="divide-y-2 divide-slate-100 bg-white" style={{ backgroundColor: '#ffffff' }}>
-                {bedBookings.map((b) => {
-                  const isCompleted = b.status === 1;
-                  const isPassed = isDatePassed(b.date);
-                  const userCanCancel = !isPassed && canCancelBooking(b);
+                {/* 🌟 3. ฝั่ง Frontend กรองเรียงลำดับอีกรอบเพื่อความชัวร์ หรือรับมาจาก Backend ก็ได้ */}
+                {[...bedBookings]
+                  .sort((a, b) => a.bed_name.localeCompare(b.bed_name))
+                  .map((b) => {
+                    const isCompleted = b.status === 1;
+                    const isPassed = isDatePassed(b.date);
+                    const userCanCancel = !isPassed && canCancelBooking(b);
 
-                  return (
-                    <tr key={b.special_booking_id} className="hover:bg-slate-50 transition">
-                      <td className="px-4 py-3.5 font-black" style={{ color: '#047857' }}>{b.time_slot}</td>
-                      <td className="px-4 py-3.5 font-black" style={{ color: '#0f172a' }}>
-                        {b.bed_name}
-                        <span className="block text-xs font-bold" style={{ color: '#475569' }}>{b.room_name}</span>
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <span className="font-black" style={{ color: '#0f172a' }}>{b.patient_name}</span>
-                        {b.hn && <span className="text-xs font-extrabold block" style={{ color: '#334155' }}>HN: {b.hn}</span>}
-                      </td>
-                      <td className="px-4 py-3.5 font-black" style={{ color: '#0f172a' }}>{b.patient_phone || "-"}</td>
-                      <td className="px-4 py-3.5 font-black" style={{ color: '#047857' }}>{b.therapist || b.provider}</td>
-                      <td className="px-4 py-3.5 text-xs font-bold" style={{ color: '#0f172a' }}>
-                        <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black mr-1.5 border-2"
-                          style={{
-                            backgroundColor: isCompleted ? '#ccfbf1' : '#fef3c7',
-                            color: isCompleted ? '#115e59' : '#78350f',
-                            borderColor: isCompleted ? '#2dd4bf' : '#f59e0b'
-                          }}
-                        >
-                          {isCompleted ? "สำเร็จ" : "จองแล้ว"}
-                        </span>
-                        {b.note || "-"}
-                      </td>
-                      <td className="px-4 py-3.5 text-center">
-                        {isCompleted ? (
-                          <span className="text-xs font-black flex items-center justify-center gap-1" style={{ color: '#0f172a' }}>
-                            <CheckCircle2 className="w-4 h-4 text-teal-600 inline" /> เสร็จสิ้นแล้ว
+                    return (
+                      <tr key={b.special_booking_id} className="hover:bg-slate-50 transition">
+                        <td className="px-4 py-3.5 font-black" style={{ color: '#047857' }}>{b.time_slot}</td>
+                        <td className="px-4 py-3.5 font-black" style={{ color: '#0f172a' }}>
+                          {b.bed_name}
+                          <span className="block text-xs font-bold" style={{ color: '#475569' }}>{b.room_name}</span>
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <span className="font-black" style={{ color: '#0f172a' }}>{b.patient_name}</span>
+                          {b.hn && <span className="text-xs font-extrabold block" style={{ color: '#334155' }}>HN: {b.hn}</span>}
+                        </td>
+                        <td className="px-4 py-3.5 font-black" style={{ color: '#0f172a' }}>{b.patient_phone || "-"}</td>
+                        <td className="px-4 py-3.5 font-black" style={{ color: '#047857' }}>{b.therapist || b.provider}</td>
+                        <td className="px-4 py-3.5 text-xs font-bold" style={{ color: '#0f172a' }}>
+                          <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black mr-1.5 border-2"
+                            style={{
+                              backgroundColor: isCompleted ? '#ccfbf1' : '#fef3c7',
+                              color: isCompleted ? '#115e59' : '#78350f',
+                              borderColor: isCompleted ? '#2dd4bf' : '#f59e0b'
+                            }}
+                          >
+                            {isCompleted ? "สำเร็จ" : "จองแล้ว"}
                           </span>
-                        ) : (
-                          <div className="flex items-center justify-center gap-2">
-                            {userCanCancel && (
-                              <button
-                                onClick={() => handleCancelBedBooking(b)}
-                                className="p-1.5 rounded-xl transition cursor-pointer border-2"
-                                style={{ backgroundColor: '#ffe4e6', color: '#9f1239', borderColor: '#f43f5e' }}
-                                title="ยกเลิกการจองเตียงพิเศษ"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            )}
-
-                            {!userCanCancel && (
-                              <span className="text-xs italic font-bold" style={{ color: '#64748b' }}>ไม่มีสิทธิ์</span>
-                            )}
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  );
+                          {b.note || "-"}
+                        </td>
+                        <td className="px-4 py-3.5 text-center">
+                          {isCompleted ? (
+                            <span className="text-xs font-black flex items-center justify-center gap-1" style={{ color: '#0f172a' }}>
+                              <CheckCircle2 className="w-4 h-4 text-teal-600 inline" /> เสร็จสิ้นแล้ว
+                            </span>
+                          ) : (
+                            <div className="flex items-center justify-center gap-2">
+                              {userCanCancel && (
+                                <button
+                                  onClick={() => handleCancelBedBooking(b)}
+                                  className="p-1.5 rounded-xl transition cursor-pointer border-2"
+                                  style={{ backgroundColor: '#ffe4e6', color: '#9f1239', borderColor: '#f43f5e' }}
+                                  title="ยกเลิกการจองเตียงพิเศษ"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
+                              {!userCanCancel && (
+                                <span className="text-xs italic font-bold" style={{ color: '#64748b' }}>ไม่มีสิทธิ์</span>
+                              )}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
                 })}
                 {bedBookings.length === 0 && (
                   <tr>
@@ -729,6 +830,35 @@ export default function BedsSpecialPage() {
               </tbody>
             </table>
           </div>
+          
+          {/* 🌟 4. ปุ่มเปลี่ยนหน้า (Pagination Controls) */}
+          {bedBookings.length > 0 && (
+            <div className="flex justify-between items-center mt-4">
+              <div className="text-sm font-bold text-slate-600">
+                รายการทั้งหมด <span className="text-emerald-700">{totalRecords}</span> รายการ
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page <= 1}
+                  className="px-3 py-1.5 rounded-xl border-2 border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-1 text-slate-700 font-bold text-sm"
+                >
+                  <ChevronLeft className="w-4 h-4" /> ก่อนหน้า
+                </button>
+                <span className="text-sm font-bold text-slate-700 px-2">
+                  หน้าที่ {page} / {totalPages}
+                </span>
+                <button
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page >= totalPages}
+                  className="px-3 py-1.5 rounded-xl border-2 border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-1 text-slate-700 font-bold text-sm"
+                >
+                  ถัดไป <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+
         </div>
       </div>
 
@@ -770,47 +900,74 @@ export default function BedsSpecialPage() {
             </div>
 
             <div className="flex-1 overflow-y-auto space-y-2 pr-1 my-2 max-h-60">
-              {filteredSlotQueues.map((q) => {
-                const isSelected = selectedQueue?.booking_id === q.booking_id;
-                return (
-                  <div
-                    key={q.booking_id}
-                    onClick={() => setSelectedQueue(q)}
-                    className="p-3.5 border-2 rounded-2xl cursor-pointer transition flex justify-between items-center"
-                    style={{
-                      backgroundColor: isSelected ? '#d1fae5' : '#f8fafc',
-                      borderColor: isSelected ? '#059669' : '#cbd5e1',
-                      color: '#0f172a'
-                    }}
-                  >
-                    <div>
-                      <p className="font-black text-sm flex items-center gap-2" style={{ color: '#0f172a' }}>
-                        {q.name}
-                        {q.hn && (
-                          <span className="text-xs font-black px-1.5 py-0.5 rounded-md" style={{ backgroundColor: '#e2e8f0', color: '#0f172a' }}>
-                            HN: {q.hn}
-                          </span>
+              {filteredSlotQueues.length === 0 ? (
+                <div className="text-center p-6 border-2 border-dashed border-slate-300 rounded-2xl text-slate-500 mt-4">
+                  <Search className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                  <p className="font-bold text-sm">ไม่พบรายชื่อคนไข้ที่ค้นหา</p>
+                  <p className="text-xs mt-1">ลองลบคำค้นหา (HN/ชื่อ) ออกเพื่อดูรายชื่อทั้งหมดในเวลานี้</p>
+                </div>
+              ) : (
+                filteredSlotQueues.map((q) => {
+                  const isSelected = selectedQueue?.booking_id === q.booking_id;
+                  const mismatch = isGenderMismatch(selectedBed?.bed_type, q.sex);
+
+                  return (
+                    <div
+                      key={q.booking_id}
+                      onClick={(e) => {
+                        if (mismatch) {
+                           e.preventDefault(); 
+                           alert("ไม่สามารถเลือกได้ เนื่องจากประเภทเตียงไม่ตรงกับเพศของผู้รับบริการ");
+                           return;
+                        }
+                        setSelectedQueue(q);
+                      }}
+                      className={`p-3.5 border-2 rounded-2xl transition flex justify-between items-center ${
+                        mismatch 
+                          ? "opacity-50 bg-slate-100 border-slate-300 cursor-not-allowed pointer-events-none grayscale" 
+                          : isSelected 
+                            ? "bg-[#d1fae5] border-[#059669] text-[#0f172a]" 
+                            : "bg-[#f8fafc] border-[#cbd5e1] text-[#0f172a] cursor-pointer hover:bg-slate-50"
+                      }`}
+                    >
+                      <div>
+                        <p className="font-black text-sm flex items-center gap-2" style={{ color: '#0f172a' }}>
+                          {q.name}
+                          {q.hn && (
+                            <span className="text-xs font-black px-1.5 py-0.5 rounded-md" style={{ backgroundColor: '#e2e8f0', color: '#0f172a' }}>
+                              HN: {q.hn}
+                            </span>
+                          )}
+                          {q.sex && (
+                             <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-md ${String(q.sex) === '1' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'}`}>
+                               {String(q.sex) === '1' ? 'ชาย' : 'หญิง'}
+                             </span>
+                          )}
+                        </p>
+                        <p className="text-xs font-black mt-1" style={{ color: '#047857' }}>
+                          ผู้ให้บริการ: {q.therapist || q.provider}
+                        </p>
+                        {q.phone && (
+                          <p className="text-[11px] font-extrabold mt-0.5" style={{ color: '#334155' }}>เบอร์โทร: {q.phone}</p>
                         )}
-                      </p>
-                      <p className="text-xs font-black mt-1" style={{ color: '#047857' }}>
-                        ผู้ให้บริการ: {q.therapist || q.provider}
-                      </p>
-                      {q.phone && (
-                        <p className="text-[11px] font-extrabold mt-0.5" style={{ color: '#334155' }}>เบอร์โทร: {q.phone}</p>
+                      </div>
+                      {mismatch ? (
+                        <span className="px-3 py-1 bg-rose-100 text-rose-700 rounded-xl text-[10px] font-black border border-rose-300 text-center">
+                          ❌ เพศไม่ตรงกับ<br/>ประเภทเตียง
+                        </span>
+                      ) : isSelected ? (
+                        <span className="px-3 py-1 text-white rounded-xl text-xs font-black flex items-center gap-1 shadow-2xs" style={{ backgroundColor: '#047857' }}>
+                          <CheckCircle2 className="w-3.5 h-3.5" /> เลือกคนไข้นี้
+                        </span>
+                      ) : (
+                        <span className="px-3 py-1 rounded-xl text-xs font-black border" style={{ backgroundColor: '#e2e8f0', color: '#0f172a', borderColor: '#cbd5e1' }}>
+                          เลือก
+                        </span>
                       )}
                     </div>
-                    {isSelected ? (
-                      <span className="px-3 py-1 text-white rounded-xl text-xs font-black flex items-center gap-1 shadow-2xs" style={{ backgroundColor: '#047857' }}>
-                        <CheckCircle2 className="w-3.5 h-3.5" /> เลือกคนไข้นี้
-                      </span>
-                    ) : (
-                      <span className="px-3 py-1 rounded-xl text-xs font-black border" style={{ backgroundColor: '#e2e8f0', color: '#0f172a', borderColor: '#cbd5e1' }}>
-                        เลือก
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
 
             <div className="mt-2 pt-2 border-t-2 border-slate-200" style={{ borderColor: '#e2e8f0' }}>
@@ -828,20 +985,15 @@ export default function BedsSpecialPage() {
             <div className="flex justify-end gap-2 pt-4 border-t-2 border-slate-200 mt-3" style={{ borderColor: '#e2e8f0' }}>
               <button
                 onClick={() => setBookingDialogOpen(false)}
-                className="px-4 py-2 rounded-xl text-xs font-black cursor-pointer border"
-                style={{ backgroundColor: '#e2e8f0', color: '#0f172a', borderColor: '#cbd5e1' }}
+                className="px-4 py-2 rounded-xl text-xs font-black cursor-pointer border bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200 transition"
               >
                 ยกเลิก
               </button>
+              
               <button
                 onClick={handleConfirmBedBooking}
-                disabled={!selectedQueue}
-                className="px-5 py-2 text-white rounded-xl text-xs font-black shadow-2xs transition"
-                style={{
-                  backgroundColor: selectedQueue ? '#047857' : '#cbd5e1',
-                  color: selectedQueue ? '#ffffff' : '#64748b',
-                  cursor: selectedQueue ? 'pointer' : 'not-allowed'
-                }}
+                disabled={!selectedQueue} 
+                className="px-5 py-2 rounded-xl text-xs font-black shadow-sm transition disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed disabled:shadow-none bg-emerald-700 text-white hover:bg-emerald-800 cursor-pointer"
               >
                 ยืนยันบันทึกการจองเตียง
               </button>

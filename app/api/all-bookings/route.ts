@@ -91,10 +91,12 @@ export async function GET(req: Request) {
     // ✅ เพิ่ม LEFT JOIN กับ special_bed_bookings / special_beds เพื่อดึงข้อมูลเตียงพิเศษมาแสดงผล + ใช้กรอง
     // (ใช้ LEFT JOIN เพราะความสัมพันธ์เป็น booking : special_bed_booking = 1 : 1 อยู่แล้ว
     //  จึงไม่ทำให้จำนวนแถวของ bookings เปลี่ยนไป เมื่อไม่ได้เปิดใช้ filterSpecialBed)
+    // 🌟 ปรับปรุง: เพิ่ม LEFT JOIN med_user และดึง u.sex ออกมา เพื่อใช้เช็คเพศการจองเตียงหน้าเว็บ
     let query = `
       SELECT
         b.id, b.provider, b.name, b.phone, b.therapist, b.time_slot, b.date, b.status, b.payment_status, b.created_at,
         b.hn,
+        u.sex, 
         (sbb.id IS NOT NULL) AS has_special_bed,
         sb.bed_name AS bed_name,
         -- ✅ เปลี่ยนมาเช็ค HN จากตาราง bookings โดยตรง (เร็วกว่าเดิมมาก
@@ -102,6 +104,7 @@ export async function GET(req: Request) {
         (CASE WHEN b.hn IS NOT NULL AND b.hn <> '' THEN 1 ELSE 0 END) AS has_confirmed_hn,
         (CASE WHEN b.hn IS NULL OR b.hn = '' THEN 1 ELSE 0 END) AS is_new_user_pending
       FROM bookings b
+      LEFT JOIN med_user u ON b.hn = u.hn
       LEFT JOIN special_bed_bookings sbb ON b.id = sbb.booking_id
       LEFT JOIN special_beds sb ON sbb.bed_id = sb.id
       WHERE 1=1

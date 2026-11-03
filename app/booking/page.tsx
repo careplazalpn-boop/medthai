@@ -56,13 +56,13 @@ interface UserInfo {
 interface BookingInfo {
   time_slot: string;
   name: string;
-  hn?: string | null; // ค่า HN ที่บันทึกไว้ตอนจอง (อาจไม่ครบทุกกรณี)
-  is_new_user_pending?: number | boolean; // ตรงกับข้อมูลในตาราง new_user (เบอร์โทร) หรือไม่
-  has_confirmed_hn?: number | boolean; // ตรวจสอบกับตาราง med_user (ตารางหลักที่ sync HN จริง) แล้วว่ามี HN ยืนยันแล้ว
+  hn?: string | null; 
+  is_new_user_pending?: number | boolean; 
+  has_confirmed_hn?: number | boolean; 
   bookedbyrole?: string;
   has_special_bed?: number | boolean;
   bed_name?: string;
-  status?: string; // ✅ ใหม่: สถานะคิวจาก bookings.status (เช่น "สำเร็จ" = ให้บริการเสร็จแล้ว)
+  status?: string; 
 }
 
 interface Therapist {
@@ -172,8 +172,6 @@ export default function BookingPage() {
       );
       setDialogTherapist(matched ? matched.name : "");
     }
-    // ✅ ใช้ user?.role_id แทน user ทั้ง object เพื่อไม่ให้ effect นี้ทำงานซ้ำ
-    // ทุกครั้งที่ user object เปลี่ยน reference (เช่นจาก context re-render) ทั้งที่ role_id ไม่ได้เปลี่ยน
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.role_id, medStaff]);
 
@@ -205,9 +203,6 @@ export default function BookingPage() {
           "16:00-17:30"
         ]);
       });
-    // ✅ ใช้ user?.role / user?.role_id แทน user ทั้ง object — ค่าที่ใช้จริงใน roleQuery
-    // มีแค่ 2 ฟิลด์นี้ การใช้ user ทั้งก้อนเป็น dependency ทำให้ effect (และ fetch)
-    // ทำงานซ้ำโดยไม่จำเป็นทุกครั้งที่ user object เปลี่ยน reference
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.role, user?.role_id]);
 
@@ -248,10 +243,6 @@ export default function BookingPage() {
       setOffTherapists(data?.success ? data.offTherapists || [] : []);
       setDisabledSlots(data?.success ? data.disabledSlotsByTherapist || {} : {});
     });
-    // ✅ ใช้ user?.role / user?.role_id แทน user ทั้ง object — เดิมใช้ [date, user]
-    // ทำให้ทุกครั้งที่ user object เปลี่ยน reference (แม้ role/role_id เดิม) จะยิง
-    // /api/bookings และ /api/off-therapists ซ้ำทั้งที่วันที่ไม่ได้เปลี่ยนเลย
-    // เงื่อนไขการ fetch จริง (roleQuery) ขึ้นกับแค่ 2 ฟิลด์นี้เท่านั้น จึงไม่กระทบผลลัพธ์
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date, user?.role, user?.role_id]);
 
@@ -404,6 +395,7 @@ export default function BookingPage() {
     setSearchResults([]);
   };
 
+  // 🌟 ปรับปรุง 1: ส่ง Role ไปด้วย เพื่อให้ API เช็คสิทธิ์ว่าใครกดปิด (ทั้งวัน)
   const toggleOffTherapist = async (therapist: string) => {
     if (isGuest) {
       alert("โหมดดูอย่างเดียว ไม่สามารถอัปเดตหมอไม่มาได้");
@@ -414,16 +406,22 @@ export default function BookingPage() {
       const res = await fetch("/api/toggle-off-therapist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ therapist, date }),
+        // 🌟 ส่ง Role เข้าไปด้วย (Admin / 909 หรือ user)
+        body: JSON.stringify({ therapist, date, role: user?.role || "user" }),
       });
       const data = await res.json();
       if (data?.success) {
         setOffTherapists(prev => prev.includes(therapist) ? prev.filter(t => t !== therapist) : [...prev, therapist]);
-      } else alert("ไม่สามารถอัปเดตหมอไม่มาได้");
-    } catch { alert("เกิดข้อผิดพลาดในการอัปเดตหมอไม่มา"); }
+      } else {
+        // 🌟 ดัก Alert แจ้งเตือนหากโดนแอดมินล็อค (API ส่ง error กลับมา)
+        alert(data.error || "ไม่สามารถอัปเดตหมอไม่มาได้");
+      }
+    } catch { 
+      alert("เกิดข้อผิดพลาดในการอัปเดตหมอไม่มา"); 
+    }
   };
 
-  // 🌟 ตรวจสอบว่าช่วงเวลานี้มีการจองเตียงพิเศษอยู่หรือไม่ ก่อนอนุญาตให้คลิกเปิด/ปิดช่วงเวลา
+  // 🌟 ปรับปรุง 2: ส่ง Role ไปด้วย เพื่อให้ API เช็คสิทธิ์ว่าใครกดปิด (ราย Slot)
   const toggleSlot = async (therapist: string, slot: string) => {
     if (isGuest) {
       alert("โหมดดูอย่างเดียว ไม่สามารถอัปเดต slot ได้");
@@ -434,13 +432,11 @@ export default function BookingPage() {
     const slotInfo = bookedSlots[therapist]?.find(b => b.time_slot === slot);
     const hasSpecialBed = !!slotInfo?.has_special_bed;
 
-    // ✅ ใหม่: ถ้าคิวในช่วงเวลานี้ให้บริการสำเร็จไปแล้ว ห้ามเปิด/ปิดช่วงเวลา
     if (slotInfo?.status === "สำเร็จ") {
       alert(`ไม่สามารถเปิด/ปิดช่วงเวลา ${slot} ได้!\n\nเนื่องจากการให้บริการ "${slotInfo?.name}" ในช่วงเวลานี้สำเร็จไปแล้ว`);
       return;
     }
 
-    // ถ้ามีการจองเตียงพิเศษอยู่ จะไม่อนุญาตให้ปิดหรือยกเลิกการให้บริการ
     if (hasSpecialBed) {
       const bedName = slotInfo?.bed_name ? ` (${slotInfo.bed_name})` : "";
       alert(`ไม่สามารถยกเลิกการให้บริการในช่วงเวลา ${slot} ได้!\n\nเนื่องจากมีการจองเตียงพิเศษ${bedName} ของคุณ "${slotInfo?.name}" ในช่วงเวลานี้แล้ว`);
@@ -451,7 +447,8 @@ export default function BookingPage() {
       const res = await fetch("/api/toggle-off-therapist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ therapist, date, slot }),
+        // 🌟 ส่ง Role เข้าไปด้วยเพื่อเช็คสิทธิ์บน Backend
+        body: JSON.stringify({ therapist, date, slot, role: user?.role || "user" }),
       });
       const data = await res.json();
       if (data?.success) {
@@ -460,8 +457,13 @@ export default function BookingPage() {
           const updated = current.includes(slot) ? current.filter(s => s !== slot) : [...current, slot];
           return { ...prev, [therapist]: updated };
         });
-      } else alert("ไม่สามารถอัปเดต slot ได้");
-    } catch { alert("เกิดข้อผิดพลาดในการอัปเดต slot"); }
+      } else {
+        // 🌟 ดัก Alert แจ้งเตือน หาก Backend ส่งบอกว่าโดน Admin ล็อคไว้
+        alert(data.error || "ไม่สามารถอัปเดตช่วงเวลาได้");
+      }
+    } catch { 
+      alert("เกิดข้อผิดพลาดในการอัปเดต slot"); 
+    }
   };
 
   const fetchWithLoading = async (url: string, setter: (data: any) => void) => {

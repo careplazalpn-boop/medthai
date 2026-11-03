@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { 
   User, Phone, UserCheck, Clock, CalendarDays, 
-  BedDouble, CheckCircle2, AlertCircle, XCircle, Users, ClipboardList, Search ,ChevronLeft, ChevronRight
+  BedDouble, CheckCircle2, AlertCircle, XCircle, Users, ClipboardList, Search, ChevronLeft, ChevronRight, Trash2
 } from "lucide-react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { AnimatePresence } from "framer-motion";
@@ -32,7 +32,7 @@ interface Booking {
   has_special_bed?: number | boolean;
   bed_name?: string;
   hn?: string | null;
-  sex?: string | number; // 🌟 1. เพิ่มฟิลด์ sex เข้ามาใน Interface Booking เพื่อรองรับค่าจาก API
+  sex?: string | number; 
   has_confirmed_hn?: number | boolean;
   is_new_user_pending?: number | boolean;
   is_own_booking?: number | boolean;
@@ -84,6 +84,9 @@ export default function AllBookingsPage() {
   const [showCancelSuccess, setShowCancelSuccess] = useState(false);
   const [showConfirmSuccess, setShowConfirmSuccess] = useState(false);
   const [showDeleteSuccess, setShowDeleteSuccess] = useState(false);
+  const [showBedCancelSuccess, setShowBedCancelSuccess] = useState(false);
+  const [bedCancelId, setBedCancelId] = useState<number | null>(null);
+  const [bedCancelling, setBedCancelling] = useState(false);
   const [filterName, setFilterName] = useState("");
   const [filterTherapist, setFilterTherapist] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -342,9 +345,8 @@ export default function AllBookingsPage() {
 
   const selectedBooking = bookings.find(b => b.id === selectedId);
 
-  // 🌟 2. ปรับปรุง handleBookingAction เพื่อส่งพารามิเตอร์ทั้งหมดไปยังหน้า Confirm แทน
-  // เนื่องจากฟังก์ชันนี้มีการทำ action "confirm" ซึ่งเราต้องการให้วิ่งไปที่หน้า confirm แทนการแค่ขึ้น Dialog
-  // (ถ้าคุณมี flow ที่จะส่งไปหน้า confirm ผ่านทางอื่น ให้ใช้ตามนั้นได้เลย)
+  // 🌟 ปรับปรุง: การยกเลิก/ยืนยันคิวจอง 
+  // หากกดยกเลิก จะไปเรียก /api/cancel-booking ซึ่งเราปรับปรุง Backend ให้ลบเตียงให้อัตโนมัติแล้ว
   const handleBookingAction = async (action: "confirm"|"cancel") => {
     if (!selectedId) return;
     try {
@@ -359,7 +361,13 @@ export default function AllBookingsPage() {
         setBookings(prev =>
           prev.map(b =>
             b.id === selectedId
-              ? { ...b, status: action==="cancel" ? "ยกเลิก" : data.updatedStatus || "อยู่ในคิว" }
+              ? { 
+                  ...b, 
+                  status: action==="cancel" ? "ยกเลิก" : data.updatedStatus || "อยู่ในคิว",
+                  // 🌟 เคลียร์ข้อมูลเตียงพิเศษออกด้วย ถ้าเป็นการยกเลิก
+                  has_special_bed: action === "cancel" ? false : b.has_special_bed,
+                  bed_name: action === "cancel" ? undefined : b.bed_name
+                }
               : b
           )
         );
@@ -372,6 +380,40 @@ export default function AllBookingsPage() {
       }
     } catch {
       alert(`ไม่สามารถ${action==="cancel"?"ยกเลิก":"ยืนยัน"}การจองได้`);
+    }
+  };
+
+  // ✅ การยกเลิกเตียงอย่างเดียว (คิวหลักยังอยู่)
+  const handleCancelBed = async (b: Booking) => {
+    if (bedCancelling) return;
+    setBedCancelling(true);
+    try {
+      const res = await fetch(`/api/cancel-special-bed?bookingId=${b.id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: (user as any)?.id,
+          role_id: user?.role_id,
+          name: user?.name,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setBookings((prev) =>
+          prev.map((x) =>
+            x.id === b.id ? { ...x, has_special_bed: false, bed_name: undefined } : x
+          )
+        );
+        setBedCancelId(null);
+        setShowBedCancelSuccess(true);
+        setTimeout(() => setShowBedCancelSuccess(false), 3000);
+      } else {
+        alert(data.error || "ยกเลิกการจองเตียงไม่สำเร็จ");
+      }
+    } catch {
+      alert("ไม่สามารถยกเลิกการจองเตียงได้");
+    } finally {
+      setBedCancelling(false);
     }
   };
 
@@ -409,9 +451,7 @@ export default function AllBookingsPage() {
       </h1>
 
       {/* ✅ SUMMARY CARDS (Clickable Filters) */}
-      {/* ✅ SUMMARY CARDS (Clickable Filters) - ดีไซน์กะทัดรัด (Compact Modern Dashboard) */}
       <div className="max-w-6xl mx-auto mb-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-        
         {/* 1. การ์ดทั้งหมด (All) */}
         <div 
           onClick={() => { setFilterStatus("all"); setPage(1); }}
@@ -724,11 +764,23 @@ export default function AllBookingsPage() {
               </div>
               
               {/* ข้อมูล */}
-              <div className="grid grid-cols-1 sm:grid-cols-[200px_211px_130px_200px_120px_120px_120px] gap-y-2 sm:gap-x-6 text-gray-700 flex-grow">
-                {/* ผู้ให้บริการ */}
-                <div className="flex flex-col sm:flex-col gap-1">
-                  <Label icon={<UserCheck className="w-4 h-4" />} text="ผู้จองคิว" />
-                  <span className="font-semibold text-sm text-gray-900">{b.provider}</span>
+              <div className="grid grid-cols-1 sm:grid-cols-[240px_211px_130px_120px_120px_120px] gap-y-2 sm:gap-x-6 text-gray-700 flex-grow">
+                {/* พนักงานนวด (เด่น) + ผู้จองคิว (รอง) รวมอยู่คอลัมน์เดียวกัน */}
+                <div className="flex flex-col gap-1.5">
+                  <Label icon={<UserCheck className="w-4 h-4" />} text="พนักงานนวด" />
+                  <div className="flex items-center gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white shadow-sm">
+                      <UserCheck className="h-5 w-5" />
+                    </span>
+                    <span className="font-black text-base leading-tight text-emerald-900 break-words">
+                      {b.therapist || "-"}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 pl-1 text-xs text-gray-500">
+                    <User className="w-3.5 h-3.5 shrink-0 text-gray-400" />
+                    <span className="font-semibold">ผู้จองคิว:</span>
+                    <span className="font-medium text-gray-700 break-words">{b.provider}</span>
+                  </div>
                 </div>
                 {/* ผู้มารับบริการ */}
                 <div className="flex flex-col sm:flex-col gap-1 relative">
@@ -743,13 +795,40 @@ export default function AllBookingsPage() {
                       </span>
                     )}
                     {Boolean(b.has_special_bed) && (
-                      <span
-                        className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[11px] font-bold rounded bg-emerald-100 text-emerald-800 border border-emerald-300 mt-0.5"
-                        title={b.bed_name ? `เตียงพิเศษ: ${b.bed_name}` : "ใช้เตียงพิเศษ"}
-                      >
-                        <BedDouble className="w-3.5 h-3.5 text-emerald-700" />
-                        <span>เตียงพิเศษ{b.bed_name ? ` (${b.bed_name})` : ""}</span>
-                      </span>
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <span
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[11px] font-bold rounded bg-emerald-100 text-emerald-800 border border-emerald-300"
+                          title={b.bed_name ? `เตียงพิเศษ: ${b.bed_name}` : "ใช้เตียงพิเศษ"}
+                        >
+                          <BedDouble className="w-3.5 h-3.5 text-emerald-700" />
+                          <span>เตียงพิเศษ{b.bed_name ? ` (${b.bed_name})` : ""}</span>
+                        </span>
+                        
+                        {/* 🌟 1. ปุ่มยกเลิกเตียง (Icon เล็กๆ) 🌟 */}
+                        {canManageBooking && !isCompleted && getStatusLabel(b) !== "ยกเลิก" && (
+                          <Dialog.Root
+                            open={bedCancelId === b.id}
+                            onOpenChange={(open) => {
+                              if (bedCancelling) return;
+                              setBedCancelId(open ? b.id : null);
+                            }}
+                          >
+                            <Dialog.Trigger asChild>
+                              <button
+                                title={b.bed_name ? `ยกเลิกการจองเตียงพิเศษ (${b.bed_name})` : "ยกเลิกการจองเตียงพิเศษ"}
+                                className="flex items-center justify-center p-1 bg-rose-100 text-rose-600 rounded-md border border-rose-300 hover:bg-rose-200 transition shadow-sm cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </Dialog.Trigger>
+                            <CancelBedDialog
+                              booking={b}
+                              loading={bedCancelling}
+                              onConfirm={() => handleCancelBed(b)}
+                            />
+                          </Dialog.Root>
+                        )}
+                      </div>
                     )}
                     {isPendingHN && (
                       <>
@@ -837,12 +916,6 @@ export default function AllBookingsPage() {
                   <span className="font-semibold text-sm text-gray-900">{b.phone}</span>
                 </div>
                 
-                {/* หมอนวด */}
-                <div className="flex flex-col sm:flex-col gap-1">
-                  <Label icon={<UserCheck className="w-4 h-4" />} text="พนักงานนวด" />
-                  <span className="font-semibold text-sm text-gray-900">{b.therapist}</span>
-                </div>
-
                 {/* วันที่ + เวลาที่บันทึก */}
                 <div className="flex flex-col sm:flex-col gap-1">
                   <Label icon={<CalendarDays className="w-4 h-4" />} text="วันที่" />
@@ -888,11 +961,9 @@ export default function AllBookingsPage() {
                 </div>
               </div>
 
-              {/* ปุ่ม action */}
-              {/* ปุ่ม action */}
-              <div className="flex gap-2 mt-3 sm:mt-0">
+              {/* กลุ่มปุ่ม Action (จัด Layout ใหม่ให้สวยงาม) */}
+              <div className="flex sm:flex-col gap-2 mt-3 sm:mt-0 justify-center items-end">
                 {getStatusLabel(b) === "ยกเลิก" && !canManageBooking && (
-                  // ✅ ใหม่: ไม่ใช่แอดมิน และไม่ใช่เจ้าของรายการ — แสดงสถานะเฉยๆ กดลบไม่ได้
                   <button
                     disabled
                     title="ไม่สามารถลบรายการนี้ได้ เนื่องจากไม่ใช่รายการของคุณ"
@@ -902,6 +973,7 @@ export default function AllBookingsPage() {
                     ยกเลิกแล้ว
                   </button>
                 )}
+
                 {getStatusLabel(b) === "ยกเลิก" && canManageBooking && (
                   <Dialog.Root open={cancelDialogOpen && selectedId === b.id} onOpenChange={setCancelDialogOpen}>
                     <Dialog.Trigger asChild>
@@ -917,7 +989,7 @@ export default function AllBookingsPage() {
                       </button>
                     </Dialog.Trigger>
                     <BookingDialog
-                      title="ต้องการลบรายการนี้หรือไม่?"
+                      title="ต้องการลบรายการนี้ทิ้งหรือไม่?"
                       color="red"
                       booking={selectedBooking}
                       onConfirm={async () => {
@@ -940,10 +1012,28 @@ export default function AllBookingsPage() {
 
                 {(getStatusLabel(b) === "รอดำเนินการ" || getStatusLabel(b) === "อยู่ในคิว") && (
                   <>
-                    {/* ✅ แสดงปุ่มเฉพาะแอดมิน (909) หรือหมอนวดที่เป็นเจ้าของ booking */}
                     {canManageBooking && (
-                      <>
-                        {/* ปุ่มยืนยัน */}
+                      <div className="flex gap-2">
+                        {/* 🌟 2. ปุ่มยกเลิกคิวหลัก (เพิ่มเข้ามาใหม่) */}
+                        <Dialog.Root>
+                          <Dialog.Trigger asChild>
+                            <button
+                              onClick={() => setSelectedId(b.id)}
+                              className="flex items-center justify-center w-12 h-10 bg-rose-500 rounded-md shadow-sm hover:bg-rose-600 transition"
+                              title="ยกเลิกคิว"
+                            >
+                              <XCircle className="text-white w-5 h-5" />
+                            </button>
+                          </Dialog.Trigger>
+                          <BookingDialog
+                            title="ต้องการยกเลิกคิวนี้หรือไม่?"
+                            color="red"
+                            booking={b}
+                            onConfirm={() => handleBookingAction("cancel")}
+                          />
+                        </Dialog.Root>
+
+                        {/* ปุ่มยืนยันสถานะ (ให้อยู่ในคิว/สำเร็จ) */}
                         {getStatusLabel(b) === "รอดำเนินการ" && (
                           isPendingHN ? (
                             <button
@@ -981,20 +1071,8 @@ export default function AllBookingsPage() {
                           )
                         )}
 
-                        {/* 🌟 2. ปรับปรุงปุ่มจองเตียงพิเศษ ให้ส่งพารามิเตอร์ทั้งหมดไปยังหน้า Confirm แทน */}
-                        {b.has_special_bed ? (
-                          <button
-                            disabled
-                            title={
-                              b.bed_name
-                                ? `ไม่สามารถยกเลิกได้ เนื่องจากมีการจองเตียงพิเศษ (${b.bed_name}) ไว้แล้ว`
-                                : "ไม่สามารถยกเลิกได้ เนื่องจากมีการจองเตียงพิเศษไว้แล้ว"
-                            }
-                            className="flex items-center justify-center w-15 h-10 bg-gray-300 rounded-md shadow cursor-not-allowed"
-                          >
-                            <BedDouble className="text-gray-500 w-5 h-5" />
-                          </button>
-                        ) : (
+                        {/* ปุ่มจองเตียงพิเศษ (กรณีที่ยังไม่ได้จองเตียง) */}
+                        {!b.has_special_bed && (
                           <button
                             onClick={() => {
                               const queryParams = new URLSearchParams();
@@ -1011,14 +1089,13 @@ export default function AllBookingsPage() {
                             <BedDouble className="w-5 h-5 text-white" />
                           </button>
                         )}
-                      </>
+                      </div>
                     )}
                   </>
                 )}
 
                 {getStatusLabel(b) === "สำเร็จ" && (
                   canEditCompleted ? (
-                    // ✅ ปรับปรุง: ใช้ Dialog.Root หุ้มเพื่อแสดง Popup ยืนยันเมื่อกดปุ่ม "แก้ไขสถานะ" (สำหรับสถานะ สำเร็จ)
                     <Dialog.Root open={cancelDialogOpen && selectedId === b.id} onOpenChange={setCancelDialogOpen}>
                       <Dialog.Trigger asChild>
                         <button
@@ -1038,7 +1115,6 @@ export default function AllBookingsPage() {
                         color="orange"
                         booking={selectedBooking}
                         onConfirm={async () => {
-                           // หากกดยืนยัน ให้เรียกใช้ handleCycleStatus เดิม
                            await handleCycleStatus(b);
                            setSelectedId(null);
                            setCancelDialogOpen(false);
@@ -1066,6 +1142,7 @@ export default function AllBookingsPage() {
         {showCancelSuccess && <Toast key="cancel" message="ยกเลิกการจองสำเร็จ" />}
         {showConfirmSuccess && <Toast key="confirm" message="ยืนยันการจองสำเร็จ" />}
         {showDeleteSuccess && <Toast key="delete" message="ลบรายการสำเร็จ" />}
+        {showBedCancelSuccess && <Toast key="bed-cancel" message="ยกเลิกการจองเตียงสำเร็จ" />}
       </AnimatePresence>
 
       {/* ส่วนควบคุมหน้า Page (ล่าง) */}
@@ -1111,10 +1188,67 @@ function Toast({ message }: { message: string }) {
   );
 }
 
+// ✅ Dialog ยืนยันการยกเลิกการจองเตียงพิเศษ
+function CancelBedDialog({ booking, loading, onConfirm }: { booking: Booking; loading: boolean; onConfirm: () => void }) {
+  const rows = [
+    { label: "เตียงพิเศษ", value: booking.bed_name || "-" },
+    { label: "ชื่อผู้รับบริการ", value: booking.name },
+    { label: "พนักงานนวด", value: booking.therapist },
+    {
+      label: "วันที่",
+      value: new Date(booking.date).toLocaleDateString("th-TH", { year: "numeric", month: "short", day: "numeric", timeZone: "Asia/Bangkok" }),
+    },
+    { label: "ช่วงเวลา", value: booking.time_slot },
+  ];
+
+  return (
+    <Dialog.Portal>
+      <Dialog.Overlay className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 transition-opacity" />
+      <Dialog.Content asChild>
+        <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white p-6 sm:p-8 rounded-2xl shadow-2xl z-50 w-[90%] max-w-md border border-gray-100">
+          <Dialog.Title className="text-xl sm:text-2xl font-black mb-2 flex items-center gap-2 text-red-600">
+            <BedDouble className="w-7 h-7" />
+            ต้องการยกเลิกการจองเตียงพิเศษหรือไม่?
+          </Dialog.Title>
+          <Dialog.Description className="text-sm text-gray-500 mb-5">
+            ระบบจะลบการจองเตียงนี้ออกจากตารางการจองเตียง (คิวนวดของผู้รับบริการยังอยู่ตามเดิม)
+          </Dialog.Description>
+
+          <div className="mb-6 text-sm grid grid-cols-1 gap-3 bg-gray-50 p-4 rounded-xl border border-gray-200">
+            {rows.map((item, i) => (
+              <div key={`${booking.id}-bed-${i}`} className="flex items-center gap-2 border-b border-gray-100 last:border-0 pb-2 last:pb-0">
+                <span className="font-semibold text-gray-600">{item.label}:</span>
+                <span className="ml-auto font-black text-gray-900">{item.value}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex justify-end gap-3">
+            <Dialog.Close asChild>
+              <button
+                disabled={loading}
+                className="px-5 py-2.5 rounded-xl bg-gray-100 text-gray-700 font-bold hover:bg-gray-200 transition cursor-pointer disabled:opacity-50"
+              >
+                ไม่ยกเลิก
+              </button>
+            </Dialog.Close>
+            <button
+              onClick={onConfirm}
+              disabled={loading}
+              className="px-6 py-2.5 rounded-xl text-white font-bold shadow-md transition hover:-translate-y-0.5 cursor-pointer bg-red-600 hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {loading ? "กำลังยกเลิก..." : "ยืนยันยกเลิกเตียง"}
+            </button>
+          </div>
+        </div>
+      </Dialog.Content>
+    </Dialog.Portal>
+  );
+}
+
 function BookingDialog({ title, color, booking, onConfirm }: any) {
   if (!booking) return null;
 
-  // ✅ สร้าง Map ระบุชื่อ Class แบบเต็มคำ เพื่อป้องกัน Tailwind ลบ Class ทิ้งตอน Build ขึ้น Server
   const colorStyles: Record<string, { text: string, bg: string }> = {
     red: {
       text: "text-red-600",
@@ -1130,7 +1264,6 @@ function BookingDialog({ title, color, booking, onConfirm }: any) {
     }
   };
 
-  // ดึงสไตล์ตามค่า color ที่ส่งมา ถ้าไม่มีให้ใช้ emerald เป็นค่าเริ่มต้น
   const selectedStyle = colorStyles[color] || colorStyles.emerald;
 
   return (
@@ -1139,7 +1272,6 @@ function BookingDialog({ title, color, booking, onConfirm }: any) {
       <Dialog.Content asChild>
         <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white p-6 sm:p-8 rounded-2xl shadow-2xl z-50 w-[90%] max-w-md border border-gray-100">
           
-          {/* ✅ เรียกใช้ class สีผ่าน selectedStyle.text */}
           <Dialog.Title className={`text-xl sm:text-2xl font-black mb-6 flex items-center gap-2 ${selectedStyle.text}`}>
             {color === "red" ? <XCircle className="w-7 h-7"/> : <CheckCircle2 className="w-7 h-7"/>}
             {title}
@@ -1164,16 +1296,15 @@ function BookingDialog({ title, color, booking, onConfirm }: any) {
           <div className="flex justify-end gap-3">
             <Dialog.Close asChild>
               <button className="px-5 py-2.5 rounded-xl bg-gray-100 text-gray-700 font-bold hover:bg-gray-200 transition cursor-pointer">
-                ยกเลิก
+                ปิด
               </button>
             </Dialog.Close>
             
-            {/* ✅ เรียกใช้ class สีผ่าน selectedStyle.bg */}
             <button 
               onClick={onConfirm} 
               className={`px-6 py-2.5 rounded-xl text-white font-bold shadow-md transition hover:-translate-y-0.5 cursor-pointer ${selectedStyle.bg}`}
             >
-              ยืนยันทำรายการ
+              ยืนยัน
             </button>
           </div>
         </div>

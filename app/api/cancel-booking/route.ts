@@ -1,57 +1,53 @@
-// /app/api/cancel-booking/route.ts
-import { NextRequest, NextResponse } from "next/server";
-import pool from '../dbconnection/db';
+import { NextResponse } from "next/server";
+import pool from "../dbconnection/db"; // ⚠️ ตรวจสอบพาธนำเข้าฐานข้อมูลของคุณว่าตรงหรือไม่
 
-export async function DELETE(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const id = searchParams.get("id");
-
-  if (!id) {
-    return NextResponse.json(
-      { success: false, message: "Missing booking id" },
-      { status: 400 }
-    );
-  }
-
-  const conn = await pool.getConnection();
+export async function DELETE(req: Request) {
   try {
-    // ตรวจสอบว่ามี booking อยู่หรือไม่
-    const [rows] = await conn.query("SELECT id FROM bookings WHERE id = ?", [id]);
-    if ((rows as any).length === 0) {
-      conn.release();
-      return NextResponse.json(
-        { success: false, message: "Booking not found" },
-        { status: 404 }
-      );
-    }
+    const url = new URL(req.url);
+    const id = url.searchParams.get("id"); // รับ ID ของคิว (bookings.id)
 
-    // ✅ ใหม่: ถ้าคิวนี้มีการจองเตียงพิเศษอยู่แล้ว ห้ามยกเลิกการให้บริการช่วงเวลานั้น
-    const [specialBedRows] = await conn.query(
-      "SELECT id FROM special_bed_bookings WHERE booking_id = ?",
-      [id]
-    );
-    if ((specialBedRows as any).length > 0) {
-      conn.release();
+    if (!id) {
       return NextResponse.json(
-        {
-          success: false,
-          message:
-            "ไม่สามารถยกเลิกได้ เนื่องจากคิวนี้มีการจองเตียงพิเศษไว้แล้ว กรุณายกเลิกการจองเตียงพิเศษก่อน",
-        },
+        { success: false, error: "ไม่พบรหัสการจอง (id)" },
         { status: 400 }
       );
     }
 
-    // อัปเดตสถานะ booking เป็น "ยกเลิก"
-    await conn.query("UPDATE bookings SET status = 'ยกเลิก' WHERE id = ?", [id]);
+    // 🌟 ขั้นตอนที่ 1: ลบข้อมูลการจองเตียงพิเศษออก (ถ้ามี) เพื่อคืนเตียงให้ว่างทันที
+    await pool.execute(
+      "DELETE FROM special_bed_bookings WHERE booking_id = ?",
+      [id]
+    );
 
-    conn.release();
-    return NextResponse.json({ success: true });
+    // 🌟 ขั้นตอนที่ 2: อัปเดตสถานะคิวหลักให้เป็น "ยกเลิก"
+    const [result]: any = await pool.execute(
+      "UPDATE bookings SET status = 'ยกเลิก' WHERE id = ?",
+      [id]
+    );
+
+    /* 
+      💡 หมายเหตุ: หากระบบของคุณออกแบบมาให้ "ลบข้อมูลคิวทิ้งไปเลย" (ลบแถวออกจาก DB) 
+      แทนการเปลี่ยนแค่สถานะเป็น 'ยกเลิก' ให้ลบ/คอมเมนต์ 4 บรรทัดข้างบนออก 
+      แล้วใช้คำสั่งบรรทัดข้างล่างนี้แทนครับ:
+
+      const [result]: any = await pool.execute("DELETE FROM bookings WHERE id = ?", [id]);
+    */
+
+    // ตรวจสอบว่ามีการอัปเดตข้อมูลจริงหรือไม่
+    if (result.affectedRows === 0) {
+      return NextResponse.json(
+        { success: false, error: "ไม่พบรายการจองที่ต้องการยกเลิก หรือถูกลบไปแล้ว" },
+        { status: 404 }
+      );
+    }
+
+    // ส่งค่ากลับไปให้ Frontend ทราบว่าทำรายการสำเร็จ
+    return NextResponse.json({ success: true, updatedStatus: "ยกเลิก" });
+    
   } catch (error) {
-    conn.release();
-    console.error("Cancel booking error:", error);
+    console.error("Error API cancel-booking:", error);
     return NextResponse.json(
-      { success: false, message: "Database error" },
+      { success: false, error: "ไม่สามารถยกเลิกการจองและเตียงพิเศษได้" },
       { status: 500 }
     );
   }

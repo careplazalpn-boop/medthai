@@ -33,6 +33,7 @@ interface Booking {
   bed_name?: string;
   hn?: string | null;
   sex?: string | number; 
+  idCard?: string; 
   has_confirmed_hn?: number | boolean;
   is_new_user_pending?: number | boolean;
   is_own_booking?: number | boolean;
@@ -60,15 +61,6 @@ const getStatusColor = (b: Booking) => {
     case "อยู่ในคิว": return "border-orange-500";
     case "สำเร็จ": return "border-emerald-500";    
     default: return "border-gray-500";
-  }
-};
-
-const getStatusBgColor = (b: Booking) => {
-  switch (getStatusLabel(b)) {
-    case "ยกเลิก": return "bg-red-50";
-    case "อยู่ในคิว": return "bg-orange-50";
-    case "สำเร็จ": return "bg-emerald-50";
-    default: return "bg-gray-50";
   }
 };
 
@@ -266,7 +258,15 @@ export default function AllBookingsPage() {
     const d = new Date(dateStr);
     return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,"0")}-${d.getDate().toString().padStart(2,"0")}`;
   };
-  const normalizeTimeSlot = (time: string) => time.replace(/\s/g, '');
+
+  // 🌟 ปรับปรุง: ใช้ normalizeSlot แบบเดียวกับหน้า confirm/beds-special เพื่อให้ถอด 0 ด้านหน้าเสมอ 
+  // เช่น "08:00-09:30" => "8:00-9:30" 
+  const normalizeTimeSlot = (slotStr: string) => {
+    if (!slotStr) return "";
+    let s = slotStr.replace(/\s+/g, "").replace(/–/g, "-");
+    s = s.replace(/(^|-)0+(\d)/g, "$1$2"); 
+    return s;
+  };
 
   const filteredBookings = bookings
     .filter(b => {
@@ -345,8 +345,6 @@ export default function AllBookingsPage() {
 
   const selectedBooking = bookings.find(b => b.id === selectedId);
 
-  // 🌟 ปรับปรุง: การยกเลิก/ยืนยันคิวจอง 
-  // หากกดยกเลิก จะไปเรียก /api/cancel-booking ซึ่งเราปรับปรุง Backend ให้ลบเตียงให้อัตโนมัติแล้ว
   const handleBookingAction = async (action: "confirm"|"cancel") => {
     if (!selectedId) return;
     try {
@@ -364,7 +362,6 @@ export default function AllBookingsPage() {
               ? { 
                   ...b, 
                   status: action==="cancel" ? "ยกเลิก" : data.updatedStatus || "อยู่ในคิว",
-                  // 🌟 เคลียร์ข้อมูลเตียงพิเศษออกด้วย ถ้าเป็นการยกเลิก
                   has_special_bed: action === "cancel" ? false : b.has_special_bed,
                   bed_name: action === "cancel" ? undefined : b.bed_name
                 }
@@ -383,7 +380,6 @@ export default function AllBookingsPage() {
     }
   };
 
-  // ✅ การยกเลิกเตียงอย่างเดียว (คิวหลักยังอยู่)
   const handleCancelBed = async (b: Booking) => {
     if (bedCancelling) return;
     setBedCancelling(true);
@@ -420,7 +416,6 @@ export default function AllBookingsPage() {
   if (!user) return <p>กำลังตรวจสอบสิทธิ์...</p>;
   if (error) return <p className="p-4 text-center text-red-600 font-semibold">Error: {error}</p>;
 
-  // ✅ คำนวณเปอร์เซ็นต์สำหรับ Summary Cards
   const totalBookings = summary.totalAttended + summary.totalCancelled + summary.totalPending + summary.totalInQueue;
   const getPercentage = (value: number) => totalBookings === 0 ? 0 : Math.round((value / totalBookings) * 100);
 
@@ -450,7 +445,7 @@ export default function AllBookingsPage() {
         จัดการข้อมูลบริการ
       </h1>
 
-      {/* ✅ SUMMARY CARDS (Clickable Filters) */}
+      {/* ✅ SUMMARY CARDS */}
       <div className="max-w-6xl mx-auto mb-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         {/* 1. การ์ดทั้งหมด (All) */}
         <div 
@@ -571,17 +566,14 @@ export default function AllBookingsPage() {
             {getPercentage(summary.totalCancelled)}% ของทั้งหมด
           </div>
         </div>
-
       </div>
 
       {/* ✅ ตัวกรอง (Filters) ชุดที่ 1 */}
-      {/* ✅ ตัวกรอง (Filters) - แยกการ์ด ค้นหาชื่อ และ วันที่ ชัดเจน สีต่างกัน */}
       <div className="max-w-6xl mx-auto mb-8 space-y-4">
         
-        {/* แถวที่ 1: ค้นหาหลัก (แยกการ์ด ชื่อ และ วันที่/เวลา) */}
+        {/* แถวที่ 1: ค้นหาหลัก */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           
-          {/* 1. การ์ดค้นหาชื่อ-สกุล (โทนสีฟ้า) */}
           <div className="bg-blue-50/80 p-5 sm:p-6 rounded-2xl shadow-sm border border-blue-200 flex flex-col justify-center">
             <label className="text-blue-900 font-extrabold mb-3 text-sm flex items-center gap-2">
               <div className="p-1.5 bg-blue-200 rounded-lg text-blue-700"><Search className="w-4 h-4" /></div>
@@ -596,7 +588,6 @@ export default function AllBookingsPage() {
             />
           </div>
 
-          {/* 2. การ์ดค้นหาวันที่และเวลา (โทนสีเขียวมรกต) */}
           <div className="bg-emerald-50/80 p-5 sm:p-6 rounded-2xl shadow-sm border border-emerald-200 flex flex-col justify-center">
             <label className="text-emerald-900 font-extrabold mb-3 text-sm flex items-center gap-2">
               <div className="p-1.5 bg-emerald-200 rounded-lg text-emerald-700"><CalendarDays className="w-4 h-4" /></div>
@@ -622,7 +613,7 @@ export default function AllBookingsPage() {
           </div>
         </div>
 
-        {/* แถวที่ 2: ตัวกรองเพิ่มเติม (โทนสีขาวสะอาดตา) */}
+        {/* แถวที่ 2: ตัวกรองเพิ่มเติม */}
         <div className="bg-white p-5 sm:px-6 rounded-2xl shadow-sm border border-gray-200 flex flex-wrap gap-4 items-end">
           
           <div className="w-full sm:flex-1 min-w-[140px]">
@@ -674,7 +665,6 @@ export default function AllBookingsPage() {
             <label className="block text-gray-700 font-bold mb-2 text-xs uppercase tracking-wider flex items-center gap-1.5">
               <BedDouble className="w-4 h-4 text-gray-400"/> เตียงพิเศษ:
             </label>
-            {/* ✅ เพิ่ม text-gray-700 เพื่อให้ตัวอักษรสีเข้มมองเห็นชัดเจนในสถานะปกติ */}
             <label className="flex items-center gap-2 h-10 px-4 border border-gray-300 rounded-xl cursor-pointer select-none bg-gray-50 text-gray-700 hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-700 transition">
               <input
                 type="checkbox"
@@ -765,23 +755,29 @@ export default function AllBookingsPage() {
               
               {/* ข้อมูล */}
               <div className="grid grid-cols-1 sm:grid-cols-[240px_211px_130px_120px_120px_120px] gap-y-2 sm:gap-x-6 text-gray-700 flex-grow">
-                {/* พนักงานนวด (เด่น) + ผู้จองคิว (รอง) รวมอยู่คอลัมน์เดียวกัน */}
-                <div className="flex flex-col gap-1.5">
-                  <Label icon={<UserCheck className="w-4 h-4" />} text="พนักงานนวด" />
-                  <div className="flex items-center gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2">
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white shadow-sm">
-                      <UserCheck className="h-5 w-5" />
-                    </span>
-                    <span className="font-black text-base leading-tight text-emerald-900 break-words">
-                      {b.therapist || "-"}
-                    </span>
+                {/* 🌟 ปรับปรุง 2: พนักงานนวดเด่นกว่าผู้จองคิว */}
+                <div className="flex flex-col gap-2">
+                  <div className="flex flex-col">
+                    <Label icon={<UserCheck className="w-4 h-4" />} text="พนักงานนวด" />
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 border-2 border-emerald-300">
+                        <UserCheck className="h-4 w-4" />
+                      </span>
+                      <span className="font-extrabold text-sm text-emerald-900 drop-shadow-sm">
+                        {b.therapist || "-"}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1.5 pl-1 text-xs text-gray-500">
-                    <User className="w-3.5 h-3.5 shrink-0 text-gray-400" />
-                    <span className="font-semibold">ผู้จองคิว:</span>
-                    <span className="font-medium text-gray-700 break-words">{b.provider}</span>
+                  
+                  <div className="flex flex-col mt-0.5 border-t border-emerald-100 pt-1">
+                     <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">ผู้จองคิว</span>
+                     <span className="font-semibold text-[13px] text-gray-600 flex items-center gap-1.5">
+                       <User className="w-3.5 h-3.5 text-gray-400" />
+                       {b.provider}
+                     </span>
                   </div>
                 </div>
+
                 {/* ผู้มารับบริการ */}
                 <div className="flex flex-col sm:flex-col gap-1 relative">
                   <Label icon={<User className="w-4 h-4" />} text="ผู้มารับบริการ" />
@@ -804,7 +800,6 @@ export default function AllBookingsPage() {
                           <span>เตียงพิเศษ{b.bed_name ? ` (${b.bed_name})` : ""}</span>
                         </span>
                         
-                        {/* 🌟 1. ปุ่มยกเลิกเตียง (Icon เล็กๆ) 🌟 */}
                         {canManageBooking && !isCompleted && getStatusLabel(b) !== "ยกเลิก" && (
                           <Dialog.Root
                             open={bedCancelId === b.id}
@@ -961,7 +956,7 @@ export default function AllBookingsPage() {
                 </div>
               </div>
 
-              {/* กลุ่มปุ่ม Action (จัด Layout ใหม่ให้สวยงาม) */}
+              {/* ปุ่ม action */}
               <div className="flex sm:flex-col gap-2 mt-3 sm:mt-0 justify-center items-end">
                 {getStatusLabel(b) === "ยกเลิก" && !canManageBooking && (
                   <button
@@ -1014,7 +1009,7 @@ export default function AllBookingsPage() {
                   <>
                     {canManageBooking && (
                       <div className="flex gap-2">
-                        {/* 🌟 2. ปุ่มยกเลิกคิวหลัก (เพิ่มเข้ามาใหม่) */}
+                        {/* 🌟 2. ปุ่มยกเลิกคิวหลัก */}
                         <Dialog.Root>
                           <Dialog.Trigger asChild>
                             <button
@@ -1071,19 +1066,25 @@ export default function AllBookingsPage() {
                           )
                         )}
 
-                        {/* ปุ่มจองเตียงพิเศษ (กรณีที่ยังไม่ได้จองเตียง) */}
+                        {/* 🌟 1. ปุ่มจองเตียงพิเศษ: ส่งพารามิเตอร์ครบเหมือนหน้า confirm */}
                         {!b.has_special_bed && (
                           <button
                             onClick={() => {
                               const queryParams = new URLSearchParams();
+                              
+                              // ✅ ใช้วิธีจัดรูปแบบเวลาใหม่ ก่อนส่งไป URL ให้เหมือนกับที่เราทำใน BedsSpecialPage
+                              let normalizedTime = b.time_slot ? b.time_slot.replace(/\s+/g, "").replace(/–/g, "-") : "";
+                              normalizedTime = normalizedTime.replace(/(^|-)0+(\d)/g, "$1$2");
+
                               if (b.date) queryParams.set("date", b.date);
-                              if (b.time_slot) queryParams.set("time", b.time_slot);
+                              if (normalizedTime) queryParams.set("time", normalizedTime); 
                               if (b.hn) queryParams.set("hn", b.hn);
                               if (b.sex) queryParams.set("sex", String(b.sex)); 
+                              if (b.idCard) queryParams.set("cid", b.idCard); 
                               
                               router.push(`/beds-special?${queryParams.toString()}`);
                             }}
-                            className="flex items-center justify-center w-15 h-10 bg-teal-600 text-white rounded-md shadow hover:bg-teal-700 transition"
+                            className="flex items-center justify-center w-15 h-10 bg-teal-600 text-white rounded-md shadow hover:bg-teal-700 transition cursor-pointer"
                             title="จองเตียงพิเศษสำหรับคิวนี้"
                           >
                             <BedDouble className="w-5 h-5 text-white" />

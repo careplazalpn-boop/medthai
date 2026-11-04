@@ -1117,9 +1117,14 @@ export default function AllBookingsPage() {
                               let normalizedTime = b.time_slot ? b.time_slot.replace(/\s+/g, "").replace(/–/g, "-") : "";
                               normalizedTime = normalizedTime.replace(/(^|-)0+(\d)/g, "$1$2");
 
-                              if (b.date) queryParams.set("date", b.date);
-                              if (normalizedTime) queryParams.set("time", normalizedTime); 
+                              // ✅ แก้สำคัญ: b.date ที่ API ส่งมาเป็น ISO/UTC เช่น "2026-11-03T17:00:00.000Z"
+                              // (คือวันที่ 4 พ.ย. เวลาไทย) ถ้าส่งไปตรง ๆ หน้าเตียงจะตีความเป็นวันที่ 3 พ.ย. → ได้คิว/ช่วงเวลาผิดวัน
+                              // แปลงเป็น YYYY-MM-DD ตามเวลาท้องถิ่นก่อน เหมือนที่หน้า confirm ส่ง (เช่น 2026-11-04)
+                              if (b.date) queryParams.set("date", formatDate(b.date));
+                              if (normalizedTime) queryParams.set("time", normalizedTime);
                               if (b.hn) queryParams.set("hn", b.hn);
+                              // ✅ คิวของคนไข้ใหม่ยังไม่มี HN → ส่งชื่อไปให้หน้าเตียงใช้เลือกคิวอัตโนมัติ (หน้าเตียงจับคู่ด้วย HN หรือชื่อ)
+                              if (!b.hn && b.name) queryParams.set("name", b.name);
                               if (b.sex) queryParams.set("sex", String(b.sex)); 
                               if (b.idCard) queryParams.set("cid", b.idCard); 
                               

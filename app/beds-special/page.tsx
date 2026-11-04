@@ -169,7 +169,8 @@ export default function BedsSpecialPage() {
   const paramTime = searchParams?.get('time');
   const paramHn = searchParams?.get('hn');
   const paramCid = searchParams?.get('cid');
-  
+  const paramName = searchParams?.get('name'); // คนไข้ใหม่ที่ยังไม่มี HN: ใช้ชื่อจับคู่คิว
+
   const { user } = (useContext(AuthContext) || {}) as {
     user: any;
     logout: () => void;
@@ -179,7 +180,9 @@ export default function BedsSpecialPage() {
   const isUserAdmin = user?.isAdmin || user?.role_id === 909 || String(user?.role).toLowerCase() === "admin";
 
   const todayStr = getTodayLocalDateStr();
-  const [date, setDate] = useState<string>(paramDate || todayStr);
+  // ✅ รับวันที่จาก URL ได้ทั้ง "2026-11-04" และ ISO/UTC เช่น "2026-11-03T17:00:00.000Z" (แปลงเป็นวันที่ท้องถิ่น)
+  // เดิมใช้ค่าดิบ ทำให้ query เป็นวันที่ผิดวัน และช่อง input type=date แสดงค่าไม่ได้
+  const [date, setDate] = useState<string>(formatToLocalDateStr(paramDate) || todayStr);
   const isPastDate = isDatePassed(date);
   
   const [timeSlots, setTimeSlots] = useState<string[]>([
@@ -207,7 +210,7 @@ export default function BedsSpecialPage() {
 
   const [loading, setLoading] = useState<boolean>(false);
   const [bookingDialogOpen, setBookingDialogOpen] = useState<boolean>(false);
-  const [searchTerm, setSearchTerm] = useState<string>(paramHn || paramCid || "");
+  const [searchTerm, setSearchTerm] = useState<string>(paramHn || paramName || paramCid || "");
   const [hasAttemptedAutoSelect, setHasAttemptedAutoSelect] = useState(false);
 
   // 🌟 State สำหรับ Pagination (ตารางด้านล่าง)
@@ -215,6 +218,31 @@ export default function BedsSpecialPage() {
   const [limit, setLimit] = useState<number>(10);
   const [totalPages, setTotalPages] = useState<number>(1);
   const [totalRecords, setTotalRecords] = useState<number>(0);
+
+  // ✅ แก้สำคัญ: อ่านพารามิเตอร์จาก URL "หลังหน้าแสดงผลแล้ว" (ใน useEffect)
+  // เดิมอ่าน window.location.search ตอน render แล้วเอาไปเป็นค่าเริ่มต้นของ useState
+  // เมื่อเข้าหน้านี้ด้วยการกดปุ่มในแอป (router.push จากหน้า all-bookings) ตอน render ครั้งแรก URL ยังไม่ถูกอัปเดต
+  // จึงอ่านไม่เจอ date/time/hn → ตกไปใช้ค่าเริ่มต้น 16:00-17:30 ทั้งที่ลิงก์ส่ง time=8:00-9:30 มา
+  // (เปิดด้วยการวาง URL ตรง ๆ จะทำงานปกติ จึงดูเหมือนเป็นบางทางเท่านั้น)
+  // effect นี้ต้องอยู่ก่อน effect ที่ดึง time-slots เพื่อให้ urlTimeRef พร้อมใช้งาน
+  const urlTimeRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const sp = new URLSearchParams(window.location.search);
+    const d = formatToLocalDateStr(sp.get("date"));
+    const t = sp.get("time");
+    const term = sp.get("hn") || sp.get("name") || sp.get("cid") || "";
+
+    if (d) setDate(d);
+    if (t) {
+      urlTimeRef.current = t;
+      setSelectedSlot(normalizeSlot(t)); // ตั้งค่าไว้ก่อน แล้วจับคู่กับรายการจริงเมื่อโหลด time-slots เสร็จ
+    }
+    if (term) {
+      setSearchTerm(term);
+      setHasAttemptedAutoSelect(false);
+    }
+  }, []);
 
   useEffect(() => {
     fetchTimeSlots();
@@ -268,8 +296,15 @@ export default function BedsSpecialPage() {
       const data = await res.json();
       if (data?.success && Array.isArray(data.timeSlots) && data.timeSlots.length > 0) {
         setTimeSlots(data.timeSlots);
-        if (!paramTime && !data.timeSlots.includes(selectedSlot)) {
+        const wantedTime = urlTimeRef.current || paramTime;
+        if (!wantedTime && !data.timeSlots.includes(selectedSlot)) {
           setSelectedSlot(data.timeSlots[0]);
+        } else if (wantedTime) {
+          // ✅ จับคู่ช่วงเวลาจาก URL กับรายการจริง แม้รูปแบบต่างกัน (08:00-09:30 กับ 8:00-9:30)
+          const matched = data.timeSlots.find(
+            (s: string) => normalizeSlot(s) === normalizeSlot(wantedTime)
+          );
+          if (matched) setSelectedSlot(matched);
         }
       }
     } catch (err) {

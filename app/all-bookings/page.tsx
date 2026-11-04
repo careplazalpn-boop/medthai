@@ -87,7 +87,13 @@ export default function AllBookingsPage() {
   const [filterProvider, setFilterProvider] = useState("all");
   const [filterSpecialBed, setFilterSpecialBed] = useState(false); 
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
+  // ✅ แยก loading ของแต่ละงานออกจากกัน เดิมใช้ flag เดียวร่วมกัน ทำให้งานหนึ่งเสร็จแล้วไป
+  // ปิด overlay ของอีกงานที่ยังโหลดอยู่ (หรือค้าง overlay เมื่อ request ถูกยกเลิก)
+  const [listLoading, setListLoading] = useState(false);
+  const [metaLoading, setMetaLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const loading = listLoading || metaLoading || exporting;
+  const [reloadKey, setReloadKey] = useState(0); // ใช้กดลองใหม่เมื่อโหลดข้อมูลไม่สำเร็จ
   const [page, setPage] = useState(1);
   const [limit] = useState(20);
   const [totalPages, setTotalPages] = useState(1);  
@@ -120,13 +126,25 @@ export default function AllBookingsPage() {
       return;
     }
 
-    setLoading(true);
+    // ✅ รอให้ทราบ user ก่อนค่อยดึงข้อมูล (เดิมยิงซ้ำ 2 รอบ: ตอน user ยังว่าง และตอน user โหลดเสร็จ)
+    if (!user) return;
+
+    // ✅ ยกเลิก request เก่าเมื่อเปลี่ยนตัวกรอง/หน้าเร็ว ๆ กันผลลัพธ์ตอบกลับสลับลำดับ (race condition)
+    // และกันการ setState หลัง component ถูก unmount
+    const controller = new AbortController();
+    setListLoading(true);
+    setError(null);
     (async () => {
       try {
+        // ✅ encodeURIComponent ทุกค่า กันชื่อที่มีอักขระพิเศษ (& # + ฯลฯ) ทำให้ query string เพี้ยน
+        const q = (v: string) => encodeURIComponent(v || "");
         const res = await fetch(
-          `/api/all-bookings?date=${filterDate || ""}&provider=${filterProvider || ""}&therapist=${filterTherapist || ""}&timeSlots=${filterTimeSlot || ""}&status=${filterStatus || ""}&specialBed=${filterSpecialBed}&page=${page}&limit=${limit}&role=${encodeURIComponent(user?.role || "")}&role_id=${encodeURIComponent(user?.role_id || "")}`
+          `/api/all-bookings?date=${q(filterDate)}&provider=${q(filterProvider)}&therapist=${q(filterTherapist)}&timeSlots=${q(filterTimeSlot)}&status=${q(filterStatus)}&specialBed=${filterSpecialBed}&page=${page}&limit=${limit}&role=${encodeURIComponent(user?.role || "")}&role_id=${encodeURIComponent(user?.role_id || "")}`,
+          { signal: controller.signal, cache: "no-store" }
         );
-        const data = await res.json();
+        // ✅ ถ้า server ตอบ 500/504 เป็น HTML จะ parse JSON ไม่ได้ → แปลงเป็นข้อความ error ที่อ่านรู้เรื่อง
+        const data = await res.json().catch(() => null);
+        if (!data) throw new Error(`เซิร์ฟเวอร์ตอบกลับผิดปกติ (HTTP ${res.status})`);
         if (!data.success) throw new Error(data.error || "เกิดข้อผิดพลาด");
 
         setBookings(data.bookings);
@@ -142,12 +160,17 @@ export default function AllBookingsPage() {
            }
 
       } catch (e: any) {
+        if (e?.name === "AbortError") return; // request เก่าถูกยกเลิกโดยตั้งใจ ไม่ถือเป็น error
         setError(e.message || "เกิดข้อผิดพลาดไม่ทราบสาเหตุ");
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setListLoading(false);
       }
     })();
-  }, [filterDate, filterProvider, filterTherapist, filterTimeSlot, filterStatus, filterSpecialBed, page, limit, user?.role, user?.role_id]);
+    return () => {
+      controller.abort();
+      setListLoading(false);
+    };
+  }, [filterDate, filterProvider, filterTherapist, filterTimeSlot, filterStatus, filterSpecialBed, page, limit, user?.role, user?.role_id, !!user, reloadKey]);
       
   const handleNext = () => {
     if (page < totalPages) setPage((p) => p + 1);
@@ -158,7 +181,8 @@ export default function AllBookingsPage() {
   };
 
   useEffect(() => {
-    setLoading(true);
+    let cancelled = false;
+    setMetaLoading(true);
     (async () => {
       try {
         const [resTherapist, resTimeSlot, resStaff] = await Promise.all([
@@ -171,23 +195,27 @@ export default function AllBookingsPage() {
         const dataTimeSlot = await resTimeSlot.json();
         const dataStaff = await resStaff.json();
 
+        if (cancelled) return;
         if (dataTherapist.success) setTherapists(dataTherapist.therapists);
         if (dataTimeSlot.success) setTimeSlots(dataTimeSlot.timeSlots);
         if (dataStaff.success) setProviders(dataStaff.staff.map((s:any) => s.name));
 
       } catch {
+        if (cancelled) return;
         setTherapists([]); setTimeSlots([]); setProviders([]);
       } finally {
-        setLoading(false);
+        if (!cancelled) setMetaLoading(false);
       }
     })();
+    return () => { cancelled = true; };
   }, []);
 
   const exportToExcel = async () => { 
     if (!filterDate) return alert("กรุณาเลือกวันที่ (Date Filter) ก่อนทำการ Export");
-    setLoading(true);
+    setExporting(true);
     try {
-        const exportUrl = `/api/all-bookings?export=true&date=${filterDate || ""}&provider=${filterProvider || ""}&therapist=${filterTherapist || ""}&timeSlots=${filterTimeSlot || ""}&status=${filterStatus || ""}&specialBed=${filterSpecialBed}`;
+        const q = (v: string) => encodeURIComponent(v || "");
+        const exportUrl = `/api/all-bookings?export=true&date=${q(filterDate)}&provider=${q(filterProvider)}&therapist=${q(filterTherapist)}&timeSlots=${q(filterTimeSlot)}&status=${q(filterStatus)}&specialBed=${filterSpecialBed}`;
         const exportRes = await fetch(exportUrl);
         const exportData = await exportRes.json();
         if (!exportData.success) throw new Error(exportData.error || "เกิดข้อผิดพลาดในการดึงข้อมูล Export");
@@ -245,7 +273,7 @@ export default function AllBookingsPage() {
         console.error("Export Error:", e);
         alert("เกิดข้อผิดพลาดในการ Export ข้อมูล");
     } finally {
-        setLoading(false);
+        setExporting(false);
     }
   };
 
@@ -414,7 +442,6 @@ export default function AllBookingsPage() {
   };
 
   if (!user) return <p>กำลังตรวจสอบสิทธิ์...</p>;
-  if (error) return <p className="p-4 text-center text-red-600 font-semibold">Error: {error}</p>;
 
   const totalBookings = summary.totalAttended + summary.totalCancelled + summary.totalPending + summary.totalInQueue;
   const getPercentage = (value: number) => totalBookings === 0 ? 0 : Math.round((value / totalBookings) * 100);
@@ -444,6 +471,19 @@ export default function AllBookingsPage() {
       <h1 className="text-3xl sm:text-4xl font-extrabold text-emerald-700 mb-6 pt-15 text-center drop-shadow-sm">
         จัดการข้อมูลบริการ
       </h1>
+
+      {/* ✅ แสดง error เป็นแถบแจ้งเตือน (เดิม return ทั้งหน้า ทำให้เกิด error ครั้งเดียวแล้วหน้าใช้งานไม่ได้ถาวร) */}
+      {error && (
+        <div className="max-w-6xl mx-auto mb-4 flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-700">
+          <span className="font-semibold text-sm">Error: {error}</span>
+          <button
+            onClick={() => { setError(null); setReloadKey((k) => k + 1); }}
+            className="shrink-0 rounded-lg bg-red-600 px-4 py-1.5 text-sm font-bold text-white hover:bg-red-700 transition"
+          >
+            ลองใหม่
+          </button>
+        </div>
+      )}
 
       {/* ✅ SUMMARY CARDS */}
       <div className="max-w-6xl mx-auto mb-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
@@ -686,6 +726,7 @@ export default function AllBookingsPage() {
                 setFilterTimeSlot("all"); 
                 setFilterProvider("all");
                 setFilterSpecialBed(false);
+                setPage(1); // ✅ กันค้างหน้าเดิมที่เกินจำนวนหน้าของข้อมูลชุดใหม่
               }}
               className="w-full sm:w-auto h-10 px-5 bg-white text-rose-600 border border-rose-200 rounded-xl font-bold hover:bg-rose-50 transition text-sm flex items-center justify-center gap-2 shadow-sm"
             >

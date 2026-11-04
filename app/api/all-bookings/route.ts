@@ -6,13 +6,24 @@ async function updateBookingStatus(status: string, bookingId: string | number) {
   await pool.execute("UPDATE bookings SET status = ? WHERE id = ?", [status, bookingId]);
 }
 
+// ✅ กัน Next.js cache ผลลัพธ์ของ GET (ข้อมูลต้องสดเสมอ)
+export const dynamic = "force-dynamic";
+
+// ✅ cache เบา ๆ ในหน่วยความจำ สำหรับข้อมูลที่เปลี่ยนน้อยและไม่ต้องยิง DB ทุกครั้ง
+const CACHE_TTL_MS = 5 * 60 * 1000;
+const avgCache = new Map<number, { value: number; at: number }>();
+const therapistNameCache = new Map<number, { names: string[]; at: number }>();
+
 // 🧠 GET: ดึง bookings ทั้งหมด พร้อม pagination + filter + summary
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
     // --- Pagination ---
-    const page = parseInt(url.searchParams.get("page") || "1"); // 👈 ใช้ let แทน const
-    const limit = parseInt(url.searchParams.get("limit") || "20");
+    // ✅ กันค่า NaN / ติดลบ / ใหญ่เกินไป (ค่าปกติ page=1, limit=20 ทำงานเหมือนเดิม)
+    const rawPage = parseInt(url.searchParams.get("page") || "1", 10);
+    const rawLimit = parseInt(url.searchParams.get("limit") || "20", 10);
+    const page = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
+    const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 500) : 20;
     const isExport = url.searchParams.get("export") === "true";
 
     // --- Filters ---
@@ -96,7 +107,9 @@ export async function GET(req: Request) {
       SELECT
         b.id, b.provider, b.name, b.phone, b.therapist, b.time_slot, b.date, b.status, b.payment_status, b.created_at,
         b.hn,
-        u.sex, 
+        -- ✅ ใช้ subquery แทน LEFT JOIN med_user: รับประกัน 1 แถวต่อ 1 booking เสมอ
+        -- (ถ้า med_user.hn ซ้ำ การ JOIN จะทำให้แถวเบิ้ล และ pagination/count เพี้ยน)
+        (SELECT u.sex FROM med_user u WHERE u.hn = b.hn LIMIT 1) AS sex,
         (sbb.id IS NOT NULL) AS has_special_bed,
         sb.bed_name AS bed_name,
         -- ✅ เปลี่ยนมาเช็ค HN จากตาราง bookings โดยตรง (เร็วกว่าเดิมมาก
@@ -104,19 +117,11 @@ export async function GET(req: Request) {
         (CASE WHEN b.hn IS NOT NULL AND b.hn <> '' THEN 1 ELSE 0 END) AS has_confirmed_hn,
         (CASE WHEN b.hn IS NULL OR b.hn = '' THEN 1 ELSE 0 END) AS is_new_user_pending
       FROM bookings b
-      LEFT JOIN med_user u ON b.hn = u.hn
       LEFT JOIN special_bed_bookings sbb ON b.id = sbb.booking_id
       LEFT JOIN special_beds sb ON sbb.bed_id = sb.id
       WHERE 1=1
     `;
-    let countQuery = `
-      SELECT COUNT(*) AS total
-      FROM bookings b
-      LEFT JOIN special_bed_bookings sbb ON b.id = sbb.booking_id
-      WHERE 1=1
-    `;
     const queryParams: any[] = [];
-    const countParams: any[] = [];
 
     // --- แปลง filterStatus จากค่าที่หน้าเว็บ → ค่าจริงในฐานข้อมูล ---
     const statusMap: Record<string, string> = {
@@ -130,41 +135,29 @@ export async function GET(req: Request) {
     // --- Apply filters ---
     if (filterDate && filterDate !== "all") {
       query += ` AND b.date = ?`;
-      countQuery += ` AND b.date = ?`;
       queryParams.push(filterDate);
-      countParams.push(filterDate);
     }
     if (filterTimeSlot && filterTimeSlot !== "all") {
-          query += `
-            AND REPLACE(REPLACE(TRIM(b.time_slot), '–', '-'), ' ', '') = REPLACE(?, ' ', '')`;
-          countQuery += `
-            AND REPLACE(REPLACE(TRIM(b.time_slot), '–', '-'), ' ', '') = REPLACE(?, ' ', '')`;
-          queryParams.push(filterTimeSlot.trim());
-          countParams.push(filterTimeSlot.trim());
-        }
-   
+      query += `
+        AND REPLACE(REPLACE(TRIM(b.time_slot), '–', '-'), ' ', '') = REPLACE(?, ' ', '')`;
+      queryParams.push(filterTimeSlot.trim());
+    }
+
     if (filterProvider && filterProvider !== "all") {
       query += ` AND b.provider = ?`;
-      countQuery += ` AND b.provider = ?`;
       queryParams.push(filterProvider);
-      countParams.push(filterProvider);
     }
     if (filterTherapist && filterTherapist !== "all") {
       query += ` AND b.therapist = ?`;
-      countQuery += ` AND b.therapist = ?`;
       queryParams.push(filterTherapist);
-      countParams.push(filterTherapist);
     }
     if (dbStatus && dbStatus !== "all") {
       query += ` AND b.status = ?`;
-      countQuery += ` AND b.status = ?`;
       queryParams.push(dbStatus);
-      countParams.push(dbStatus);
     }
     // ✅ ใหม่: กรองเฉพาะคิวที่มีการจองเตียงพิเศษ (ไม่ต้องใช้ param)
     if (filterSpecialBed) {
       query += ` AND sbb.id IS NOT NULL`;
-      countQuery += ` AND sbb.id IS NOT NULL`;
     }
 
     // ✅ ใหม่: ถ้าผู้ใช้เป็น role=user ให้คิวของตัวเอง (พนักงานนวดคนนั้น) แสดงก่อน
@@ -176,11 +169,18 @@ export async function GET(req: Request) {
     if (isUserViewer && !isExport) {
       let ownNames: string[] = [];
       try {
-        const [tRows]: any = await pool.execute(
-          "SELECT name, fname FROM therapist WHERE id = ? LIMIT 1",
-          [viewerRoleId]
-        );
-        ownNames = [tRows?.[0]?.name, tRows?.[0]?.fname].filter((n: any) => !!n);
+        // ✅ cache ชื่อหมอนวด (เปลี่ยนน้อยมาก) ลดการยิง DB เพิ่มต่อ 1 request
+        const cached = therapistNameCache.get(viewerRoleId);
+        if (cached && Date.now() - cached.at < CACHE_TTL_MS) {
+          ownNames = cached.names;
+        } else {
+          const [tRows]: any = await pool.execute(
+            "SELECT name, fname FROM therapist WHERE id = ? LIMIT 1",
+            [viewerRoleId]
+          );
+          ownNames = [tRows?.[0]?.name, tRows?.[0]?.fname].filter((n: any) => !!n);
+          therapistNameCache.set(viewerRoleId, { names: ownNames, at: Date.now() });
+        }
       } catch (e) {
         console.error("หาชื่อหมอนวดของผู้ใช้ไม่สำเร็จ (ไม่กระทบการแสดงผล ใช้ therapist_id อย่างเดียว):", e);
       }
@@ -200,7 +200,8 @@ export async function GET(req: Request) {
               (CASE WHEN b.hn IS NULL OR b.hn = '' THEN 0 ELSE 1 END) ASC,
               b.date ASC,
               STR_TO_DATE(SUBSTRING_INDEX(b.time_slot, '-', 1), '%H:%i') ASC,
-              b.name ASC
+              b.name ASC,
+              b.id ASC
             LIMIT ? OFFSET ?
         `;
         queryParams.push(...ownFirstParams, limit, offset);
@@ -210,7 +211,8 @@ export async function GET(req: Request) {
               (CASE WHEN b.hn IS NULL OR b.hn = '' THEN 0 ELSE 1 END) ASC,
               b.date ASC,
               STR_TO_DATE(SUBSTRING_INDEX(b.time_slot, '-', 1), '%H:%i') ASC,
-              b.name ASC
+              b.name ASC,
+              b.id ASC
         `;
     }
 
@@ -240,50 +242,65 @@ export async function GET(req: Request) {
     if (filterSpecialBed) {
       summaryCondition += " AND sbb.id IS NOT NULL";
     }
+    // หมายเหตุ: summary ไม่กรอง status (ตั้งใจ) เพื่อให้การ์ดสรุปแสดงครบทุกสถานะ
 
     // ✅ ปรับปรุง: รวม 4 query สรุปสถานะเดิม (attended/cancelled/pending/inQueue) เป็น query เดียว
     // ด้วย conditional aggregation — สแกนตาราง bookings แค่รอบเดียวแทน 4 รอบ
     // ผลลัพธ์ตัวเลขที่ได้เหมือนเดิมทุกประการ (เงื่อนไข filter และการนับแต่ละสถานะไม่เปลี่ยน)
+    // ✅ ปรับปรุง: รวม count (total) เข้ามาใน summary query เดียวกัน
+    // total = จำนวนแถวตาม filter ทั้งหมด "รวม status" (เท่ากับ countQuery เดิมทุกประการ)
+    // ทำให้เหลือแค่ 2 query ต่อ request (เดิม 4) ลดการแย่งคอนเนกชันใน pool
+    const totalExpr =
+      dbStatus && dbStatus !== "all"
+        ? "SUM(CASE WHEN b.status = ? THEN 1 ELSE 0 END)"
+        : "COUNT(*)";
+    const summaryQueryParams: any[] =
+      dbStatus && dbStatus !== "all" ? [dbStatus, ...summaryParams] : summaryParams;
+
+    // ✅ ใช้ JOIN special_bed_bookings เฉพาะตอนกรองเตียงพิเศษ (ความสัมพันธ์ 1:1 ผลลัพธ์เท่าเดิม)
     const summaryQuery = `
       SELECT
+        ${totalExpr} AS total,
         SUM(CASE WHEN b.status = 'สำเร็จ' THEN 1 ELSE 0 END) AS totalAttended,
         SUM(CASE WHEN b.status = 'ยกเลิก' THEN 1 ELSE 0 END) AS totalCancelled,
         SUM(CASE WHEN b.status = 'รอดำเนินการ' THEN 1 ELSE 0 END) AS totalPending,
         SUM(CASE WHEN b.status = 'อยู่ในคิว' THEN 1 ELSE 0 END) AS totalInQueue
       FROM bookings b
-      LEFT JOIN special_bed_bookings sbb ON b.id = sbb.booking_id
+      ${filterSpecialBed ? "LEFT JOIN special_bed_bookings sbb ON b.id = sbb.booking_id" : ""}
       WHERE 1=1 ${summaryCondition}
     `;
 
     // --- Average per month ---
+    // ✅ เดิมใช้ YEAR(date) = ? ซึ่งทำให้ index ใช้ไม่ได้ (full table scan ทุก request)
+    // เปลี่ยนเป็นช่วงวันที่ — ผลลัพธ์เท่าเดิม และ cache 5 นาที เพราะค่านี้เปลี่ยนช้ามาก
     const now = new Date();
     const year = now.getFullYear();
-    const avgQuery = "SELECT COUNT(*) / 12 AS avg_per_month FROM bookings WHERE YEAR(date) = ?";
+    const getAvgPerMonth = async (): Promise<number> => {
+      const hit = avgCache.get(year);
+      if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.value;
+      const [avgRows]: any = await pool.execute(
+        "SELECT COUNT(*) / 12 AS avg_per_month FROM bookings WHERE date >= ? AND date < ?",
+        [`${year}-01-01`, `${year + 1}-01-01`]
+      );
+      const value = avgRows[0]?.avg_per_month || 0;
+      avgCache.set(year, { value, at: Date.now() });
+      return value;
+    };
 
-    // ✅ ปรับปรุง: ยิง query ทั้ง 4 ตัวที่เป็นอิสระต่อกัน (ไม่พึ่งผลลัพธ์ของกันและกัน) พร้อมกัน
-    // ด้วย Promise.all แทนการ await ทีละตัวตามลำดับ — ลดเวลารอรวมจาก "ผลรวมของทุก query"
-    // เหลือแค่ "เวลาของ query ที่ช้าที่สุดตัวเดียว" ผลลัพธ์ที่ได้เหมือนเดิมทุกประการ
-    const [
-      [rows],
-      [countRows],
-      [summaryRows],
-      [avgRows],
-    ]: any = await Promise.all([
+    // ✅ ยิง query ที่เป็นอิสระต่อกันพร้อมกัน (สูงสุด 3 คอนเนกชัน และปกติ avg มาจาก cache)
+    const [[rows], [summaryRows], avgPerMonth]: any = await Promise.all([
       pool.execute(query, queryParams),
-      pool.execute(countQuery, countParams),
-      pool.execute(summaryQuery, summaryParams),
-      pool.execute(avgQuery, [year]),
+      pool.execute(summaryQuery, summaryQueryParams),
+      getAvgPerMonth(),
     ]);
 
-    const total = countRows[0]?.total || 0;
+    const total = Number(summaryRows?.[0]?.total) || 0;
     const totalPages = Math.ceil(total / limit);
 
     const totalAttended = Number(summaryRows?.[0]?.totalAttended) || 0;
     const totalCancelled = Number(summaryRows?.[0]?.totalCancelled) || 0;
     const totalPending = Number(summaryRows?.[0]?.totalPending) || 0;
     const totalInQueue = Number(summaryRows?.[0]?.totalInQueue) || 0;
-
-    const avgPerMonth = avgRows[0]?.avg_per_month || 0;
 
     // ✅ ส่งข้อมูลกลับ
     return NextResponse.json({

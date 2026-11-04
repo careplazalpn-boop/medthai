@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useContext, createContext } from "react";
+import { useState, useEffect, useContext, createContext, useRef } from "react";
 import {
   BedDouble,
   Calendar,
@@ -194,7 +194,12 @@ export default function BedsSpecialPage() {
   
   const [specialBeds, setSpecialBeds] = useState<SpecialBed[]>([]);
   const [bedBookings, setBedBookings] = useState<SpecialBedBooking[]>([]);
+  // ✅ รายการจองเตียง "ทั้งวัน" (ไม่แบ่งหน้า) ใช้กับผังเตียงด้านบนเท่านั้น
+  // เดิมผังใช้ bedBookings ซึ่งถูกแบ่งหน้า (ค่าเริ่มต้น 10 รายการ) → คิวที่อยู่หน้าอื่นจึงไม่แสดงในผัง
+  // ทำให้เตียงที่ถูกจองแล้วดู "ว่าง" และจองซ้อนได้ (null = ยังโหลดไม่สำเร็จ ให้ fallback ไปใช้ bedBookings)
+  const [dayBedBookings, setDayBedBookings] = useState<SpecialBedBooking[] | null>(null);
   const [availableBookings, setAvailableBookings] = useState<BookingRecord[]>([]);
+  const dayFetchSeq = useRef(0); // กัน response เก่าทับข้อมูลใหม่
 
   const [selectedBed, setSelectedBed] = useState<SpecialBed | null>(null);
   const [selectedQueue, setSelectedQueue] = useState<BookingRecord | null>(null);
@@ -221,7 +226,15 @@ export default function BedsSpecialPage() {
       fetchBedBookings();
     }
     // 🌟 เพิ่ม page และ limit เป็น dependency ให้ดึงข้อมูลใหม่เมื่อมีการเปลี่ยนหน้า
-  }, [date, isAuthenticated, user, page, limit]); 
+  }, [date, isAuthenticated, user, page, limit]);
+
+  // ✅ ผังเตียง: ดึงข้อมูลทั้งวันแยกต่างหาก — ไม่ขึ้นกับ page/limit ของตารางด้านล่าง
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchDayBedBookings();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [date, isAuthenticated, user?.name, user?.role_id]);
 
   // ถ้าเปลี่ยนวัน ให้รีเซ็ตหน้าที่ 1 ใหม่เสมอ
   useEffect(() => {
@@ -295,8 +308,9 @@ export default function BedsSpecialPage() {
       const data = await res.json();
       if (data?.success) {
         setBedBookings(data.bedBookings || []);
-        setAvailableBookings(data.availableBookings || []);
-        
+        // availableBookings ถูกตั้งค่าโดย fetchDayBedBookings (ครบทั้งวัน) — ตั้งที่นี่เฉพาะตอนที่ยังไม่มีข้อมูลทั้งวัน
+        if (dayBedBookings === null) setAvailableBookings(data.availableBookings || []);
+
         // 🌟 เซ็ตค่า Pagination จาก API
         if (data.pagination) {
           setTotalPages(data.pagination.totalPages);
@@ -314,11 +328,59 @@ export default function BedsSpecialPage() {
     }
   };
 
+  // ✅ ดึงรายการจองเตียงของวันนั้น "ทุกหน้า" มารวมกัน (ไล่ตาม pagination.totalPages จนครบ)
+  // คืนค่า { all, available } โดย de-duplicate ด้วย special_booking_id / booking_id
+  const loadAllBedBookingsOfDay = async () => {
+    const roleId = user?.role_id?.toString() || "";
+    const PAGE_SIZE = 100;
+    const MAX_PAGES = 50; // กันวนไม่รู้จบหาก API ตอบ totalPages ผิดปกติ
+    const all = new Map<number, SpecialBedBooking>();
+    const avail = new Map<number, BookingRecord>();
+    let p = 1;
+    let pages = 1;
+
+    do {
+      const qs = new URLSearchParams({
+        date,
+        role_id: roleId,
+        is_admin: isUserAdmin ? "true" : "false",
+        user_name: user?.name || "",
+        page: String(p),
+        limit: String(PAGE_SIZE),
+      });
+      const res = await fetch(`/api/beds-special-bookings?${qs.toString()}`, { cache: "no-store" });
+      const data = await res.json();
+      if (!data?.success) throw new Error(data?.error || "โหลดข้อมูลเตียงไม่สำเร็จ");
+
+      (data.bedBookings || []).forEach((b: SpecialBedBooking) => all.set(b.special_booking_id, b));
+      (data.availableBookings || []).forEach((q: BookingRecord) => avail.set(q.booking_id, q));
+
+      pages = Number(data.pagination?.totalPages) || 1;
+      p += 1;
+    } while (p <= pages && p <= MAX_PAGES);
+
+    return { all: Array.from(all.values()), available: Array.from(avail.values()) };
+  };
+
+  const fetchDayBedBookings = async () => {
+    const seq = ++dayFetchSeq.current;
+    try {
+      const { all, available } = await loadAllBedBookingsOfDay();
+      if (seq !== dayFetchSeq.current) return; // มี request ใหม่กว่าแล้ว
+      setDayBedBookings(all);
+      setAvailableBookings(available);
+    } catch (err) {
+      if (seq !== dayFetchSeq.current) return;
+      console.warn("Error fetching all bed bookings of the day:", err);
+      setDayBedBookings(null); // fallback ไปใช้ bedBookings (หน้าปัจจุบัน)
+    }
+  };
+
+  // ข้อมูลที่ผังเตียงใช้: ทั้งวัน ถ้าไม่มีให้ fallback เป็นข้อมูลหน้าปัจจุบัน
+  const mapBookings = dayBedBookings ?? bedBookings;
+
   const getBedReservation = (bedId: number, slot: string) => {
-    // เนื่องจากระบบแบ่งหน้า bedBookings อาจจะมาไม่ครบทุกเตียง
-    // 🌟 แนะนำ: สำหรับผังเตียงด้านบน ควรมี API แยกหรือ Query แยกที่ดึงข้อมูลเตียงทั้งวันมาโชว์ 
-    // โดยไม่สนเรื่องการแบ่งหน้า (Pagination) เพื่อให้ผังทำงานได้ 100%
-    return bedBookings.find(
+    return mapBookings.find(
       (b) => b.bed_id === bedId && normalizeSlot(b.time_slot) === normalizeSlot(slot) && b.booking_status !== "ยกเลิก"
     );
   };
@@ -398,6 +460,34 @@ export default function BedsSpecialPage() {
       return;
     }
 
+    // ✅ ตรวจซ้ำด้วยข้อมูลสดทั้งวันก่อนบันทึก กันจองซ้อน (เตียงเดียวกัน/ช่วงเวลาเดียวกัน หรือคิวเดียวกันมีเตียงแล้ว)
+    try {
+      const { all } = await loadAllBedBookingsOfDay();
+      const active = all.filter((b) => b.booking_status !== "ยกเลิก");
+      const bedTaken = active.find(
+        (b) =>
+          b.bed_id === selectedBed.id &&
+          normalizeSlot(b.time_slot) === normalizeSlot(selectedQueue.time_slot)
+      );
+      if (bedTaken) {
+        setDayBedBookings(all);
+        alert(`ไม่สามารถจองได้: เตียง "${selectedBed.bed_name}" ในช่วงเวลา ${selectedQueue.time_slot} ถูกจองไปแล้ว (คนไข้: ${bedTaken.patient_name})`);
+        setBookingDialogOpen(false);
+        fetchBedBookings();
+        return;
+      }
+      const queueHasBed = active.find((b) => b.booking_id === selectedQueue.booking_id);
+      if (queueHasBed) {
+        setDayBedBookings(all);
+        alert(`ไม่สามารถจองได้: คิวนี้ถูกลงเตียง "${queueHasBed.bed_name}" ไปแล้ว`);
+        setBookingDialogOpen(false);
+        fetchBedBookings();
+        return;
+      }
+    } catch (err) {
+      console.warn("ตรวจสอบเตียงซ้ำก่อนบันทึกไม่สำเร็จ (ให้เซิร์ฟเวอร์ตรวจต่อ):", err);
+    }
+
     const payload = {
       bed_id: selectedBed.id,
       booking_id: selectedQueue.booking_id,
@@ -419,6 +509,7 @@ export default function BedsSpecialPage() {
       if (data?.success) {
         alert("บันทึกการจองเตียงพิเศษเรียบร้อยแล้ว");
         fetchBedBookings();
+        fetchDayBedBookings();
       } else {
         alert(data?.error || "ไม่สามารถบันทึกการจองเตียงได้");
       }
@@ -446,6 +537,7 @@ export default function BedsSpecialPage() {
       if (data?.success) {
         alert("ยกเลิกการจองเตียงพิเศษเรียบร้อยแล้ว");
         fetchBedBookings();
+        fetchDayBedBookings();
       } else {
         alert("เกิดข้อผิดพลาดในการยกเลิกรายการ");
       }

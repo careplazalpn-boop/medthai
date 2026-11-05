@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useContext, useRef, createContext } from "react";
+import { useState, useEffect, useContext, useRef, useMemo, createContext } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Calendar as CalendarIcon,
@@ -15,7 +15,12 @@ import {
   Check,
   CheckCircle2,
   X,
-  BedDouble
+  BedDouble,
+  Users,
+  CalendarCheck,
+  CalendarX,
+  ClipboardList,
+  Activity
 } from "lucide-react";
 import * as Dialog from "@radix-ui/react-dialog";
 
@@ -90,7 +95,7 @@ const getLocalDateStr = (addDays = 0) => {
 const MIN_DATE_STR = getLocalDateStr(0);
 const MAX_DATE_STR = getLocalDateStr(30);
 
-// 🎨 (UI เท่านั้น) แปลงวันที่เป็นข้อความภาษาไทยเพื่อแสดงผล — ไม่ได้ใช้ในการคำนวณ/ส่งข้อมูล
+// 🎨 (UI เท่านั้น) แปลงวันที่เป็นข้อความภาษาไทยเพื่อแสดงผล
 const formatThaiDateLabel = (value: string) => {
   if (!value) return "";
   const [y, m, d] = value.split("-").map(Number);
@@ -138,6 +143,14 @@ export default function BookingPage() {
   const [patientFirstName, setPatientFirstName] = useState("");
   const [patientLastName, setPatientLastName] = useState("");
   const [patientPhone, setPatientPhone] = useState("");
+
+  // --- State สำหรับ Dashboard สรุปคิวแพทย์ทั่วไป ---
+  const [generalStats, setGeneralStats] = useState({
+    totalCapacity: 0,
+    booked: 0,
+    available: 0,
+    disabled: 0
+  });
 
   useEffect(() => {
     if (!showAlert) return;
@@ -188,7 +201,6 @@ export default function BookingPage() {
       );
       setDialogTherapist(matched ? matched.name : "");
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.role_id, medStaff]);
 
   useEffect(() => {
@@ -219,7 +231,6 @@ export default function BookingPage() {
           "16:00-17:30"
         ]);
       });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.role, user?.role_id]);
 
   useEffect(() => {
@@ -259,8 +270,71 @@ export default function BookingPage() {
       setOffTherapists(data?.success ? data.offTherapists || [] : []);
       setDisabledSlots(data?.success ? data.disabledSlotsByTherapist || {} : {});
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date, user?.role, user?.role_id]);
+
+  // 🌟 Logic คำนวณสรุปข้อมูลแพทย์ทั่วไป
+  useEffect(() => {
+    if (!date || therapists.length === 0 || timeSlots.length === 0) return;
+
+    let totalCap = 0;
+    let totalBooked = 0;
+    let totalDisabled = 0;
+    let totalAvailable = 0;
+
+    // กรองเฉพาะแพทย์ทั่วไป (therapist_type !== 1) 
+    // (หากเงื่อนไขแพทย์พิเศษของคุณคือค่าอื่น ให้ปรับตรงนี้ครับ)
+    const generalTherapists = therapists.filter(t => t.therapist_type !== 1);
+
+    generalTherapists.forEach(t => {
+      // ถ้าหมอหยุดทั้งวัน = ไม่มี Capacity เลยในวันนั้น
+      if (offTherapists.includes(t.name)) return;
+
+      const disabledByT = disabledSlots[t.name] || [];
+      const bookedByT = bookedSlots[t.name] || [];
+
+      // Capacity เริ่มต้นคือจำนวน Time Slot ทั้งหมด
+      totalCap += timeSlots.length;
+
+      timeSlots.forEach(slot => {
+        const isSlotDisabled = disabledByT.includes(slot);
+        const isSlotBooked = bookedByT.some(b => b.time_slot === slot);
+
+        if (isSlotDisabled) {
+          totalDisabled += 1;
+        } else if (isSlotBooked) {
+          totalBooked += 1;
+        } else {
+          totalAvailable += 1;
+        }
+      });
+    });
+
+    setGeneralStats({
+      totalCapacity: totalCap,
+      booked: totalBooked,
+      available: totalAvailable,
+      disabled: totalDisabled
+    });
+  }, [date, therapists, timeSlots, bookedSlots, disabledSlots, offTherapists]);
+
+  // 🌟 สรุปรายช่วงเวลา (เฉพาะแพทย์ทั่วไป therapist_type !== 1) — ใช้กับการ์ดด้านล่าง
+  // capacity = จำนวนแพทย์ทั่วไปที่ยังไม่หยุดและช่วงเวลานั้นไม่ถูกปิด
+  // booked   = จำนวนแพทย์ที่มีคิวจองในช่วงเวลานั้น
+  const slotStats = useMemo(() => {
+    const generalTherapists = therapists.filter(t => t.therapist_type !== 1);
+    return timeSlots.map(slot => {
+      let capacity = 0;
+      let booked = 0;
+      generalTherapists.forEach(t => {
+        if (offTherapists.includes(t.name)) return;
+        const disabled = disabledSlots[t.name] || [];
+        if (disabled.includes(slot)) return;
+        capacity += 1;
+        if (bookedSlots[t.name]?.some(b => b.time_slot === slot)) booked += 1;
+      });
+      return { slot, capacity, booked, available: capacity - booked };
+    });
+  }, [timeSlots, therapists, bookedSlots, disabledSlots, offTherapists]);
 
   const formatPhone = (value: string) => {
     const digits = value.replace(/\D/g, "");
@@ -411,7 +485,6 @@ export default function BookingPage() {
     setSearchResults([]);
   };
 
-  // 🌟 ปรับปรุง 1: ส่ง Role ไปด้วย เพื่อให้ API เช็คสิทธิ์ว่าใครกดปิด (ทั้งวัน)
   const toggleOffTherapist = async (therapist: string) => {
     if (isGuest) {
       alert("โหมดดูอย่างเดียว ไม่สามารถอัปเดตหมอไม่มาได้");
@@ -422,22 +495,15 @@ export default function BookingPage() {
       const res = await fetch("/api/toggle-off-therapist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // 🌟 ส่ง Role เข้าไปด้วย (Admin / 909 หรือ user)
         body: JSON.stringify({ therapist, date, role: user?.role || "user" }),
       });
       const data = await res.json();
       if (data?.success) {
         setOffTherapists(prev => prev.includes(therapist) ? prev.filter(t => t !== therapist) : [...prev, therapist]);
-      } else {
-        // 🌟 ดัก Alert แจ้งเตือนหากโดนแอดมินล็อค (API ส่ง error กลับมา)
-        alert(data.error || "ไม่สามารถอัปเดตหมอไม่มาได้");
-      }
-    } catch { 
-      alert("เกิดข้อผิดพลาดในการอัปเดตหมอไม่มา"); 
-    }
+      } else alert(data.error || "ไม่สามารถอัปเดตหมอไม่มาได้");
+    } catch { alert("เกิดข้อผิดพลาดในการอัปเดตหมอไม่มา"); }
   };
 
-  // 🌟 ปรับปรุง 2: ส่ง Role ไปด้วย เพื่อให้ API เช็คสิทธิ์ว่าใครกดปิด (ราย Slot)
   const toggleSlot = async (therapist: string, slot: string) => {
     if (isGuest) {
       alert("โหมดดูอย่างเดียว ไม่สามารถอัปเดต slot ได้");
@@ -453,14 +519,6 @@ export default function BookingPage() {
       return;
     }
 
-    if (hasSpecialBed) {
-      const bedName = slotInfo?.bed_name ? ` (${slotInfo.bed_name})` : "";
-      alert(`ไม่สามารถยกเลิกการให้บริการในช่วงเวลา ${slot} ได้!\n\nเนื่องจากมีการจองเตียงพิเศษ${bedName} ของคุณ "${slotInfo?.name}" ในช่วงเวลานี้แล้ว`);
-      return;
-    }
-
-    // ✅ ใหม่: ห้ามปิดช่วงเวลาที่มีการจองคิวแล้ว (ไม่ว่าจะมีเตียงหรือไม่)
-    // บล็อกเฉพาะกรณี "กำลังจะปิด" — ถ้าช่วงเวลานี้ถูกปิดอยู่แล้ว ยังกดเพื่อเปิดกลับได้ตามเดิม
     const isCurrentlyClosed = (disabledSlots[therapist] || []).includes(slot);
     if (slotInfo && !isCurrentlyClosed) {
       alert(`ไม่สามารถปิดช่วงเวลา ${slot} ได้!\n\nเนื่องจากมีการจองคิวของ "${slotInfo.name || "ไม่ระบุ"}" ในช่วงเวลานี้แล้ว`);
@@ -471,7 +529,6 @@ export default function BookingPage() {
       const res = await fetch("/api/toggle-off-therapist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // 🌟 ส่ง Role เข้าไปด้วยเพื่อเช็คสิทธิ์บน Backend
         body: JSON.stringify({ therapist, date, slot, role: user?.role || "user" }),
       });
       const data = await res.json();
@@ -481,13 +538,8 @@ export default function BookingPage() {
           const updated = current.includes(slot) ? current.filter(s => s !== slot) : [...current, slot];
           return { ...prev, [therapist]: updated };
         });
-      } else {
-        // 🌟 ดัก Alert แจ้งเตือน หาก Backend ส่งบอกว่าโดน Admin ล็อคไว้
-        alert(data.error || "ไม่สามารถอัปเดตช่วงเวลาได้");
-      }
-    } catch { 
-      alert("เกิดข้อผิดพลาดในการอัปเดต slot"); 
-    }
+      } else alert(data.error || "ไม่สามารถอัปเดตช่วงเวลาได้");
+    } catch { alert("เกิดข้อผิดพลาดในการอัปเดต slot"); }
   };
 
   const fetchWithLoading = async (url: string, setter: (data: any) => void) => {
@@ -510,14 +562,13 @@ export default function BookingPage() {
       : therapists.filter(t => t.id === user.role_id)
     : therapists;
 
-  // 🎨 ค่าคงที่สำหรับ UI (class ที่ใช้ซ้ำ)
   const inputBase =
     "w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-[15px] text-slate-900 placeholder:text-slate-400 shadow-sm transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-100";
   const labelBase = "mb-1.5 block text-sm font-semibold text-slate-700";
 
   const legendItems: { color: string; label: string; staffOnly?: boolean }[] = [
     { color: "bg-emerald-500", label: "ว่าง" },
-    { color: "bg-rose-400", label: "ไม่ว่าง" },
+    { color: "bg-rose-400", label: "จองแล้ว / ไม่ว่าง" },
     { color: "bg-violet-400", label: "จองโดยแอดมิน", staffOnly: true },
     { color: "bg-amber-400", label: "รอบันทึก HN / แพทย์พิเศษ", staffOnly: true },
     { color: "bg-sky-400", label: "ให้บริการสำเร็จ", staffOnly: true },
@@ -539,9 +590,6 @@ export default function BookingPage() {
         </div>
       )}
 
-      {/* ปุ่ม "HN ?" (เฉพาะ admin) — ย้ายมาเป็น element ของหน้าเอง
-          เพราะ HamburgerMenu ย้ายไปอยู่ใน layout.tsx (global) แล้ว
-          ไม่สามารถส่ง rightSlot เฉพาะหน้าเข้าไปได้อีกต่อไป */}
       {user?.role === "admin" && (
         <>
           <button
@@ -657,48 +705,103 @@ export default function BookingPage() {
       )}
 
       <div className="relative z-10 mx-auto max-w-[1400px] px-4 pb-16 pt-24 sm:px-6">
-        {/* ===== Header ===== */}
-        <header className="mb-8 text-center">
-          <span className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-700">
-            <CalendarIcon className="h-3.5 w-3.5" />
-            {isGuest ? "โหมดดูอย่างเดียว" : "ระบบนัดหมาย"}
-          </span>
-          <h1 className="text-2xl font-extrabold tracking-tight text-emerald-900 sm:text-4xl">
-            {isGuest ? "ดูคิวจองนวดแผนไทย" : "ผู้ให้บริการแพทย์แผนไทยและช่วงเวลา"}
+        
+        {/* 🌟 1. ปรับปรุง Header ให้สวยและเป็นมาตรฐานมากขึ้น */}
+        <header className="mb-8 flex flex-col items-center">
+          <div className="mb-2 inline-flex items-center justify-center rounded-full bg-white/60 px-3.5 py-1.5 text-xs font-bold tracking-wide text-emerald-800 shadow-sm ring-1 ring-emerald-900/10 backdrop-blur-md">
+            <Activity className="mr-1.5 h-3.5 w-3.5 text-emerald-600" />
+            {isGuest ? "โหมดดูข้อมูลคิวจอง" : "ระบบนัดหมายบริการ"}
+          </div>
+          <h1 className="text-xl font-black text-slate-800 sm:text-3xl">
+            {isGuest ? "ดูคิวจองนวดแผนไทย" : "เลือกผู้ให้บริการและรอบเวลา"}
           </h1>
-          <p className="mx-auto mt-2 max-w-xl text-sm text-slate-700 sm:text-base">
-            {isGuest ? "เลือกวันที่เพื่อดูช่วงเวลาที่ว่างของแต่ละท่าน" : "เลือกวันที่ ผู้ให้บริการ และช่วงเวลาที่ต้องการนัดหมาย"}
-          </p>
         </header>
 
-        {/* ===== Date picker card ===== */}
-        <section className="mx-auto mb-6 max-w-md rounded-3xl border border-emerald-200 bg-white p-5 shadow-lg shadow-emerald-900/10">
-          <label className="mb-2 flex items-center gap-2 text-base font-bold text-emerald-800">
-            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-100">
-              <CalendarIcon className="h-4 w-4 text-emerald-700" />
-            </span>
-            {isGuest ? "เลือกวันที่ต้องการดู" : "เลือกวันที่ต้องการนวด"}
-          </label>
-          <input
-            type="date"
-            value={date || ""}
-            min={MIN_DATE_STR}
-            max={MAX_DATE_STR}
-            onChange={e => {
-              const val = e.target.value;
-              setDate(val);
-              if (val) {
-                localStorage.setItem("selectedDate", val);
-              } else {
-                localStorage.removeItem("selectedDate");
-              }
-            }}
-            className={`w-full cursor-pointer rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-100 ${!date ? "text-slate-400" : "text-slate-900"}`}
-          />
-          <p className="mt-2 min-h-[1.25rem] text-center text-sm font-medium text-emerald-700">
-            {date ? formatThaiDateLabel(date) : "ยังไม่ได้เลือกวันที่"}
-          </p>
-        </section>
+        {/* 🌟 ส่วนบน: วันที่ + สรุปคิวรวม + สรุปรายช่วงเวลา รวมเป็น card เดียว */}
+        <div className="mx-auto mb-8 max-w-5xl rounded-3xl border border-emerald-100 bg-gradient-to-br from-white via-emerald-50/70 to-teal-50/80 p-4 shadow-lg shadow-emerald-900/5 backdrop-blur-xl sm:p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
+          
+            {/* วันที่รับบริการ */}
+            <div className="w-full lg:w-60 lg:flex-shrink-0">
+              <label className="mb-2 flex items-center gap-2 text-sm font-extrabold text-slate-800">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100">
+                  <CalendarIcon className="h-4 w-4 text-emerald-700" />
+                </span>
+                วันที่รับบริการ
+              </label>
+              <input
+                type="date"
+                value={date || ""}
+                min={MIN_DATE_STR}
+                max={MAX_DATE_STR}
+                onChange={e => {
+                  const val = e.target.value;
+                  setDate(val);
+                  if (val) localStorage.setItem("selectedDate", val);
+                  else localStorage.removeItem("selectedDate");
+                }}
+                className="w-full cursor-pointer rounded-xl border border-slate-200 bg-slate-50/50 p-3 text-[15px] font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-emerald-500/20"
+              />
+            </div>
+
+            {/* สรุปจำนวนคิวรวม (แพทย์ทั่วไป) — แบบกะทัดรัด */}
+            <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4">
+              {[
+                { label: "รับได้ทั้งหมด", value: generalStats.totalCapacity, icon: <ClipboardList className="h-4 w-4 text-blue-500" />, box: "border-blue-200 bg-blue-50/80", tone: "text-blue-800" },
+                { label: "ว่างให้จอง", value: generalStats.available, icon: <CheckCircle2 className="h-4 w-4 text-emerald-600" />, box: "border-emerald-200 bg-emerald-50/80", tone: "text-emerald-700" },
+                { label: "จองแล้ว", value: generalStats.booked, icon: <Users className="h-4 w-4 text-rose-500" />, box: "border-rose-200 bg-rose-50/80", tone: "text-rose-700" },
+                { label: "ปิดบริการ", value: generalStats.disabled, icon: <CalendarX className="h-4 w-4 text-slate-500" />, box: "border-slate-300 bg-slate-100/90", tone: "text-slate-700" },
+              ].map(item => (
+                <div key={item.label} className={`flex items-center gap-2.5 rounded-xl border px-3 py-2 ${item.box}`}>
+                  <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-white shadow-sm">{item.icon}</span>
+                  <div className="min-w-0">
+                    <div className="truncate text-[10px] font-bold uppercase tracking-wide text-slate-500">{item.label}</div>
+                    <div className={`text-lg font-black leading-tight ${item.tone}`}>
+                      {item.value} <span className="text-[10px] font-bold text-slate-400">คิว</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* สรุปคิวรายช่วงเวลา — จองแล้ว/รับได้ (เฉพาะแพทย์ทั่วไป) */}
+          {date && slotStats.length > 0 && (
+            <div className="mt-4 border-t border-slate-200 pt-4">
+              <div className="mb-2.5 flex items-center gap-2 text-sm font-extrabold text-slate-700">
+                <ClipboardList className="h-4 w-4 text-emerald-600" />
+                สรุปคิวรายช่วงเวลา
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700 border border-amber-200">
+                  เฉพาะแพทย์ทั่วไป
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+                {slotStats.map(s => {
+                  const isFull = s.capacity > 0 && s.available <= 0;
+                  return (
+                    <div
+                      key={s.slot}
+                      className={`rounded-xl border px-2.5 py-2 text-center transition ${
+                        isFull ? "border-rose-200 bg-rose-50/60" : "border-emerald-100 bg-emerald-50/50"
+                      }`}
+                    >
+                      <div className="flex items-center justify-center gap-1 text-[11px] font-bold text-slate-600">
+                        <Clock className="h-3 w-3 text-emerald-600" /> {s.slot}
+                      </div>
+                      <div className="mt-0.5 text-lg font-black leading-tight text-slate-800">
+                        {s.booked}
+                        <span className="text-xs font-bold text-slate-400">/{s.capacity}</span>
+                      </div>
+                      <div className={`text-[10px] font-bold ${isFull ? "text-rose-600" : "text-emerald-700"}`}>
+                        {s.capacity === 0 ? "ไม่มีคิว" : `ว่าง ${s.available}`}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* ===== Selection summary (แสดงเมื่อเลือกช่วงเวลาแล้ว) ===== */}
         <AnimatePresence>
@@ -717,18 +820,18 @@ export default function BookingPage() {
         </AnimatePresence>
 
         {/* ===== Legend ===== */}
-        <div className="mx-auto mb-8 flex max-w-3xl flex-wrap items-center justify-center gap-x-4 gap-y-2 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-xs font-medium text-slate-700 shadow-sm sm:text-sm">
+        <div className="mx-auto mb-8 flex max-w-3xl flex-wrap items-center justify-center gap-x-4 gap-y-2 rounded-2xl border border-slate-200 bg-white/80 backdrop-blur-sm px-4 py-3 text-xs font-bold text-slate-600 shadow-sm">
           {legendItems
             .filter(item => !item.staffOnly || !isGuest)
             .map(item => (
               <span key={item.label} className="flex items-center gap-1.5">
-                <span className={`h-2.5 w-2.5 rounded-full ${item.color}`} />
+                <span className={`h-2.5 w-2.5 rounded-full ${item.color} shadow-sm`} />
                 {item.label}
               </span>
             ))}
         </div>
 
-        {/* ===== Therapist & slots rendering (แนวขวาง: 1 แถว = 1 ผู้ให้บริการ, ช่วงเวลาแบ่งคอลัมน์) ===== */}
+        {/* ===== Therapist & slots rendering ===== */}
         <div className="flex flex-col gap-4">
           {filteredTherapists.length === 0 && (
             <div className="rounded-3xl border border-dashed border-slate-300 bg-white/70 p-10 text-center text-slate-500">
@@ -741,7 +844,6 @@ export default function BookingPage() {
             const isOff = offTherapists.includes(t.name);
             const disabled = disabledSlots[t.name] || [];
             const isSpecialType = t.therapist_type === 1;
-            // 🎨 (UI เท่านั้น) นับช่วงเวลาที่ยังว่างเพื่อแสดงเป็นป้ายสรุป
             const freeCount = isOff
               ? 0
               : timeSlots.filter(
@@ -753,15 +855,15 @@ export default function BookingPage() {
                 key={t.name}
                 className={`flex flex-col gap-4 rounded-3xl border p-4 transition-all duration-300 sm:p-5 lg:flex-row lg:items-stretch lg:gap-5 ${
                   isOff
-                    ? "border-slate-300 border-l-[6px] border-l-slate-400 bg-slate-100"
+                    ? "border-slate-300 border-l-[6px] border-l-slate-400 bg-slate-100/80"
                     : isSpecialType
-                    ? "border-amber-300 border-l-[6px] border-l-amber-500 bg-gradient-to-r from-amber-100 via-amber-50 to-white"
-                    : "border-emerald-300 border-l-[6px] border-l-emerald-600 bg-gradient-to-r from-emerald-100 via-white to-white"
+                    ? "border-amber-300 border-l-[6px] border-l-amber-500 bg-gradient-to-r from-amber-50/90 via-white to-white"
+                    : "border-emerald-300 border-l-[6px] border-l-emerald-600 bg-gradient-to-r from-emerald-50/90 via-white to-white"
                 } ${
                   isSelected
                     ? "shadow-xl shadow-emerald-700/20 ring-4 ring-emerald-300"
-                    : "shadow-lg shadow-slate-900/10 hover:shadow-xl"
-                }`}
+                    : "shadow-lg shadow-slate-900/5 hover:shadow-xl"
+                } backdrop-blur-md`}
               >
                 {/* ===== ซ้าย: ข้อมูลผู้ให้บริการ + ปุ่มจัดการ ===== */}
                 <div className="flex flex-col justify-between gap-3 lg:w-64 lg:flex-shrink-0">
@@ -780,21 +882,21 @@ export default function BookingPage() {
                     <div className="min-w-0 flex-1">
                       <h2
                         className={`text-base font-bold leading-snug sm:text-lg ${
-                          isOff ? "text-slate-500" : isSpecialType ? "text-amber-700" : "text-emerald-900"
+                          isOff ? "text-slate-500" : isSpecialType ? "text-amber-800" : "text-emerald-900"
                         }`}
                       >
                         {idx + 1}. {t.shortname}
                       </h2>
                       <div className="mt-1 flex flex-wrap items-center gap-1.5">
                         {isSpecialType && (
-                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">แพทย์พิเศษ</span>
+                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700 border border-amber-200">แพทย์พิเศษ</span>
                         )}
                         {isOff ? (
-                          <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-600">วันนี้ไม่มา</span>
+                          <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-600 border border-slate-300">วันนี้ไม่มา</span>
                         ) : date && timeSlots.length > 0 ? (
                           <span
-                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                              freeCount > 0 ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-600"
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold border ${
+                              freeCount > 0 ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "bg-rose-100 text-rose-600 border-rose-200"
                             }`}
                           >
                             ว่าง {freeCount}/{timeSlots.length}
@@ -824,7 +926,7 @@ export default function BookingPage() {
                         className={`w-full cursor-pointer rounded-xl py-2.5 text-center text-sm font-bold transition active:scale-[0.99] ${
                           isSelected && selectedTime && date && !isOff
                             ? "bg-emerald-600 text-white shadow-lg shadow-emerald-600/25 hover:bg-emerald-700"
-                            : "cursor-not-allowed bg-slate-100 text-slate-400"
+                            : "cursor-not-allowed bg-slate-200 text-slate-400"
                         }`}
                       >
                         เลือก
@@ -833,7 +935,7 @@ export default function BookingPage() {
                   </div>
                 </div>
 
-                {/* ===== ขวา: ช่วงเวลา แบ่งคอลัมน์ตามจำนวน time slot (ปกติ 6 คอลัมน์) ===== */}
+                {/* ===== ขวา: ช่วงเวลา ===== */}
                 <div
                   style={{ ["--cols" as any]: timeSlots.length || 6 }}
                   className="grid flex-1 grid-cols-2 gap-2.5 border-t border-slate-300/70 pt-4 sm:grid-cols-3 lg:border-l lg:border-l-slate-300/70 lg:border-t-0 lg:pl-5 lg:pt-0 lg:[grid-template-columns:repeat(var(--cols),minmax(0,1fr))]"
@@ -844,11 +946,7 @@ export default function BookingPage() {
                     const isActive = isSelected && selectedTime === slot;
                     const isSlotDisabled = disabled.includes(slot);
                     const hasSpecialBed = !!slotInfo?.has_special_bed;
-                    // ✅ ใหม่: คิวในช่วงเวลานี้ให้บริการสำเร็จแล้ว (bookings.status = "สำเร็จ")
                     const isServiceDone = isBooked && slotInfo?.status === "สำเร็จ";
-                    // 📌 ผู้มารับบริการรายใหม่ที่จองโดยยังไม่มี HN (รอเจ้าหน้าที่บันทึกข้อมูลให้สมบูรณ์ในตาราง new_user)
-                    // 📌 "รอบันทึก HN" = ตรงกับข้อมูลใน new_user (เบอร์โทร) และยังไม่พบว่ามี HN ยืนยันแล้วใน med_user
-                    // (ไม่พึ่งพา bookings.hn อย่างเดียว เพราะอาจไม่ได้ถูกบันทึกไว้ครบทุกกรณี)
                     const isPendingHN = isBooked && !!slotInfo?.is_new_user_pending && !slotInfo?.has_confirmed_hn;
 
                     let bookedBg = "bg-rose-50 text-rose-600 border-rose-200";
@@ -878,7 +976,7 @@ export default function BookingPage() {
                                 ? "scale-[1.03] cursor-pointer border-emerald-600 bg-emerald-600 text-white shadow-lg shadow-emerald-600/25"
                                 : isSpecialType
                                 ? "cursor-pointer border-amber-200 bg-white text-amber-800 shadow-sm hover:border-amber-300 hover:bg-amber-50"
-                                : "cursor-pointer border-slate-200 bg-white text-emerald-800 shadow-sm hover:border-emerald-300 hover:bg-emerald-50"
+                                : "cursor-pointer border-emerald-200 bg-white text-emerald-800 shadow-sm hover:border-emerald-300 hover:bg-emerald-50"
                             }`}
                         >
                           <div className="flex items-center gap-1 text-[13px] font-bold sm:text-sm">
@@ -886,36 +984,32 @@ export default function BookingPage() {
                           </div>
                           {isBooked ? (
                             <div className="flex w-full min-w-0 flex-col items-center gap-1 text-xs">
-                              <span className="w-full truncate text-center">{!isGuest ? `(${slotInfo?.name || "ไม่ระบุ"})` : "ไม่ว่าง"}</span>
+                              <span className="w-full truncate text-center font-bold text-slate-800">{!isGuest ? `(${slotInfo?.name || "ไม่ระบุ"})` : "ไม่ว่าง"}</span>
                               <div className="flex flex-wrap items-center justify-center gap-1">
-                                {/* แสดงสัญลักษณ์เตือน: ผู้มารับบริการรายใหม่ยังไม่มี HN สมบูรณ์ (รอบันทึกจาก new_user) */}
                                 {!isGuest && isPendingHN && (
                                   <span
-                                    className="inline-flex items-center gap-0.5 rounded-md border border-amber-300 bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800"
+                                    className="inline-flex items-center gap-0.5 rounded-md border border-amber-300 bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800 shadow-sm"
                                     title="ผู้มารับบริการรายใหม่ ยังไม่มี HN — รอเจ้าหน้าที่บันทึกข้อมูลให้สมบูรณ์"
                                   >
                                     <AlertTriangle className="h-3.5 w-3.5 text-amber-700" />
                                     <span className="hidden xl:inline">รอบันทึก HN</span>
                                   </span>
                                 )}
-                                {/* ✅ ใหม่: สัญลักษณ์ว่าบริการช่วงเวลานี้สำเร็จแล้ว (แสดงเฉพาะเจ้าหน้าที่ที่ login) */}
                                 {!isGuest && isServiceDone && (
                                   <span
-                                    className="inline-flex items-center gap-0.5 rounded-md border border-sky-300 bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold text-sky-800"
+                                    className="inline-flex items-center gap-0.5 rounded-md border border-sky-300 bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold text-sky-800 shadow-sm"
                                     title="ให้บริการในช่วงเวลานี้สำเร็จแล้ว"
                                   >
                                     <CheckCircle2 className="h-3.5 w-3.5 text-sky-700" />
                                     <span className="hidden xl:inline">สำเร็จแล้ว</span>
                                   </span>
                                 )}
-                                {/* แสดงสัญลักษณ์ไอคอนเตียงพิเศษ */}
                                 {hasSpecialBed && (
                                   <span
-                                    className="inline-flex items-center gap-0.5 rounded-md border border-emerald-300 bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800"
+                                    className="inline-flex items-center gap-0.5 rounded-md border border-emerald-300 bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800 shadow-sm"
                                     title={slotInfo?.bed_name ? `เตียงพิเศษ: ${slotInfo.bed_name}` : "ใช้เตียงพิเศษ"}
                                   >
                                     <BedDouble className="h-3.5 w-3.5 text-emerald-700" />
-                                    {/* แสดงชื่อ/หมายเลขเตียงจาก special_beds.bed_name แทนข้อความ "เตียงพิเศษ" */}
                                     {slotInfo?.bed_name && <span>{slotInfo.bed_name}</span>}
                                   </span>
                                 )}
@@ -924,7 +1018,7 @@ export default function BookingPage() {
                           ) : isOff || isSlotDisabled ? (
                             <span className="text-[11px] font-semibold text-slate-400">ปิดให้บริการ</span>
                           ) : isActive ? (
-                            <span className="flex items-center gap-1 text-[11px] font-semibold">
+                            <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-50">
                               <CheckCircle2 className="h-3 w-3" />เลือกอยู่
                             </span>
                           ) : (
@@ -984,11 +1078,10 @@ export default function BookingPage() {
                 </button>
               </Dialog.Title>
 
-              {/* สรุปรายการที่เลือก */}
-              <div className="mb-5 flex flex-wrap gap-x-4 gap-y-1 rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-                <span className="flex items-center gap-1.5"><UserIcon className="h-4 w-4" />{selectedTherapist}</span>
-                <span className="flex items-center gap-1.5"><CalendarIcon className="h-4 w-4" />{date}</span>
-                <span className="flex items-center gap-1.5"><Clock className="h-4 w-4" />{selectedTime}</span>
+              <div className="mb-5 flex flex-wrap gap-x-4 gap-y-1 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800 border border-emerald-100">
+                <span className="flex items-center gap-1.5"><UserIcon className="h-4 w-4 text-emerald-600" />{selectedTherapist}</span>
+                <span className="flex items-center gap-1.5"><CalendarIcon className="h-4 w-4 text-emerald-600" />{date}</span>
+                <span className="flex items-center gap-1.5"><Clock className="h-4 w-4 text-emerald-600" />{selectedTime}</span>
               </div>
 
               {["hn", "name", "phone"].map((field) => {
@@ -1016,7 +1109,7 @@ export default function BookingPage() {
                         placeholder={
                           field === "hn" ? "กรอก HN" : field === "name" ? "กรอกชื่อ" : "กรอกเบอร์โทร"
                         }
-                        className="flex-1 bg-transparent px-3.5 py-2.5 text-[15px] text-slate-900 placeholder:text-slate-400 focus:outline-none"
+                        className="flex-1 bg-transparent px-3.5 py-2.5 text-[15px] font-bold text-slate-900 placeholder:font-medium placeholder:text-slate-400 focus:outline-none"
                       />
                       {(field === "name" || field === "hn") && !noHN && (
                         <button
@@ -1048,7 +1141,7 @@ export default function BookingPage() {
                     }
                     maxLength={13}
                     placeholder="กรอกหมายเลขบัตรประชาชน"
-                    className={inputBase}
+                    className={inputBase + " font-bold"}
                   />
                 </label>
               )}
@@ -1062,21 +1155,19 @@ export default function BookingPage() {
                       className="flex w-full cursor-pointer items-center justify-between px-3 py-2.5 text-slate-900 transition hover:bg-emerald-50"
                     >
                       <span className="flex flex-col items-start text-left">
-                        <span className="font-semibold">{u.name}</span>
-                        {/* ✅ ใหม่: แสดง HN เพิ่มเติมใต้ชื่อ (แสดงเฉพาะเมื่อมีค่า HN เท่านั้น) */}
+                        <span className="font-bold text-emerald-900">{u.name}</span>
                         {u.hn ? (
-                          <span className="text-xs text-slate-500">HN: {u.hn}</span>
+                          <span className="text-xs font-bold text-emerald-600">HN: {u.hn}</span>
                         ) : (
-                          // ✅ ใหม่: ถ้ายังไม่มี HN ให้แจ้งว่าเป็นข้อมูลชั่วคราว/ยังไม่สมบูรณ์ แทนบรรทัด HN
                           <span
-                            className="text-xs font-medium text-amber-600"
+                            className="text-[11px] font-bold text-amber-600"
                             title="ยังไม่มี HN — รอเจ้าหน้าที่บันทึกข้อมูลให้สมบูรณ์"
                           >
                             ⚠ ข้อมูลชั่วคราว ยังไม่มี HN
                           </span>
                         )}
                       </span>
-                      <span className="text-right text-sm text-slate-500">{u.phone || "ไม่มีเบอร์"}</span>
+                      <span className="text-right text-sm font-semibold text-slate-500">{u.phone || "ไม่มีเบอร์"}</span>
                     </button>
                   ))}
                 </div>
@@ -1105,7 +1196,7 @@ export default function BookingPage() {
               initial={{ opacity: 0, y: -16 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -16 }}
-              className="fixed left-1/2 top-6 z-50 flex -translate-x-1/2 items-center gap-2 rounded-2xl bg-rose-500 px-5 py-3 text-sm font-semibold text-white shadow-xl shadow-rose-500/30"
+              className="fixed left-1/2 top-6 z-50 flex -translate-x-1/2 items-center gap-2 rounded-2xl bg-rose-500 px-5 py-3 text-sm font-bold text-white shadow-xl shadow-rose-500/30"
             >
               <AlertCircle className="h-5 w-5" />
               <span>กรุณาเลือกวันที่ก่อน</span>

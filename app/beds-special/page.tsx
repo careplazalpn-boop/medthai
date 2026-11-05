@@ -254,7 +254,8 @@ export default function BedsSpecialPage() {
       fetchBedBookings();
     }
     // 🌟 เพิ่ม page และ limit เป็น dependency ให้ดึงข้อมูลใหม่เมื่อมีการเปลี่ยนหน้า
-  }, [date, isAuthenticated, user, page, limit]);
+    // ✅ ใช้ field ย่อยของ user แทน object user ทั้งก้อน — กัน re-fetch ซ้ำถ้า context สร้าง user object ใหม่ทุก render
+  }, [date, isAuthenticated, page, limit, user?.role_id, user?.name, isUserAdmin]);
 
   // ✅ ผังเตียง: ดึงข้อมูลทั้งวันแยกต่างหาก — ไม่ขึ้นกับ page/limit ของตารางด้านล่าง
   useEffect(() => {
@@ -326,7 +327,9 @@ export default function BedsSpecialPage() {
     }
   };
 
-  const fetchBedBookings = async () => {
+  // includeAvailable=true เมื่อต้องการให้ API ส่งคิวรอลงเตียงมาด้วย (ใช้เป็น fallback กรณี day-fetch ล้มเหลว)
+  // ปกติข้ามไว้ — ข้อมูลคิวได้จาก fetchDayBedBookings (all=1) อยู่แล้ว ไม่ต้อง query ซ้ำ
+  const fetchBedBookings = async (includeAvailable = false) => {
     setLoading(true);
     try {
       const roleId = user?.role_id?.toString() || "";
@@ -336,7 +339,8 @@ export default function BedsSpecialPage() {
         is_admin: isUserAdmin ? "true" : "false",
         user_name: user?.name || "",
         page: page.toString(),    // 🌟 ส่ง page
-        limit: limit.toString()   // 🌟 ส่ง limit
+        limit: limit.toString(),  // 🌟 ส่ง limit
+        skip_available: includeAvailable ? "0" : "1"
       });
 
       const res = await fetch(`/api/beds-special-bookings?${queryParams.toString()}`);
@@ -344,7 +348,8 @@ export default function BedsSpecialPage() {
       if (data?.success) {
         setBedBookings(data.bedBookings || []);
         // availableBookings ถูกตั้งค่าโดย fetchDayBedBookings (ครบทั้งวัน) — ตั้งที่นี่เฉพาะตอนที่ยังไม่มีข้อมูลทั้งวัน
-        if (dayBedBookings === null) setAvailableBookings(data.availableBookings || []);
+        // หรือเมื่อผู้เรียกขอ includeAvailable (fallback)
+        if (includeAvailable || dayBedBookings === null) setAvailableBookings(data.availableBookings || []);
 
         // 🌟 เซ็ตค่า Pagination จาก API
         if (data.pagination) {
@@ -365,8 +370,31 @@ export default function BedsSpecialPage() {
 
   // ✅ ดึงรายการจองเตียงของวันนั้น "ทุกหน้า" มารวมกัน (ไล่ตาม pagination.totalPages จนครบ)
   // คืนค่า { all, available } โดย de-duplicate ด้วย special_booking_id / booking_id
+  // ✅ ปรับปรุง: ใช้โหมด all=1 ของ API ให้คืนข้อมูลทั้งวันใน request เดียว
+  //    เดิมวนเรียกทีละหน้า (limit=100 × จำนวนหน้า) ทำให้ช้ามากและยิง query หนักซ้ำหลายรอบ
   const loadAllBedBookingsOfDay = async () => {
     const roleId = user?.role_id?.toString() || "";
+    const qs = new URLSearchParams({
+      date,
+      role_id: roleId,
+      is_admin: isUserAdmin ? "true" : "false",
+      user_name: user?.name || "",
+      all: "1",
+    });
+    const res = await fetch(`/api/beds-special-bookings?${qs.toString()}`, { cache: "no-store" });
+    const data = await res.json();
+    if (!data?.success) throw new Error(data?.error || "โหลดข้อมูลเตียงไม่สำเร็จ");
+
+    if (data.all === true) {
+      // API คืนข้อมูลครบทั้งวันแล้ว — de-duplicate เผื่อกรณีข้อมูลซ้ำ (เหมือนเดิม)
+      const allMap = new Map<number, SpecialBedBooking>();
+      const availMap = new Map<number, BookingRecord>();
+      (data.bedBookings || []).forEach((b: SpecialBedBooking) => allMap.set(b.special_booking_id, b));
+      (data.availableBookings || []).forEach((q: BookingRecord) => availMap.set(q.booking_id, q));
+      return { all: Array.from(allMap.values()), available: Array.from(availMap.values()) };
+    }
+
+    // fallback: ถ้า API ไม่รองรับ all=1 (เวอร์ชันเก่า) ให้วนตาม pagination เหมือนเดิม
     const PAGE_SIZE = 100;
     const MAX_PAGES = 50; // กันวนไม่รู้จบหาก API ตอบ totalPages ผิดปกติ
     const all = new Map<number, SpecialBedBooking>();
@@ -375,7 +403,7 @@ export default function BedsSpecialPage() {
     let pages = 1;
 
     do {
-      const qs = new URLSearchParams({
+      const qsPage = new URLSearchParams({
         date,
         role_id: roleId,
         is_admin: isUserAdmin ? "true" : "false",
@@ -383,14 +411,14 @@ export default function BedsSpecialPage() {
         page: String(p),
         limit: String(PAGE_SIZE),
       });
-      const res = await fetch(`/api/beds-special-bookings?${qs.toString()}`, { cache: "no-store" });
-      const data = await res.json();
-      if (!data?.success) throw new Error(data?.error || "โหลดข้อมูลเตียงไม่สำเร็จ");
+      const resPage = await fetch(`/api/beds-special-bookings?${qsPage.toString()}`, { cache: "no-store" });
+      const dataPage = await resPage.json();
+      if (!dataPage?.success) throw new Error(dataPage?.error || "โหลดข้อมูลเตียงไม่สำเร็จ");
 
-      (data.bedBookings || []).forEach((b: SpecialBedBooking) => all.set(b.special_booking_id, b));
-      (data.availableBookings || []).forEach((q: BookingRecord) => avail.set(q.booking_id, q));
+      (dataPage.bedBookings || []).forEach((b: SpecialBedBooking) => all.set(b.special_booking_id, b));
+      (dataPage.availableBookings || []).forEach((q: BookingRecord) => avail.set(q.booking_id, q));
 
-      pages = Number(data.pagination?.totalPages) || 1;
+      pages = Number(dataPage.pagination?.totalPages) || 1;
       p += 1;
     } while (p <= pages && p <= MAX_PAGES);
 
@@ -408,6 +436,8 @@ export default function BedsSpecialPage() {
       if (seq !== dayFetchSeq.current) return;
       console.warn("Error fetching all bed bookings of the day:", err);
       setDayBedBookings(null); // fallback ไปใช้ bedBookings (หน้าปัจจุบัน)
+      // ✅ fallback: ดึง availableBookings มาด้วยเผื่อ day-fetch ล้มเหลว (เหมือนพฤติกรรมเดิมที่ table fetch มีคิวมาด้วย)
+      fetchBedBookings(true);
     }
   };
 

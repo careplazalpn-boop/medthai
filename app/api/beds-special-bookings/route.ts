@@ -26,6 +26,15 @@ export async function GET(req: Request) {
     const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 500) : 10;
     const offset = (page - 1) * limit;
 
+    // ✅ โหมด all=1: คืนข้อมูลการจองเตียงของวันนั้นทั้งหมดใน request เดียว (ไม่แบ่งหน้า)
+    //    ใช้โดยหน้าจองเตียงพิเศษสำหรับ "ผังเตียง" — เดิม frontend ต้องวนเรียก API ทีละหน้า
+    //    (limit=100 ต่อครั้ง × จำนวนหน้า) ทำให้ช้ามากและยิง query หนักซ้ำหลายรอบ
+    const fetchAll = url.searchParams.get("all") === "1";
+
+    // ✅ skip_available=1: ข้ามการดึงคิวรอลงเตียง (availableBookings) — ใช้โดยตาราง pagination
+    //    ที่ frontend มีข้อมูลคิวชุดเดียวกันจาก request all=1 อยู่แล้ว ไม่ต้อง query ซ้ำ
+    const skipAvailable = url.searchParams.get("skip_available") === "1";
+
     if (!date) {
       return NextResponse.json({ success: false, error: "Missing date" }, { status: 400 });
     }
@@ -38,7 +47,8 @@ export async function GET(req: Request) {
     //    "ตกหล่น" ไม่ปรากฏในหน้าใดเลย และบางรายการซ้ำ → เพิ่ม sbb.id เป็นตัวตัดสินให้ลำดับคงที่
     // ✅ แก้ 2: เปลี่ยน LEFT JOIN med_user เป็น subquery ดึงเพศ รับประกัน 1 แถวต่อ 1 การจองเตียง
     //    (ถ้า med_user.hn ซ้ำ JOIN จะทำให้แถวเบิ้ล ทำให้จำนวนแถวไม่ตรงกับ COUNT และแบ่งหน้าเพี้ยน)
-    const [bedBookingRows]: any = await pool.execute(
+    // ✅ ยิง query หลัก (เตียง) ทันทีโดยไม่รอ — ให้ทำงานขนานกับ query คิว/นับด้านล่าง
+    const bedBookingsPromise: Promise<any> = pool.execute(
       `SELECT
          sbb.id AS special_booking_id, sbb.bed_id, sbb.booking_id, sbb.date, sbb.time_slot, sbb.note, sbb.created_by, sbb.status,
          sb.bed_code, sb.bed_name, sb.room_name, sb.bed_type,
@@ -48,25 +58,21 @@ export async function GET(req: Request) {
        INNER JOIN bookings b ON sbb.booking_id = b.id
        INNER JOIN special_beds sb ON sbb.bed_id = sb.id
        WHERE sbb.date = ?
-       ORDER BY sb.bed_name ASC, sbb.id ASC
-       LIMIT ? OFFSET ?`,
-      [date, limit, offset]
+       ORDER BY sb.bed_name ASC, sbb.id ASC${fetchAll ? "" : "\n       LIMIT ? OFFSET ?"}`,
+      fetchAll ? [date] : [date, limit, offset]
     );
 
-    // 1.1 นับจำนวนรายการเตียงทั้งหมดในวันนี้เพื่อทำ Pagination
-    // ✅ แก้ 3: ใช้ INNER JOIN เหมือน query ข้อมูลหลัก — เดิมนับจาก special_bed_bookings อย่างเดียว
-    //    ถ้ามีรายการเตียงที่ booking ถูกลบไปแล้ว (orphan) จะถูกนับแต่ไม่ถูกส่งกลับ ทำให้จำนวนหน้าเกินจริงและมีหน้าว่าง
-    const [countRows]: any = await pool.execute(
-      `SELECT COUNT(*) AS total
-       FROM special_bed_bookings sbb
-       INNER JOIN bookings b ON sbb.booking_id = b.id
-       INNER JOIN special_beds sb ON sbb.bed_id = sb.id
-       WHERE sbb.date = ?`,
-      [date]
-    );
-
-    const totalRecords = Number(countRows[0]?.total) || 0;
-    const totalPages = Math.ceil(totalRecords / limit);
+    // ✅ นับจำนวนรายการ (เฉพาะโหมดแบ่งหน้า) — ยิงพร้อมกันไปเลย ไม่ต้องรอ query หลัก
+    const countPromise: Promise<any> | null = fetchAll
+      ? null
+      : pool.execute(
+          `SELECT COUNT(*) AS total
+           FROM special_bed_bookings sbb
+           INNER JOIN bookings b ON sbb.booking_id = b.id
+           INNER JOIN special_beds sb ON sbb.bed_id = sb.id
+           WHERE sbb.date = ?`,
+          [date]
+        );
 
     // ==============================================================
     // 2. ดึงคิวที่รอลงเตียง (availableBookings) ไม่ต้องทำ Pagination
@@ -84,7 +90,7 @@ export async function GET(req: Request) {
     const availableParams: any[] = [date];
 
     // ✅ ถ้าไม่ใช่ Admin ให้กรองเฉพาะคิวที่ตัวเองดูแล (เป็น Therapist หรือ Provider)
-    if (!isAdmin && roleId !== 909) {
+    if (!skipAvailable && !isAdmin && roleId !== 909) {
       let ownNames: string[] = [userName];
       try {
         const [tRows]: any = await pool.execute(
@@ -110,9 +116,28 @@ export async function GET(req: Request) {
       }
     }
 
-    const [availableRows]: any = await pool.execute(availableQuery, availableParams);
+    // ✅ ยิง query คิวรอลงเตียงทันที (ไม่ await) ให้ทำงานขนานกับ query เตียง/นับที่ยิงไว้ข้างบน
+    //    (ข้าม entirely ถ้าผู้เรียกส่ง skip_available=1)
+    const availablePromise: Promise<any> = skipAvailable
+      ? Promise.resolve([[]])
+      : pool.execute(availableQuery, availableParams);
 
-    // 3. ส่งข้อมูลทั้งหมดกลับไปพร้อมข้อมูลหน้า Pagination
+    // 3. รอผลทุก query พร้อมกัน แล้วส่งข้อมูลทั้งหมดกลับไปพร้อมข้อมูลหน้า Pagination
+    const [bedBookingRows]: any = await bedBookingsPromise;
+    const [availableRows]: any = await availablePromise;
+
+    let totalRecords: number;
+    let totalPages: number;
+    if (fetchAll) {
+      // โหมด all=1 ไม่ต้อง COUNT — ใช้จำนวนแถวที่ได้จริงแทน
+      totalRecords = bedBookingRows.length;
+      totalPages = 1;
+    } else {
+      const [countRows]: any = await countPromise!;
+      totalRecords = Number(countRows[0]?.total) || 0;
+      totalPages = Math.ceil(totalRecords / limit);
+    }
+
     return NextResponse.json({
       success: true,
       bedBookings: bedBookingRows,
@@ -123,6 +148,7 @@ export async function GET(req: Request) {
         totalRecords,
         totalPages,
       },
+      all: fetchAll,
     });
   } catch (error) {
     console.error("Error API beds-special-bookings:", error);

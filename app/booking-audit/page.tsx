@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useEffect, useContext, useRef } from "react";
+import { useState, useEffect, useContext, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { AuthContext } from "@/context/AuthContext";
-import { CalendarIcon, UserIcon, Clock, AlertCircle, UserCheck, UserX, Search } from "lucide-react";
-import { ImSpinner2 } from "react-icons/im";
+import { CalendarIcon, UserIcon, Clock, AlertCircle, UserCheck, UserX, Search, Eye, Loader2 } from "lucide-react";
 import { FaCheck, FaTimes } from "react-icons/fa";
 import * as Dialog from "@radix-ui/react-dialog";
 import { CheckCircle2 } from "lucide-react";
@@ -31,6 +30,7 @@ interface Therapist {
   id: number;
   name: string;
   shortname?: string;
+  therapist_type?: number;
 }
 interface MedStaff {
   id: number;
@@ -87,6 +87,14 @@ export default function BookingPage() {
   const [patientLastName, setPatientLastName] = useState("");
   const [patientPhone, setPatientPhone] = useState("");
 
+  // --- State สำหรับ Dashboard สรุปคิวแพทย์ทั่วไป (UI เหมือนหน้า booking) ---
+  const [generalStats, setGeneralStats] = useState({
+    totalCapacity: 0,
+    booked: 0,
+    available: 0,
+    disabled: 0
+  });
+
   const getLocalDateStr = (addDays = 0) => {
   const d = new Date();
   d.setDate(d.getDate() + addDays);
@@ -95,6 +103,8 @@ export default function BookingPage() {
   const day = String(d.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
   };
+  const MIN_DATE_STR = getLocalDateStr(0);
+  const MAX_DATE_STR = getLocalDateStr(30);
 
 
   useEffect(() => {
@@ -190,6 +200,64 @@ export default function BookingPage() {
     setDisabledSlots(data?.success ? data.disabledSlotsByTherapist || {} : {});
   });
 }, [date]);
+
+  // 🌟 Logic คำนวณสรุปข้อมูลแพทย์ทั่วไป (เหมือนหน้า booking)
+  useEffect(() => {
+    if (!date || therapists.length === 0 || timeSlots.length === 0) return;
+
+    let totalCap = 0;
+    let totalBooked = 0;
+    let totalDisabled = 0;
+    let totalAvailable = 0;
+
+    const generalTherapists = therapists.filter(t => t.therapist_type !== 1);
+
+    generalTherapists.forEach(t => {
+      if (offTherapists.includes(t.name)) return;
+
+      const disabledByT = disabledSlots[t.name] || [];
+      const bookedByT = bookedSlots[t.name] || [];
+
+      totalCap += timeSlots.length;
+
+      timeSlots.forEach(slot => {
+        const isSlotDisabled = disabledByT.includes(slot);
+        const isSlotBooked = bookedByT.some(b => b.time_slot === slot);
+
+        if (isSlotDisabled) {
+          totalDisabled += 1;
+        } else if (isSlotBooked) {
+          totalBooked += 1;
+        } else {
+          totalAvailable += 1;
+        }
+      });
+    });
+
+    setGeneralStats({
+      totalCapacity: totalCap,
+      booked: totalBooked,
+      available: totalAvailable,
+      disabled: totalDisabled
+    });
+  }, [date, therapists, timeSlots, bookedSlots, disabledSlots, offTherapists]);
+
+  // 🌟 สรุปรายช่วงเวลา (เฉพาะแพทย์ทั่วไป) — ใช้กับการ์ดด้านล่าง
+  const slotStats = useMemo(() => {
+    const generalTherapists = therapists.filter(t => t.therapist_type !== 1);
+    return timeSlots.map(slot => {
+      let capacity = 0;
+      let booked = 0;
+      generalTherapists.forEach(t => {
+        if (offTherapists.includes(t.name)) return;
+        const disabled = disabledSlots[t.name] || [];
+        if (disabled.includes(slot)) return;
+        capacity += 1;
+        if (bookedSlots[t.name]?.some(b => b.time_slot === slot)) booked += 1;
+      });
+      return { slot, capacity, booked, available: capacity - booked };
+    });
+  }, [timeSlots, therapists, bookedSlots, disabledSlots, offTherapists]);
 
   const formatPhone = (value: string) => {
     const digits = value.replace(/\D/g, "");
@@ -440,10 +508,10 @@ const filteredTherapists = therapists;
     "w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-[15px] text-slate-900 placeholder:text-slate-400 shadow-sm transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-100";
   const labelBase = "mb-1.5 block text-sm font-semibold text-slate-700";
 
-  const legendItems: { color: string; label: string }[] = [
+  const legendItems: { color: string; label: string; staffOnly?: boolean }[] = [
     { color: "bg-emerald-500", label: "ว่าง" },
-    { color: "bg-rose-400", label: "ไม่ว่าง" },
-    { color: "bg-violet-400", label: "จองโดยแอดมิน" },
+    { color: "bg-rose-400", label: "จองแล้ว / ไม่ว่าง" },
+    { color: "bg-violet-400", label: "จองโดยแอดมิน", staffOnly: true },
     { color: "bg-slate-300", label: "ปิด/หยุด" },
   ];
 
@@ -456,7 +524,7 @@ const filteredTherapists = therapists;
       {loading && (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-900/30 backdrop-blur-[2px]">
           <div className="flex items-center gap-3 rounded-2xl bg-white px-5 py-4 shadow-2xl">
-            <ImSpinner2 className="h-6 w-6 animate-spin text-emerald-600" />
+            <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
             <span className="text-sm font-semibold text-slate-700">กำลังโหลดข้อมูล...</span>
           </div>
         </div>
@@ -467,12 +535,12 @@ const filteredTherapists = therapists;
           ด้านล่างแทน โดย state/handler/Dialog ทั้งหมดยังเหมือนเดิมทุกประการ ไม่มีการแก้ไข logic */}
       <div className="relative z-10 mx-auto max-w-[1400px] px-4 pb-16 pt-24 sm:px-6">
         {user?.role === "admin" && (
-          <div className="mb-4 flex justify-end">
-            <button
-              onClick={() => setAddPatientDialog(true)}
-              className="flex cursor-pointer items-center gap-1.5 rounded-full bg-emerald-700 px-4 py-2 text-xs font-bold text-white shadow-lg transition hover:bg-emerald-800 sm:text-sm"
-              title="คนไข้มี HN แต่หาไม่เจอ"
-            >
+          <>
+          <button
+            onClick={() => setAddPatientDialog(true)}
+            className="fixed top-16 right-3 z-40 flex cursor-pointer items-center gap-1.5 rounded-full border border-emerald-100 bg-white/90 px-3.5 py-2 text-xs font-bold text-emerald-700 shadow-lg backdrop-blur transition hover:bg-emerald-50 hover:shadow-xl sm:right-4 sm:text-sm"
+            title="คนไข้มี HN แต่หาไม่เจอ"
+          >
               <Search className="h-3.5 w-3.5" />
               HN ?
             </button>
@@ -580,7 +648,7 @@ const filteredTherapists = therapists;
                 </Dialog.Content>
               </Dialog.Portal>
             </Dialog.Root>
-          </div>
+          </>
         )}
 
         {/* ===== Header ===== */}

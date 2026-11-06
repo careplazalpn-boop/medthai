@@ -4,7 +4,7 @@ import { useState, useEffect, useContext, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { AuthContext } from "@/context/AuthContext";
-import { CalendarIcon, UserIcon, Clock, AlertCircle, UserCheck, UserX, Search, Eye, Loader2 } from "lucide-react";
+import { CalendarIcon, UserIcon, Clock, AlertCircle, UserCheck, UserX, Search, Eye, Loader2, ClipboardList } from "lucide-react";
 import { FaCheck, FaTimes } from "react-icons/fa";
 import * as Dialog from "@radix-ui/react-dialog";
 import { CheckCircle2 } from "lucide-react";
@@ -127,6 +127,8 @@ export default function BookingPage() {
       } else {
         setDate(savedDate);
       }
+    } else {
+      setDate(getLocalDateStr(0)); // ค่าเริ่มต้น = วันที่ปัจจุบัน
     }
   }, []);
 
@@ -692,6 +694,63 @@ const filteredTherapists = therapists;
             {date ? formatThaiDateLabel(date) : "ยังไม่ได้เลือกวันที่"}
           </p>
         </section>
+
+        {/* สรุปคิวรายช่วงเวลา — จองแล้ว/รับได้ (เฉพาะแพทย์ทั่วไป) เหมือนหน้า booking */}
+        {date && slotStats.length > 0 && (
+          <section className="mx-auto mb-6 max-w-5xl rounded-3xl border border-emerald-100 bg-gradient-to-br from-white via-emerald-50/70 to-teal-50/80 p-4 shadow-lg shadow-emerald-900/5 sm:p-5">
+            <div className="mb-2.5 flex items-center gap-2 text-sm font-extrabold text-slate-700">
+              <ClipboardList className="h-4 w-4 text-emerald-600" />
+              สรุปคิวรายช่วงเวลา
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700 border border-amber-200">
+                เฉพาะแพทย์ทั่วไป
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+              {slotStats.map(s => {
+                const isFull = s.capacity > 0 && s.available <= 0;
+                // 🎨 (UI เท่านั้น) ไล่ระดับสีตามสัดส่วนคิวว่าง: ว่างทั้งหมด → ว่างบางส่วน → ใกล้เต็ม → เต็ม
+                const ratio = s.capacity > 0 ? s.available / s.capacity : 0;
+                const tone =
+                  s.capacity === 0
+                    ? { box: "border-slate-200 bg-slate-50", icon: "text-slate-400", text: "text-slate-400", bar: "bg-slate-300" }
+                    : isFull
+                    ? { box: "border-rose-300 bg-gradient-to-br from-rose-100 to-rose-50", icon: "text-rose-500", text: "text-rose-700", bar: "bg-rose-500" }
+                    : ratio <= 1 / 3
+                    ? { box: "border-amber-300 bg-gradient-to-br from-amber-100 to-amber-50", icon: "text-amber-600", text: "text-amber-700", bar: "bg-amber-500" }
+                    : ratio < 1
+                    ? { box: "border-lime-300 bg-gradient-to-br from-lime-100 to-emerald-50", icon: "text-lime-700", text: "text-lime-700", bar: "bg-lime-500" }
+                    : { box: "border-emerald-400 bg-gradient-to-br from-emerald-200 to-teal-100", icon: "text-emerald-700", text: "text-emerald-800", bar: "bg-emerald-600" };
+                const bookedPct = s.capacity > 0 ? Math.min(100, Math.round((s.booked / s.capacity) * 100)) : 0;
+                return (
+                  <div
+                    key={s.slot}
+                    className={`rounded-xl border px-2.5 py-2 text-center transition ${tone.box}`}
+                  >
+                    <div className="flex items-center justify-center gap-1 text-[11px] font-bold text-slate-600">
+                      <Clock className={`h-3 w-3 ${tone.icon}`} /> {s.slot}
+                    </div>
+                    <div className="mt-0.5 text-lg font-black leading-tight text-slate-800">
+                      {s.booked}
+                      <span className="text-xs font-bold text-slate-400">/{s.capacity}</span>
+                    </div>
+                    <div className="mx-auto mt-1 h-1.5 w-full overflow-hidden rounded-full bg-white/80">
+                      <div className={`h-full rounded-full ${tone.bar}`} style={{ width: `${bookedPct}%` }} />
+                    </div>
+                    <div className={`mt-1 text-[10px] font-bold ${tone.text}`}>
+                      {s.capacity === 0
+                        ? "ไม่มีคิว"
+                        : isFull
+                        ? "เต็ม (ว่าง 0)"
+                        : ratio >= 1
+                        ? `ว่างทั้งหมด ${s.available}`
+                        : `ว่าง ${s.available}`}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
 
         {/* ===== Legend ===== */}
         <div className="mx-auto mb-8 flex max-w-3xl flex-wrap items-center justify-center gap-x-4 gap-y-2 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-xs font-medium text-slate-700 shadow-sm sm:text-sm">

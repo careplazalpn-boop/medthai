@@ -168,7 +168,6 @@ export default function BedsSpecialPage() {
   const paramDate = searchParams?.get('date');
   const paramTime = searchParams?.get('time');
   const paramHn = searchParams?.get('hn');
-  const paramCid = searchParams?.get('cid');
   const paramName = searchParams?.get('name'); // คนไข้ใหม่ที่ยังไม่มี HN: ใช้ชื่อจับคู่คิว
 
   const { user } = (useContext(AuthContext) || {}) as {
@@ -211,7 +210,7 @@ export default function BedsSpecialPage() {
 
   const [loading, setLoading] = useState<boolean>(false);
   const [bookingDialogOpen, setBookingDialogOpen] = useState<boolean>(false);
-  const [searchTerm, setSearchTerm] = useState<string>(paramHn || paramName || paramCid || "");
+  const [searchTerm, setSearchTerm] = useState<string>(paramHn || paramName || "");
   const [hasAttemptedAutoSelect, setHasAttemptedAutoSelect] = useState(false);
 
   // 🌟 State สำหรับ Pagination (ตารางด้านล่าง)
@@ -232,7 +231,8 @@ export default function BedsSpecialPage() {
     const sp = new URLSearchParams(window.location.search);
     const d = formatToLocalDateStr(sp.get("date"));
     const t = sp.get("time");
-    const term = sp.get("hn") || sp.get("name") || sp.get("cid") || "";
+    // ไม่ใช้ cid เป็นคำค้น: ข้อมูลคิวไม่มีเลขบัตร ถ้าใช้จะกรองรายชื่อคนไข้ไม่มี HN จนว่าง
+    const term = sp.get("hn") || sp.get("name") || "";
 
     if (d) setDate(d);
     if (t) {

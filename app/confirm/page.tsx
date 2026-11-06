@@ -134,6 +134,8 @@ export default function ConfirmPage() {
                   if (date) queryParams.set("date", date);
                   if (time) queryParams.set("time", time);
                   if (hn) queryParams.set("hn", hn);
+                  // คนไข้ใหม่ที่ยังไม่มี HN → ส่งชื่อไปให้หน้าเตียงจับคู่คิว (เหมือนหน้า all-bookings)
+                  if (!hn && name) queryParams.set("name", name);
                   if (idCard) queryParams.set("cid", idCard); 
                   if (sex) queryParams.set("sex", sex); // 🌟 ส่งต่อ sex ไปหน้า beds-special
                   

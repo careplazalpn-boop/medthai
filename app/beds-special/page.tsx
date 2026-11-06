@@ -168,7 +168,6 @@ export default function BedsSpecialPage() {
   const paramDate = searchParams?.get('date');
   const paramTime = searchParams?.get('time');
   const paramHn = searchParams?.get('hn');
-  const paramCid = searchParams?.get('cid');
   const paramName = searchParams?.get('name'); // คนไข้ใหม่ที่ยังไม่มี HN: ใช้ชื่อจับคู่คิว
 
   const { user } = (useContext(AuthContext) || {}) as {
@@ -203,6 +202,7 @@ export default function BedsSpecialPage() {
   const [dayBedBookings, setDayBedBookings] = useState<SpecialBedBooking[] | null>(null);
   const [availableBookings, setAvailableBookings] = useState<BookingRecord[]>([]);
   const dayFetchSeq = useRef(0); // กัน response เก่าทับข้อมูลใหม่
+  const tableFetchSeq = useRef(0); // กัน response เก่าของตาราง (เช่น วันที่ก่อนอ่าน URL) ทับข้อมูลใหม่
 
   const [selectedBed, setSelectedBed] = useState<SpecialBed | null>(null);
   const [selectedQueue, setSelectedQueue] = useState<BookingRecord | null>(null);
@@ -210,7 +210,7 @@ export default function BedsSpecialPage() {
 
   const [loading, setLoading] = useState<boolean>(false);
   const [bookingDialogOpen, setBookingDialogOpen] = useState<boolean>(false);
-  const [searchTerm, setSearchTerm] = useState<string>(paramHn || paramName || paramCid || "");
+  const [searchTerm, setSearchTerm] = useState<string>(paramHn || paramName || "");
   const [hasAttemptedAutoSelect, setHasAttemptedAutoSelect] = useState(false);
 
   // 🌟 State สำหรับ Pagination (ตารางด้านล่าง)
@@ -231,7 +231,8 @@ export default function BedsSpecialPage() {
     const sp = new URLSearchParams(window.location.search);
     const d = formatToLocalDateStr(sp.get("date"));
     const t = sp.get("time");
-    const term = sp.get("hn") || sp.get("name") || sp.get("cid") || "";
+    // ไม่ใช้ cid เป็นคำค้น: ข้อมูลคิวไม่มีเลขบัตร ถ้าใช้จะกรองรายชื่อคนไข้ไม่มี HN จนว่าง
+    const term = sp.get("hn") || sp.get("name") || "";
 
     if (d) setDate(d);
     if (t) {
@@ -330,6 +331,7 @@ export default function BedsSpecialPage() {
   // includeAvailable=true เมื่อต้องการให้ API ส่งคิวรอลงเตียงมาด้วย (ใช้เป็น fallback กรณี day-fetch ล้มเหลว)
   // ปกติข้ามไว้ — ข้อมูลคิวได้จาก fetchDayBedBookings (all=1) อยู่แล้ว ไม่ต้อง query ซ้ำ
   const fetchBedBookings = async (includeAvailable = false) => {
+    const seq = ++tableFetchSeq.current;
     setLoading(true);
     try {
       const roleId = user?.role_id?.toString() || "";
@@ -345,11 +347,13 @@ export default function BedsSpecialPage() {
 
       const res = await fetch(`/api/beds-special-bookings?${queryParams.toString()}`);
       const data = await res.json();
+      if (seq !== tableFetchSeq.current) return; // มี request ใหม่กว่าแล้ว
       if (data?.success) {
         setBedBookings(data.bedBookings || []);
-        // availableBookings ถูกตั้งค่าโดย fetchDayBedBookings (ครบทั้งวัน) — ตั้งที่นี่เฉพาะตอนที่ยังไม่มีข้อมูลทั้งวัน
-        // หรือเมื่อผู้เรียกขอ includeAvailable (fallback)
-        if (includeAvailable || dayBedBookings === null) setAvailableBookings(data.availableBookings || []);
+        // availableBookings ถูกตั้งค่าโดย fetchDayBedBookings (ครบทั้งวัน) — ตั้งที่นี่เฉพาะเมื่อผู้เรียกขอ includeAvailable (fallback)
+        // ✅ แก้: เดิมตั้งค่าด้วยเมื่อ dayBedBookings === null แต่โหมดปกติส่ง skip_available=1 ทำให้ API คืนคิวเป็น [] เสมอ
+        //    ถ้า request นี้ตอบกลับช้ากว่า fetchDayBedBookings จะล้างรายชื่อคิวทิ้ง → หน้าต่างลงเตียงไม่มีรายชื่อให้เลือก
+        if (includeAvailable) setAvailableBookings(data.availableBookings || []);
 
         // 🌟 เซ็ตค่า Pagination จาก API
         if (data.pagination) {
@@ -358,13 +362,14 @@ export default function BedsSpecialPage() {
         }
       } else {
         setBedBookings([]);
-        setAvailableBookings([]);
+        if (includeAvailable) setAvailableBookings([]);
       }
     } catch {
+      if (seq !== tableFetchSeq.current) return;
       setBedBookings([]);
-      setAvailableBookings([]);
+      if (includeAvailable) setAvailableBookings([]);
     } finally {
-      setLoading(false);
+      if (seq === tableFetchSeq.current) setLoading(false);
     }
   };
 
@@ -1041,7 +1046,8 @@ export default function BedsSpecialPage() {
                 </span>
               </div>
 
-              {slotMatchingQueues.length > 1 && (
+              {/* ✅ แสดงช่องค้นหาเมื่อมีคำค้นหาค้างอยู่ด้วย (เช่น HN/ชื่อ/เลขบัตรที่ส่งมาจาก URL) ให้ลบคำค้นหาเพื่อดูรายชื่อได้ */}
+              {(slotMatchingQueues.length > 1 || searchTerm !== "") && (
                 <div className="relative mt-2">
                   <Search className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
                   <input

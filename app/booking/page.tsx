@@ -778,22 +778,42 @@ export default function BookingPage() {
               <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
                 {slotStats.map(s => {
                   const isFull = s.capacity > 0 && s.available <= 0;
+                  // 🎨 (UI เท่านั้น) ไล่ระดับสีตามสัดส่วนคิวว่าง: ว่างทั้งหมด → ว่างบางส่วน → ใกล้เต็ม → เต็ม
+                  const ratio = s.capacity > 0 ? s.available / s.capacity : 0;
+                  const tone =
+                    s.capacity === 0
+                      ? { box: "border-slate-200 bg-slate-50", icon: "text-slate-400", text: "text-slate-400", bar: "bg-slate-300" }
+                      : isFull
+                      ? { box: "border-rose-300 bg-gradient-to-br from-rose-100 to-rose-50", icon: "text-rose-500", text: "text-rose-700", bar: "bg-rose-500" }
+                      : ratio <= 1 / 3
+                      ? { box: "border-amber-300 bg-gradient-to-br from-amber-100 to-amber-50", icon: "text-amber-600", text: "text-amber-700", bar: "bg-amber-500" }
+                      : ratio < 1
+                      ? { box: "border-lime-300 bg-gradient-to-br from-lime-100 to-emerald-50", icon: "text-lime-700", text: "text-lime-700", bar: "bg-lime-500" }
+                      : { box: "border-emerald-400 bg-gradient-to-br from-emerald-200 to-teal-100", icon: "text-emerald-700", text: "text-emerald-800", bar: "bg-emerald-600" };
+                  const bookedPct = s.capacity > 0 ? Math.min(100, Math.round((s.booked / s.capacity) * 100)) : 0;
                   return (
                     <div
                       key={s.slot}
-                      className={`rounded-xl border px-2.5 py-2 text-center transition ${
-                        isFull ? "border-rose-200 bg-rose-50/60" : "border-emerald-100 bg-emerald-50/50"
-                      }`}
+                      className={`rounded-xl border px-2.5 py-2 text-center transition ${tone.box}`}
                     >
                       <div className="flex items-center justify-center gap-1 text-[11px] font-bold text-slate-600">
-                        <Clock className="h-3 w-3 text-emerald-600" /> {s.slot}
+                        <Clock className={`h-3 w-3 ${tone.icon}`} /> {s.slot}
                       </div>
                       <div className="mt-0.5 text-lg font-black leading-tight text-slate-800">
                         {s.booked}
                         <span className="text-xs font-bold text-slate-400">/{s.capacity}</span>
                       </div>
-                      <div className={`text-[10px] font-bold ${isFull ? "text-rose-600" : "text-emerald-700"}`}>
-                        {s.capacity === 0 ? "ไม่มีคิว" : `ว่าง ${s.available}`}
+                      <div className="mx-auto mt-1 h-1.5 w-full overflow-hidden rounded-full bg-white/80">
+                        <div className={`h-full rounded-full ${tone.bar}`} style={{ width: `${bookedPct}%` }} />
+                      </div>
+                      <div className={`mt-1 text-[10px] font-bold ${tone.text}`}>
+                        {s.capacity === 0
+                          ? "ไม่มีคิว"
+                          : isFull
+                          ? "เต็ม (ว่าง 0)"
+                          : ratio >= 1
+                          ? `ว่างทั้งหมด ${s.available}`
+                          : `ว่าง ${s.available}`}
                       </div>
                     </div>
                   );

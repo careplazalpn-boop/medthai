@@ -175,6 +175,9 @@ export default function BookingPage() {
       } else {
         setDate(savedDate);
       }
+    } else {
+      // เปิดครั้งแรก (ยังไม่เคยเลือกวันที่) → เริ่มที่วันนี้ ทุกสิทธิ์ (admin / user / guest)
+      setDate(getLocalDateStr(0));
     }
   }, []);
 

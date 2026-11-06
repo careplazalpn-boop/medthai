@@ -4,7 +4,7 @@ import { useState, useEffect, useContext, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { AuthContext } from "@/context/AuthContext";
-import { CalendarIcon, UserIcon, Clock, AlertCircle, UserCheck, UserX, Search, Eye, Loader2 } from "lucide-react";
+import { CalendarIcon, UserIcon, Clock, AlertCircle, UserCheck, UserX, Search, Eye, Loader2, ClipboardList } from "lucide-react";
 import { FaCheck, FaTimes } from "react-icons/fa";
 import * as Dialog from "@radix-ui/react-dialog";
 import { CheckCircle2 } from "lucide-react";
@@ -127,6 +127,8 @@ export default function BookingPage() {
       } else {
         setDate(savedDate);
       }
+    } else {
+      setDate(getLocalDateStr(0)); // ค่าเริ่มต้น = วันที่ปัจจุบัน
     }
   }, []);
 
@@ -692,6 +694,43 @@ const filteredTherapists = therapists;
             {date ? formatThaiDateLabel(date) : "ยังไม่ได้เลือกวันที่"}
           </p>
         </section>
+
+        {/* สรุปคิวรายช่วงเวลา — จองแล้ว/รับได้ (เฉพาะแพทย์ทั่วไป) เหมือนหน้า booking */}
+        {date && slotStats.length > 0 && (
+          <section className="mx-auto mb-6 max-w-5xl rounded-3xl border border-emerald-100 bg-gradient-to-br from-white via-emerald-50/70 to-teal-50/80 p-4 shadow-lg shadow-emerald-900/5 sm:p-5">
+            <div className="mb-2.5 flex items-center gap-2 text-sm font-extrabold text-slate-700">
+              <ClipboardList className="h-4 w-4 text-emerald-600" />
+              สรุปคิวรายช่วงเวลา
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700 border border-amber-200">
+                เฉพาะแพทย์ทั่วไป
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+              {slotStats.map(s => {
+                const isFull = s.capacity > 0 && s.available <= 0;
+                return (
+                  <div
+                    key={s.slot}
+                    className={`rounded-xl border px-2.5 py-2 text-center transition ${
+                      isFull ? "border-rose-200 bg-rose-50/60" : "border-emerald-100 bg-emerald-50/50"
+                    }`}
+                  >
+                    <div className="flex items-center justify-center gap-1 text-[11px] font-bold text-slate-600">
+                      <Clock className="h-3 w-3 text-emerald-600" /> {s.slot}
+                    </div>
+                    <div className="mt-0.5 text-lg font-black leading-tight text-slate-800">
+                      {s.booked}
+                      <span className="text-xs font-bold text-slate-400">/{s.capacity}</span>
+                    </div>
+                    <div className={`text-[10px] font-bold ${isFull ? "text-rose-600" : "text-emerald-700"}`}>
+                      {s.capacity === 0 ? "ไม่มีคิว" : `ว่าง ${s.available}`}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
 
         {/* ===== Legend ===== */}
         <div className="mx-auto mb-8 flex max-w-3xl flex-wrap items-center justify-center gap-x-4 gap-y-2 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-xs font-medium text-slate-700 shadow-sm sm:text-sm">

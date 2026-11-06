@@ -117,6 +117,9 @@ export default function BookingPage() {
   const { user, logout } = (useContext(AuthContext) || {}) as { user: any; logout: () => void };
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isGuest = !user;
+  // 🎨 (UI เท่านั้น) Admin เห็นการ์ดสถิติทั้งหมด / user ทั่วไปเห็นเฉพาะสรุปรายช่วงเวลาของตัวเอง / ไม่ login เห็นสรุปรวม
+  const isAdminView = !!user && (Number(user.role_id) === 909 || user.isAdmin === true);
+  const isOwnStatsView = !!user && !isAdminView;
 
   const [idCardNumber, setIdCardNumber] = useState("");
   const [therapists, setTherapists] = useState<Therapist[]>([]);
@@ -321,7 +324,10 @@ export default function BookingPage() {
   // capacity = จำนวนแพทย์ทั่วไปที่ยังไม่หยุดและช่วงเวลานั้นไม่ถูกปิด
   // booked   = จำนวนแพทย์ที่มีคิวจองในช่วงเวลานั้น
   const slotStats = useMemo(() => {
-    const generalTherapists = therapists.filter(t => t.therapist_type !== 1);
+    const statsTherapists = isOwnStatsView
+      ? therapists.filter(t => Number(t.id) === Number(user?.role_id))
+      : therapists;
+    const generalTherapists = statsTherapists.filter(t => t.therapist_type !== 1);
     return timeSlots.map(slot => {
       let capacity = 0;
       let booked = 0;
@@ -334,7 +340,7 @@ export default function BookingPage() {
       });
       return { slot, capacity, booked, available: capacity - booked };
     });
-  }, [timeSlots, therapists, bookedSlots, disabledSlots, offTherapists]);
+  }, [timeSlots, therapists, bookedSlots, disabledSlots, offTherapists, isOwnStatsView, user?.role_id]);
 
   const formatPhone = (value: string) => {
     const digits = value.replace(/\D/g, "");
@@ -744,7 +750,8 @@ export default function BookingPage() {
               />
             </div>
 
-            {/* สรุปจำนวนคิวรวม (แพทย์ทั่วไป) — แบบกะทัดรัด */}
+            {/* สรุปจำนวนคิวรวม (แพทย์ทั่วไป) — แบบกะทัดรัด (แสดงเฉพาะ Admin) */}
+            {isAdminView && (
             <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4">
               {[
                 { label: "รับได้ทั้งหมด", value: generalStats.totalCapacity, icon: <ClipboardList className="h-4 w-4 text-blue-500" />, box: "border-blue-200 bg-blue-50/80", tone: "text-blue-800" },
@@ -763,6 +770,7 @@ export default function BookingPage() {
                 </div>
               ))}
             </div>
+            )}
           </div>
 
           {/* สรุปคิวรายช่วงเวลา — จองแล้ว/รับได้ (เฉพาะแพทย์ทั่วไป) */}
@@ -774,6 +782,11 @@ export default function BookingPage() {
                 <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700 border border-amber-200">
                   เฉพาะแพทย์ทั่วไป
                 </span>
+                {isOwnStatsView && (
+                  <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-bold text-sky-700 border border-sky-200">
+                    เฉพาะคิวของคุณ
+                  </span>
+                )}
               </div>
               <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
                 {slotStats.map(s => {

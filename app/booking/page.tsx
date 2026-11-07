@@ -596,19 +596,6 @@ export default function BookingPage() {
       return;
     }
 
-    // ✅ Admin เท่านั้น: ถ้ามีเคส "สำเร็จ" อย่างน้อย 1 รายการในช่วงเวลานี้ (ของผู้ให้บริการคนใดก็ได้)
-    //    ห้ามปิดการให้บริการช่วงเวลานี้ของทุกคน — กันปิดทับคิวที่ให้บริการไปแล้ว
-    //    (ตรวจเฉพาะตอนกำลังจะ "ปิด" — ถ้าปิดอยู่แล้วกดเพื่อเปิดคืนได้ตามเดิม)
-    if (isAdminView && !isCurrentlyClosed) {
-      const anyCompletedInSlot = Object.values(bookedSlots).some(list =>
-        list.some(b => b.time_slot === slot && b.status === "สำเร็จ")
-      );
-      if (anyCompletedInSlot) {
-        alert(`ไม่สามารถปิดช่วงเวลา ${slot} ได้!\n\nเนื่องจากมีการให้บริการที่สำเร็จแล้วอย่างน้อย 1 รายการในช่วงเวลานี้\n\nเงื่อนไขนี้มีผลกับผู้ดูแลระบบ (Admin) เท่านั้น`);
-        return;
-      }
-    }
-
     try {
       const res = await fetch("/api/toggle-off-therapist", {
         method: "POST",

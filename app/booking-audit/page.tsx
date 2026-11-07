@@ -520,8 +520,8 @@ const filteredTherapists = therapists;
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-b from-emerald-200 via-slate-200 to-teal-200">
       {/* พื้นหลังตกแต่ง */}
-      <div aria-hidden className="pointer-events-none absolute -top-32 -right-24 h-96 w-96 rounded-full bg-emerald-200/40 blur-3xl" />
-      <div aria-hidden className="pointer-events-none absolute top-1/3 -left-32 h-96 w-96 rounded-full bg-teal-200/30 blur-3xl" />
+      <div aria-hidden className="pointer-events-none fixed -top-32 -right-24 h-96 w-96 rounded-full bg-emerald-200/40 blur-3xl" />
+      <div aria-hidden className="pointer-events-none fixed top-1/3 -left-32 h-96 w-96 rounded-full bg-teal-200/30 blur-3xl" />
 
       {loading && (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-900/30 backdrop-blur-[2px]">
@@ -753,7 +753,7 @@ const filteredTherapists = therapists;
         )}
 
         {/* ===== Legend ===== */}
-        <div className="mx-auto mb-8 flex max-w-3xl flex-wrap items-center justify-center gap-x-4 gap-y-2 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-xs font-medium text-slate-700 shadow-sm sm:text-sm">
+        <div className="mx-auto mb-8 flex max-w-6xl flex-wrap items-center justify-center gap-x-5 gap-y-2 rounded-2xl border border-slate-300 bg-white px-5 py-3 text-xs font-medium text-slate-700 shadow-sm sm:text-sm lg:flex-nowrap lg:gap-x-6">
           {legendItems.map(item => (
             <span key={item.label} className="flex items-center gap-1.5">
               <span className={`h-2.5 w-2.5 rounded-full ${item.color}`} />

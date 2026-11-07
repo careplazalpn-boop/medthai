@@ -139,6 +139,7 @@ export default function BookingPage() {
   const [searchResults, setSearchResults] = useState<UserInfo[]>([]);
   const [dialogTherapist, setDialogTherapist] = useState<string>("");
   const [offTherapists, setOffTherapists] = useState<string[]>([]);
+  const [togglingAll, setTogglingAll] = useState(false);
   const [addPatientDialog, setAddPatientDialog] = useState(false);
   const [noHN, setNoHN] = useState(false);
   const [hn, setHn] = useState("");
@@ -497,6 +498,17 @@ export default function BookingPage() {
       return;
     }
     if (!date) return alert("กรุณาเลือกวันที่ก่อน");
+
+    // ✅ ถ้าผู้ให้บริการคนนี้มีเคส "สำเร็จ" แล้วอย่างน้อย 1 ช่วงเวลาในวันนี้
+    //    ห้ามปิดการให้บริการทั้งวัน (บล็อกเฉพาะตอนกำลังจะ "ปิด/ไม่มา" — ถ้าปิดอยู่แล้วกดเปิดกลับได้)
+    if (!offTherapists.includes(therapist)) {
+      const hasCompleted = (bookedSlots[therapist] || []).some(b => b.status === "สำเร็จ");
+      if (hasCompleted) {
+        alert(`ไม่สามารถปิดการให้บริการทั้งวันของ "${therapist}" ได้!\n\nเนื่องจากมีการให้บริการที่สำเร็จแล้วอย่างน้อย 1 ช่วงเวลาในวันนี้`);
+        return;
+      }
+    }
+
     try {
       const res = await fetch("/api/toggle-off-therapist", {
         method: "POST",
@@ -508,6 +520,59 @@ export default function BookingPage() {
         setOffTherapists(prev => prev.includes(therapist) ? prev.filter(t => t !== therapist) : [...prev, therapist]);
       } else alert(data.error || "ไม่สามารถอัปเดตหมอไม่มาได้");
     } catch { alert("เกิดข้อผิดพลาดในการอัปเดตหมอไม่มา"); }
+  };
+
+  // ✅ Admin: ปิด/เปิดการให้บริการ "ทั้งวันของทุกคน" พร้อมกัน (สำหรับวันหยุด)
+  const toggleAllTherapistsOff = async () => {
+    if (isGuest) {
+      alert("โหมดดูอย่างเดียว ไม่สามารถอัปเดตได้");
+      return;
+    }
+    if (!date) return alert("กรุณาเลือกวันที่ก่อน");
+    if (filteredTherapists.length === 0) return;
+
+    const allOffToday = filteredTherapists.every(t => offTherapists.includes(t.name));
+
+    // 🛑 ถ้ากำลังจะ "ปิด" และมีเคส "สำเร็จ" ≥1 รายการของใครก็ได้ → ห้ามปิดทั้งวัน
+    if (!allOffToday) {
+      const anyCompleted = Object.values(bookedSlots).some(list =>
+        list.some(b => b.status === "สำเร็จ")
+      );
+      if (anyCompleted) {
+        alert("ไม่สามารถปิดการให้บริการทั้งวันได้!\n\nเนื่องจากมีการให้บริการที่สำเร็จแล้วอย่างน้อย 1 รายการในวันนี้");
+        return;
+      }
+      if (!confirm(`ยืนยันปิดการให้บริการทั้งวันของผู้ให้บริการทุกคน (${filteredTherapists.length} คน)?\n\nวันที่: ${date}`)) return;
+    } else {
+      if (!confirm(`ยืนยันเปิดการให้บริการทุกคนในวันที่ ${date}?`)) return;
+    }
+
+    setTogglingAll(true);
+    try {
+      const res = await fetch("/api/toggle-off-therapist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ all: true, date, role: user?.role || "user" }),
+      });
+      const data = await res.json();
+      if (data?.success) {
+        // อัปเดต state ตรง ๆ จากผล API — ไม่ต้อง refetch /api/off-therapists ซ้ำ (เร็วกว่ามาก)
+        if (data.off) {
+          setOffTherapists(prev => {
+            const rest = prev.filter(t => !filteredTherapists.some(ft => ft.name === t));
+            return [...rest, ...filteredTherapists.map(t => t.name)];
+          });
+        } else {
+          setOffTherapists(prev => prev.filter(t => !filteredTherapists.some(ft => ft.name === t)));
+        }
+      } else {
+        alert(data.error || data.message || "ไม่สามารถอัปเดตได้");
+      }
+    } catch {
+      alert("เกิดข้อผิดพลาดในการอัปเดต");
+    } finally {
+      setTogglingAll(false);
+    }
   };
 
   const toggleSlot = async (therapist: string, slot: string) => {
@@ -529,6 +594,19 @@ export default function BookingPage() {
     if (slotInfo && !isCurrentlyClosed) {
       alert(`ไม่สามารถปิดช่วงเวลา ${slot} ได้!\n\nเนื่องจากมีการจองคิวของ "${slotInfo.name || "ไม่ระบุ"}" ในช่วงเวลานี้แล้ว`);
       return;
+    }
+
+    // ✅ Admin เท่านั้น: ถ้ามีเคส "สำเร็จ" อย่างน้อย 1 รายการในช่วงเวลานี้ (ของผู้ให้บริการคนใดก็ได้)
+    //    ห้ามปิดการให้บริการช่วงเวลานี้ของทุกคน — กันปิดทับคิวที่ให้บริการไปแล้ว
+    //    (ตรวจเฉพาะตอนกำลังจะ "ปิด" — ถ้าปิดอยู่แล้วกดเพื่อเปิดคืนได้ตามเดิม)
+    if (isAdminView && !isCurrentlyClosed) {
+      const anyCompletedInSlot = Object.values(bookedSlots).some(list =>
+        list.some(b => b.time_slot === slot && b.status === "สำเร็จ")
+      );
+      if (anyCompletedInSlot) {
+        alert(`ไม่สามารถปิดช่วงเวลา ${slot} ได้!\n\nเนื่องจากมีการให้บริการที่สำเร็จแล้วอย่างน้อย 1 รายการในช่วงเวลานี้\n\nเงื่อนไขนี้มีผลกับผู้ดูแลระบบ (Admin) เท่านั้น`);
+        return;
+      }
     }
 
     try {
@@ -584,8 +662,8 @@ export default function BookingPage() {
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-b from-emerald-200 via-slate-200 to-teal-200">
       {/* พื้นหลังตกแต่ง */}
-      <div aria-hidden className="pointer-events-none absolute -top-32 -right-24 h-96 w-96 rounded-full bg-emerald-200/40 blur-3xl" />
-      <div aria-hidden className="pointer-events-none absolute top-1/3 -left-32 h-96 w-96 rounded-full bg-teal-200/30 blur-3xl" />
+      <div aria-hidden className="pointer-events-none fixed -top-32 -right-24 h-96 w-96 rounded-full bg-emerald-200/40 blur-3xl" />
+      <div aria-hidden className="pointer-events-none fixed top-1/3 -left-32 h-96 w-96 rounded-full bg-teal-200/30 blur-3xl" />
 
       {loading && (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-900/30 backdrop-blur-[2px]">
@@ -724,7 +802,7 @@ export default function BookingPage() {
         </header>
 
         {/* 🌟 ส่วนบน: วันที่ + สรุปคิวรวม + สรุปรายช่วงเวลา รวมเป็น card เดียว */}
-        <div className="mx-auto mb-8 max-w-5xl rounded-3xl border border-emerald-100 bg-gradient-to-br from-white via-emerald-50/70 to-teal-50/80 p-4 shadow-lg shadow-emerald-900/5 backdrop-blur-xl sm:p-5">
+        <div className="mx-auto mb-8 max-w-5xl rounded-3xl border border-emerald-100 bg-gradient-to-br from-white via-emerald-50/70 to-teal-50/80 p-4 shadow-lg shadow-emerald-900/5 sm:p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
           
             {/* วันที่รับบริการ */}
@@ -848,15 +926,41 @@ export default function BookingPage() {
         </AnimatePresence>
 
         {/* ===== Legend ===== */}
-        <div className="mx-auto mb-8 flex max-w-3xl flex-wrap items-center justify-center gap-x-4 gap-y-2 rounded-2xl border border-slate-200 bg-white/80 backdrop-blur-sm px-4 py-3 text-xs font-bold text-slate-600 shadow-sm">
-          {legendItems
-            .filter(item => !item.staffOnly || !isGuest)
-            .map(item => (
-              <span key={item.label} className="flex items-center gap-1.5">
-                <span className={`h-2.5 w-2.5 rounded-full ${item.color} shadow-sm`} />
-                {item.label}
-              </span>
-            ))}
+        {/* ===== Legend (สถานะ) + Admin ปิด/เปิดทั้งวัน — อยู่ระดับเดียวกัน ===== */}
+        <div className="mx-auto mb-8 flex max-w-6xl flex-wrap items-center gap-3">
+          <div className="flex flex-1 flex-wrap items-center justify-center gap-x-5 gap-y-2 rounded-2xl border border-slate-200 bg-white/80 px-5 py-3 text-xs font-bold text-slate-600 shadow-sm lg:flex-nowrap lg:gap-x-6">
+            {legendItems
+              .filter(item => !item.staffOnly || !isGuest)
+              .map(item => (
+                <span key={item.label} className="flex items-center gap-1.5">
+                  <span className={`h-2.5 w-2.5 rounded-full ${item.color} shadow-sm`} />
+                  {item.label}
+                </span>
+              ))}
+          </div>
+          {isAdminView && !isGuest && filteredTherapists.length > 0 && (
+            <button
+              onClick={toggleAllTherapistsOff}
+              disabled={togglingAll || !date}
+              className={`flex cursor-pointer items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-bold text-white shadow transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                filteredTherapists.every(t => offTherapists.includes(t.name))
+                  ? "bg-emerald-500 hover:bg-emerald-600"
+                  : "bg-rose-500 hover:bg-rose-600"
+              }`}
+              title={date ? `วันที่ ${date}` : "กรุณาเลือกวันที่ก่อน"}
+            >
+              {togglingAll ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : filteredTherapists.every(t => offTherapists.includes(t.name)) ? (
+                <CalendarCheck className="h-3.5 w-3.5" />
+              ) : (
+                <CalendarX className="h-3.5 w-3.5" />
+              )}
+              {filteredTherapists.every(t => offTherapists.includes(t.name))
+                ? "เปิดการให้บริการทุกคน"
+                : "ปิดทั้งวัน (วันหยุด)"}
+            </button>
+          )}
         </div>
 
         {/* ===== Therapist & slots rendering ===== */}
@@ -891,7 +995,7 @@ export default function BookingPage() {
                   isSelected
                     ? "shadow-xl shadow-emerald-700/20 ring-4 ring-emerald-300"
                     : "shadow-lg shadow-slate-900/5 hover:shadow-xl"
-                } backdrop-blur-md`}
+                }`}
               >
                 {/* ===== ซ้าย: ข้อมูลผู้ให้บริการ + ปุ่มจัดการ ===== */}
                 <div className="flex flex-col justify-between gap-3 lg:w-64 lg:flex-shrink-0">

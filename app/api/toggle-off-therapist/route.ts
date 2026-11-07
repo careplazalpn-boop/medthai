@@ -4,13 +4,46 @@ import pool from '../dbconnection/db';
 export async function POST(req: NextRequest) {
   try {
     // 🌟 รับค่า role เข้ามาเพิ่ม (ส่งมาจาก page.tsx ที่เราปรับปรุงไป)
-    const { therapist, date, slot, role }: { therapist: string; date: string; slot?: string; role?: string } = await req.json();
-    if (!therapist || !date) return NextResponse.json({ success: false, message: "Missing params" });
+    const { therapist, date, slot, role, all }: { therapist?: string; date: string; slot?: string; role?: string; all?: boolean } = await req.json();
+    if (!date || (!therapist && all !== true)) return NextResponse.json({ success: false, message: "Missing params" });
 
     // จัดการสิทธิ์ให้อ่านง่ายขึ้น
     const userRole = (role === "admin" || String(role) === "909") ? "admin" : "user";
 
     const conn = await pool.getConnection();
+
+    // ==========================================
+    // 🗓️ โหมดพิเศษ: ปิด/เปิด "ทั้งวันของทุกคน" (Admin เท่านั้น — สำหรับวันหยุด)
+    // ==========================================
+    if (all === true) {
+      if (userRole !== "admin") {
+        conn.release();
+        return NextResponse.json({ success: false, error: "เฉพาะผู้ดูแลระบบ (Admin) เท่านั้นที่ปิด/เปิดทั้งวันได้" }, { status: 403 });
+      }
+
+      const [allRows]: any = await conn.query("SELECT name, off_date FROM therapist");
+      const isOffOnDate = (offDate: string | null) =>
+        !!offDate && offDate.split(",").map((d: string) => d.trim()).some((d: string) => d === date || d.startsWith(date + "|"));
+
+      // ถ้าทุกคนปิดอยู่แล้ว → เปิดทั้งหมด / ถ้ายังมีคนไม่ปิด → ปิดทั้งหมด
+      const targetOff = !allRows.every((r: any) => isOffOnDate(r.off_date));
+
+      for (const row of allRows) {
+        const kept = (row.off_date || "")
+          .split(",")
+          .map((d: string) => d.trim())
+          .filter(Boolean)
+          .filter((d: string) => !(d === date || d.startsWith(date + "|")));
+        if (targetOff) kept.push(`${date}|admin`);
+        await conn.query(
+          "UPDATE therapist SET off_date = ? WHERE name = ?",
+          [kept.length > 0 ? kept.join(",") : null, row.name]
+        );
+      }
+
+      conn.release();
+      return NextResponse.json({ success: true, off: targetOff });
+    }
 
     // ดึงค่า off_date และ disabled_slots ปัจจุบัน
     const [rows]: any = await conn.query("SELECT off_date, disabled_slots FROM therapist WHERE name = ?", [therapist]);

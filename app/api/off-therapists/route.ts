@@ -19,7 +19,8 @@ export async function GET(req: NextRequest) {
         const offDates = row.off_date
           .split(",")
           .map((d: string) => d.trim());
-        if (offDates.includes(date)) offTherapists.push(row.name);
+        // รองรับทั้ง format เก่า "YYYY-MM-DD" และใหม่ "YYYY-MM-DD|role"
+        if (offDates.some((d: string) => d === date || d.startsWith(date + "|"))) offTherapists.push(row.name);
       }
 
       // ดึง slot ปิดของวันที่เลือก

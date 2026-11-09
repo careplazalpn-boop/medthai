@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useContext, createContext, useRef } from "react";
+import { useState, useEffect, useContext, createContext, useRef, useMemo } from "react";
 import {
   BedDouble,
   Calendar,
@@ -200,6 +200,8 @@ export default function BedsSpecialPage() {
   // เดิมผังใช้ bedBookings ซึ่งถูกแบ่งหน้า (ค่าเริ่มต้น 10 รายการ) → คิวที่อยู่หน้าอื่นจึงไม่แสดงในผัง
   // ทำให้เตียงที่ถูกจองแล้วดู "ว่าง" และจองซ้อนได้ (null = ยังโหลดไม่สำเร็จ ให้ fallback ไปใช้ bedBookings)
   const [dayBedBookings, setDayBedBookings] = useState<SpecialBedBooking[] | null>(null);
+  // ✅ true เมื่อดึงข้อมูลทั้งวัน (all=1) ล้มเหลว → สลับไปใช้โหมดตารางแบบแบ่งหน้าจาก API (fetchBedBookings)
+  const [dayFetchFailed, setDayFetchFailed] = useState<boolean>(false);
   const [availableBookings, setAvailableBookings] = useState<BookingRecord[]>([]);
   const dayFetchSeq = useRef(0); // กัน response เก่าทับข้อมูลใหม่
   const tableFetchSeq = useRef(0); // กัน response เก่าของตาราง (เช่น วันที่ก่อนอ่าน URL) ทับข้อมูลใหม่
@@ -249,22 +251,33 @@ export default function BedsSpecialPage() {
     fetchTimeSlots();
   }, []);
 
+  // ✅ รายการเตียง (specialBeds) เป็นข้อมูลคงที่ทั้งระบบ — ดึงครั้งเดียวตอน login
+  //    เดิมถูกเรียกซ้ำทุกครั้งที่เปลี่ยนวันที่/เปลี่ยนหน้า/เปลี่ยนจำนวนแสดงผล โดยไม่จำเป็น
   useEffect(() => {
     if (isAuthenticated) {
       fetchBeds();
-      fetchBedBookings();
     }
-    // 🌟 เพิ่ม page และ limit เป็น dependency ให้ดึงข้อมูลใหม่เมื่อมีการเปลี่ยนหน้า
-    // ✅ ใช้ field ย่อยของ user แทน object user ทั้งก้อน — กัน re-fetch ซ้ำถ้า context สร้าง user object ใหม่ทุก render
-  }, [date, isAuthenticated, page, limit, user?.role_id, user?.name, isUserAdmin]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated]);
 
-  // ✅ ผังเตียง: ดึงข้อมูลทั้งวันแยกต่างหาก — ไม่ขึ้นกับ page/limit ของตารางด้านล่าง
+  // ✅ ผังเตียง + ตารางเตียง: ดึงข้อมูลทั้งวันครั้งเดียว (all=1) — ตารางใช้ client-side
+  //    pagination จากข้อมูลชุดเดียวกัน (ผลลัพธ์เหมือน server pagination เดิมทุกประการ)
+  //    เดิมยิง 2 requests (ตารางแบบแบ่งหน้า + ทั้งวัน) ทำให้ query ข้อมูลวันเดียวกันซ้ำซ้อน
   useEffect(() => {
     if (isAuthenticated) {
       fetchDayBedBookings();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [date, isAuthenticated, user?.name, user?.role_id]);
+  }, [date, isAuthenticated, user?.name, user?.role_id, isUserAdmin]);
+
+  // ✅ Fallback: เฉพาะเมื่อดึงทั้งวัน (all=1) ไม่สำเร็จ จึงใช้ตารางแบบแบ่งหน้าจาก API เหมือนเดิม
+  //    (รวม availableBookings ด้วยเพื่อให้คิวรอลงเตียงยังแสดง) — ไม่ทำงานในโหมดปกติ
+  useEffect(() => {
+    if (isAuthenticated && dayFetchFailed) {
+      fetchBedBookings(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [date, isAuthenticated, page, limit, dayFetchFailed, user?.name, user?.role_id, isUserAdmin]);
 
   // ถ้าเปลี่ยนวัน ให้รีเซ็ตหน้าที่ 1 ใหม่เสมอ
   useEffect(() => {
@@ -437,17 +450,47 @@ export default function BedsSpecialPage() {
       if (seq !== dayFetchSeq.current) return; // มี request ใหม่กว่าแล้ว
       setDayBedBookings(all);
       setAvailableBookings(available);
+      setDayFetchFailed(false);
     } catch (err) {
       if (seq !== dayFetchSeq.current) return;
       console.warn("Error fetching all bed bookings of the day:", err);
       setDayBedBookings(null); // fallback ไปใช้ bedBookings (หน้าปัจจุบัน)
-      // ✅ fallback: ดึง availableBookings มาด้วยเผื่อ day-fetch ล้มเหลว (เหมือนพฤติกรรมเดิมที่ table fetch มีคิวมาด้วย)
-      fetchBedBookings(true);
+      // ✅ เปิดโหมด fallback — effect เฉพาะทางจะเรียก fetchBedBookings(true) ดึงตาราง + คิวรอลงเตียง
+      setDayFetchFailed(true);
     }
   };
 
   // ข้อมูลที่ผังเตียงใช้: ทั้งวัน ถ้าไม่มีให้ fallback เป็นข้อมูลหน้าปัจจุบัน
   const mapBookings = dayBedBookings ?? bedBookings;
+
+  // ✅ ตารางเตียง: เมื่อมีข้อมูลทั้งวัน (all=1) ให้แบ่งหน้าฝั่ง client จากชุดเดียวกัน
+  //    ลำดับ sort ด้วย bed_name เหมือนเดิม (stable sort รักษาลำดับ sbb.id ภายในชื่อเตียงเดียวกัน
+  //    ซึ่งตรงกับ ORDER BY ของ API: bed_name ASC, sbb.id ASC) → แถวแต่ละหน้าเหมือนเดิมทุกประการ
+  //    กรณี fallback (dayBedBookings === null) ใช้ bedBookings ที่ API แบ่งหน้าให้แล้วตามเดิม
+  const tableBedBookings = useMemo(() => {
+    if (dayBedBookings === null) {
+      return [...bedBookings].sort((a, b) => a.bed_name.localeCompare(b.bed_name));
+    }
+    const sorted = [...dayBedBookings].sort((a, b) => a.bed_name.localeCompare(b.bed_name));
+    const start = (page - 1) * limit;
+    return sorted.slice(start, start + limit);
+  }, [dayBedBookings, bedBookings, page, limit]);
+
+  // ✅ ยอดรวมสำหรับแสดง Pagination — โหมด both day ใช้จำนวนจริงของทั้งวัน (เท่ากับ COUNT ของ API เดิม)
+  const displayTotalRecords = dayBedBookings !== null ? dayBedBookings.length : totalRecords;
+  const displayTotalPages = dayBedBookings !== null
+    ? Math.ceil(dayBedBookings.length / limit)
+    : totalPages;
+
+  // ✅ นับจำนวนคิวรอลงเตียงแยกตามช่วงเวลาไว้ล่วงหน้า (เดิม filter ซ้ำทุก slot ทุก render)
+  const slotQueueCountMap = useMemo(() => {
+    const m = new Map<string, number>();
+    availableBookings.forEach((q) => {
+      const key = normalizeSlot(q.time_slot);
+      m.set(key, (m.get(key) || 0) + 1);
+    });
+    return m;
+  }, [availableBookings]);
 
   const getBedReservation = (bedId: number, slot: string) => {
     return mapBookings.find(
@@ -530,34 +573,9 @@ export default function BedsSpecialPage() {
       return;
     }
 
-    // ✅ ตรวจซ้ำด้วยข้อมูลสดทั้งวันก่อนบันทึก กันจองซ้อน (เตียงเดียวกัน/ช่วงเวลาเดียวกัน หรือคิวเดียวกันมีเตียงแล้ว)
-    try {
-      const { all } = await loadAllBedBookingsOfDay();
-      const active = all.filter((b) => b.booking_status !== "ยกเลิก");
-      const bedTaken = active.find(
-        (b) =>
-          b.bed_id === selectedBed.id &&
-          normalizeSlot(b.time_slot) === normalizeSlot(selectedQueue.time_slot)
-      );
-      if (bedTaken) {
-        setDayBedBookings(all);
-        alert(`ไม่สามารถจองได้: เตียง "${selectedBed.bed_name}" ในช่วงเวลา ${selectedQueue.time_slot} ถูกจองไปแล้ว (คนไข้: ${bedTaken.patient_name})`);
-        setBookingDialogOpen(false);
-        fetchBedBookings();
-        return;
-      }
-      const queueHasBed = active.find((b) => b.booking_id === selectedQueue.booking_id);
-      if (queueHasBed) {
-        setDayBedBookings(all);
-        alert(`ไม่สามารถจองได้: คิวนี้ถูกลงเตียง "${queueHasBed.bed_name}" ไปแล้ว`);
-        setBookingDialogOpen(false);
-        fetchBedBookings();
-        return;
-      }
-    } catch (err) {
-      console.warn("ตรวจสอบเตียงซ้ำก่อนบันทึกไม่สำเร็จ (ให้เซิร์ฟเวอร์ตรวจต่อ):", err);
-    }
-
+    // ✅ ไม่ต้อง pre-check เตียงซ้ำฝั่ง client อีกต่อไป — API POST ตรวจสอบใน transaction
+    //    (ล็อกแถว FOR UPDATE) และตอบ 409 พร้อมข้อความเหตุผลที่เทียบเท่ากันอยู่แล้ว
+    //    เดิมขั้นตอนนี้ fetch ข้อมูลทั้งวันซ้ำก่อนบันทึกทุกครั้ง ทำให้การบันทึกช้าลงมาก
     const payload = {
       bed_id: selectedBed.id,
       booking_id: selectedQueue.booking_id,
@@ -578,9 +596,11 @@ export default function BedsSpecialPage() {
       const data = await res.json();
       if (data?.success) {
         alert("บันทึกการจองเตียงพิเศษเรียบร้อยแล้ว");
-        fetchBedBookings();
+        // ✅ refetch ครั้งเดียว (all=1) — ได้ทั้งผังเตียงและตารางพร้อมกัน ไม่ต้องยิงซ้ำ 2 requests
         fetchDayBedBookings();
       } else {
+        // ✅ เผื่อ server ปฏิเสธเพราะข้อมูลไม่ตรง (เช่น 409 เตียงถูกจอง) ให้รีเฟรชข้อมูลล่าสุดด้วย
+        fetchDayBedBookings();
         alert(data?.error || "ไม่สามารถบันทึกการจองเตียงได้");
       }
     } catch {
@@ -606,7 +626,7 @@ export default function BedsSpecialPage() {
       const data = await res.json();
       if (data?.success) {
         alert("ยกเลิกการจองเตียงพิเศษเรียบร้อยแล้ว");
-        fetchBedBookings();
+        // ✅ refetch ครั้งเดียว (all=1) — ได้ทั้งผังเตียงและตารางพร้อมกัน
         fetchDayBedBookings();
       } else {
         alert("เกิดข้อผิดพลาดในการยกเลิกรายการ");
@@ -696,9 +716,7 @@ export default function BedsSpecialPage() {
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
               {timeSlots.map((slot) => {
                 const isSelected = normalizeSlot(selectedSlot) === normalizeSlot(slot);
-                const waitingCount = availableBookings.filter(
-                  (q) => normalizeSlot(q.time_slot) === normalizeSlot(slot)
-                ).length;
+                const waitingCount = slotQueueCountMap.get(normalizeSlot(slot)) || 0;
 
                 return (
                   <button
@@ -924,8 +942,7 @@ export default function BedsSpecialPage() {
               </thead>
               <tbody className="divide-y-2 divide-slate-100 bg-white" style={{ backgroundColor: '#ffffff' }}>
                 {/* 🌟 3. ฝั่ง Frontend กรองเรียงลำดับอีกรอบเพื่อความชัวร์ หรือรับมาจาก Backend ก็ได้ */}
-                {[...bedBookings]
-                  .sort((a, b) => a.bed_name.localeCompare(b.bed_name))
+                {tableBedBookings
                   .map((b) => {
                     const isCompleted = b.status === 1;
                     const isPassed = isDatePassed(b.date);
@@ -982,7 +999,7 @@ export default function BedsSpecialPage() {
                       </tr>
                     );
                 })}
-                {bedBookings.length === 0 && (
+                {tableBedBookings.length === 0 && (
                   <tr>
                     <td colSpan={7} className="text-center py-8 italic font-bold" style={{ color: '#64748b' }}>
                       ยังไม่มีการจองเตียงพิเศษในวันที่ {date}
@@ -994,10 +1011,10 @@ export default function BedsSpecialPage() {
           </div>
           
           {/* 🌟 4. ปุ่มเปลี่ยนหน้า (Pagination Controls) */}
-          {bedBookings.length > 0 && (
+          {tableBedBookings.length > 0 && (
             <div className="flex justify-between items-center mt-4">
               <div className="text-sm font-bold text-slate-600">
-                รายการทั้งหมด <span className="text-emerald-700">{totalRecords}</span> รายการ
+                รายการทั้งหมด <span className="text-emerald-700">{displayTotalRecords}</span> รายการ
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -1008,11 +1025,11 @@ export default function BedsSpecialPage() {
                   <ChevronLeft className="w-4 h-4" /> ก่อนหน้า
                 </button>
                 <span className="text-sm font-bold text-slate-700 px-2">
-                  หน้าที่ {page} / {totalPages}
+                  หน้าที่ {page} / {displayTotalPages}
                 </span>
                 <button
-                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                  disabled={page >= totalPages}
+                  onClick={() => setPage(p => Math.min(displayTotalPages, p + 1))}
+                  disabled={page >= displayTotalPages}
                   className="px-3 py-1.5 rounded-xl border-2 border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-1 text-slate-700 font-bold text-sm"
                 >
                   ถัดไป <ChevronRight className="w-4 h-4" />

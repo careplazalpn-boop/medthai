@@ -252,10 +252,13 @@ export default function BookingPage() {
 
     const roleQuery = user ? `&role=${encodeURIComponent(user.role || "")}&role_id=${encodeURIComponent(user.role_id || "")}` : "";
 
-    fetchWithLoading(`/api/bookings?date=${encodeURIComponent(date)}${roleQuery}`, data => {
+    // ✅ รวมเป็น request เดียว (include_off=1) — เดิมยิง /api/bookings และ /api/off-therapists แยกกัน
+    //    2 requests ต่อการเปลี่ยนวันที่; API คืน offTherapists/disabledSlotsByTherapist ใน response เดียวกัน
+    //    (ผลลัพธ์เหมือนเดิมทุกประการ รวมถึงกรณี error ที่ reset state ทั้ง 3 ตัวเหมือนเดิม)
+    fetchWithLoading(`/api/bookings?date=${encodeURIComponent(date)}${roleQuery}&include_off=1`, data => {
       if (data?.success) {
         const grouped: Record<string, BookingInfo[]> = {};
-        data.bookings.forEach((b: any) => {
+        (data.bookings || []).forEach((b: any) => {
           if (!grouped[b.therapist]) grouped[b.therapist] = [];
           grouped[b.therapist].push({
             time_slot: b.time_slot,
@@ -270,12 +273,13 @@ export default function BookingPage() {
           });
         });
         setBookedSlots(grouped);
-      } else setBookedSlots({});
-    });
-
-    fetchWithLoading(`/api/off-therapists?date=${encodeURIComponent(date)}`, data => {
-      setOffTherapists(data?.success ? data.offTherapists || [] : []);
-      setDisabledSlots(data?.success ? data.disabledSlotsByTherapist || {} : {});
+        setOffTherapists(data.offTherapists || []);
+        setDisabledSlots(data.disabledSlotsByTherapist || {});
+      } else {
+        setBookedSlots({});
+        setOffTherapists([]);
+        setDisabledSlots({});
+      }
     });
   }, [date, user?.role, user?.role_id]);
 
@@ -354,6 +358,23 @@ export default function BookingPage() {
     if (!date) return setShowAlert(true);
     setSelectedTherapist(therapist);
     setSelectedTime(time);
+  };
+
+  // ✅ ส่งต่อไปหน้าจองเตียงพิเศษสำหรับคิวที่จองแล้วแต่ยังไม่มีเตียง (พารามิเตอร์ชุดเดียวกับหน้า all-bookings)
+  const goToBedBooking = (slotInfo: BookingInfo, slot: string) => {
+    const queryParams = new URLSearchParams();
+
+    // ✅ จัดรูปแบบเวลาให้เหมือนหน้า confirm/beds-special (ถอด 0 ด้านหน้า เช่น "08:00-09:30" => "8:00-9:30")
+    let normalizedTime = slot ? slot.replace(/\s+/g, "").replace(/–/g, "-") : "";
+    normalizedTime = normalizedTime.replace(/(^|-)0+(\d)/g, "$1$2");
+
+    if (date) queryParams.set("date", date);
+    if (normalizedTime) queryParams.set("time", normalizedTime);
+    if (slotInfo.hn) queryParams.set("hn", slotInfo.hn);
+    // ✅ คิวของคนไข้ใหม่ยังไม่มี HN → ส่งชื่อไปให้หน้าเตียงใช้เลือกคิวอัตโนมัติ
+    if (!slotInfo.hn && slotInfo.name) queryParams.set("name", slotInfo.name);
+
+    router.push(`/beds-special?${queryParams.toString()}`);
   };
 
   const handleSubmit = () => {
@@ -1080,7 +1101,7 @@ export default function BookingPage() {
                       bookedBg = "bg-amber-50 text-amber-700 border-amber-200";
                     }
                     return (
-                      <div key={slot} className="flex min-w-0 flex-col gap-1.5">
+                      <div key={slot} className="relative flex min-w-0 flex-col gap-1.5">
                         <button
                           disabled={isBooked || isOff || isSlotDisabled || isGuest}
                           onClick={() => handleSelect(t.name, slot)}
@@ -1146,6 +1167,17 @@ export default function BookingPage() {
                             </span>
                           )}
                         </button>
+                        {/* ✅ ไอคอนจองเตียงพิเศษ: แสดงเฉพาะคิวที่จองแล้วแต่ยังไม่มีเตียง — กดเพื่อไปหน้าจองเตียงของคิวนั้น */}
+                        {isBooked && !hasSpecialBed && !isGuest && date && slotInfo && (
+                          <button
+                            type="button"
+                            onClick={() => goToBedBooking(slotInfo, slot)}
+                            className="absolute right-1.5 top-1.5 z-10 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-teal-600 text-white shadow-md ring-2 ring-white/70 transition hover:scale-105 hover:bg-teal-700"
+                            title="จองเตียงพิเศษสำหรับคิวนี้"
+                          >
+                            <BedDouble className="h-4 w-4" />
+                          </button>
+                        )}
                         {date && !isGuest && (
                           <button
                             onClick={() => toggleSlot(t.name, slot)}

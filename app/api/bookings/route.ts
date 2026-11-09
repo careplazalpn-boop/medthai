@@ -146,9 +146,44 @@ export async function GET(request: Request) {
       queryParams.push(date);
     }
 
+    // ✅ ใหม่ (ไม่กระทบผู้เรียกเดิม): include_off=1 ให้ส่งข้อมูลหมอไม่มา/slot ปิดกลับมาด้วยใน
+    //    response เดียว — หน้า booking ใช้รวมกับรายการจองเพื่อลดจาก 2 requests เหลือ 1 request ต่อวันที่
+    //    (ตรรกะการคำนวณเหมือน /api/off-therapists ทุกประการ)
+    const includeOff = url.searchParams.get("include_off") === "1";
+    const offTherapistsPromise = includeOff
+      ? pool.execute("SELECT name, off_date, disabled_slots FROM therapist")
+      : null;
+
     const [rows] = await conn.query(query, queryParams);
     conn.release();
-    return NextResponse.json({ success: true, bookings: rows });
+
+    const payload: any = { success: true, bookings: rows };
+
+    if (offTherapistsPromise) {
+      const [offRows]: any = await offTherapistsPromise;
+      const offTherapists: string[] = [];
+      const disabledSlotsByTherapist: Record<string, string[]> = {};
+      (offRows || []).forEach((row: any) => {
+        if (row.off_date) {
+          const offDates = String(row.off_date)
+            .split(",")
+            .map((d: string) => d.trim());
+          if (offDates.some((d: string) => d === date || d.startsWith(date + "|"))) offTherapists.push(row.name);
+        }
+        if (row.disabled_slots) {
+          const slots = String(row.disabled_slots)
+            .split(",")
+            .map((d: string) => d.trim())
+            .filter((s: string) => s.startsWith(date + "|"))
+            .map((s: string) => s.split("|")[1]);
+          if (slots.length > 0) disabledSlotsByTherapist[row.name] = slots;
+        }
+      });
+      payload.offTherapists = offTherapists;
+      payload.disabledSlotsByTherapist = disabledSlotsByTherapist;
+    }
+
+    return NextResponse.json(payload);
   } catch (error) {
     console.error("GET bookings error:", error);
     return NextResponse.json(

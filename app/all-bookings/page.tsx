@@ -85,7 +85,8 @@ export default function AllBookingsPage() {
   const [filterDate, setFilterDate] = useState("");
   const [filterTimeSlot, setFilterTimeSlot] = useState("all");
   const [filterProvider, setFilterProvider] = useState("all");
-  const [filterSpecialBed, setFilterSpecialBed] = useState(false); 
+  // ✅ ตัวกรองเตียงนวด: all = ทั้งหมด / none = ยังไม่ได้จองเตียง / booked = จองเตียงแล้ว
+  const [filterBed, setFilterBed] = useState<"all" | "none" | "booked">("all");
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   // ✅ แยก loading ของแต่ละงานออกจากกัน เดิมใช้ flag เดียวร่วมกัน ทำให้งานหนึ่งเสร็จแล้วไป
   // ปิด overlay ของอีกงานที่ยังโหลดอยู่ (หรือค้าง overlay เมื่อ request ถูกยกเลิก)
@@ -119,6 +120,9 @@ export default function AllBookingsPage() {
     setFilterDate(getTodayLocal());
   }, []);
 
+  // ✅ map ค่าตัวกรองเตียงนวดเป็นค่า param ของ API ( booked→true / none→none / all→false=ไม่กรอง )
+  const bedFilterParam = filterBed === "booked" ? "true" : filterBed === "none" ? "none" : "false";
+
   useEffect(() => {  
     if (!filterDate) {
       setBookings([]);
@@ -139,7 +143,7 @@ export default function AllBookingsPage() {
         // ✅ encodeURIComponent ทุกค่า กันชื่อที่มีอักขระพิเศษ (& # + ฯลฯ) ทำให้ query string เพี้ยน
         const q = (v: string) => encodeURIComponent(v || "");
         const res = await fetch(
-          `/api/all-bookings?date=${q(filterDate)}&provider=${q(filterProvider)}&therapist=${q(filterTherapist)}&timeSlots=${q(filterTimeSlot)}&status=${q(filterStatus)}&specialBed=${filterSpecialBed}&page=${page}&limit=${limit}&role=${encodeURIComponent(user?.role || "")}&role_id=${encodeURIComponent(user?.role_id || "")}`,
+          `/api/all-bookings?date=${q(filterDate)}&provider=${q(filterProvider)}&therapist=${q(filterTherapist)}&timeSlots=${q(filterTimeSlot)}&status=${q(filterStatus)}&specialBed=${bedFilterParam}&page=${page}&limit=${limit}&role=${encodeURIComponent(user?.role || "")}&role_id=${encodeURIComponent(user?.role_id || "")}`,
           { signal: controller.signal, cache: "no-store" }
         );
         // ✅ ถ้า server ตอบ 500/504 เป็น HTML จะ parse JSON ไม่ได้ → แปลงเป็นข้อความ error ที่อ่านรู้เรื่อง
@@ -170,7 +174,7 @@ export default function AllBookingsPage() {
       controller.abort();
       setListLoading(false);
     };
-  }, [filterDate, filterProvider, filterTherapist, filterTimeSlot, filterStatus, filterSpecialBed, page, limit, user?.role, user?.role_id, !!user, reloadKey]);
+  }, [filterDate, filterProvider, filterTherapist, filterTimeSlot, filterStatus, bedFilterParam, page, limit, user?.role, user?.role_id, !!user, reloadKey]);
       
   const handleNext = () => {
     if (page < totalPages) setPage((p) => p + 1);
@@ -215,7 +219,7 @@ export default function AllBookingsPage() {
     setExporting(true);
     try {
         const q = (v: string) => encodeURIComponent(v || "");
-        const exportUrl = `/api/all-bookings?export=true&date=${q(filterDate)}&provider=${q(filterProvider)}&therapist=${q(filterTherapist)}&timeSlots=${q(filterTimeSlot)}&status=${q(filterStatus)}&specialBed=${filterSpecialBed}`;
+        const exportUrl = `/api/all-bookings?export=true&date=${q(filterDate)}&provider=${q(filterProvider)}&therapist=${q(filterTherapist)}&timeSlots=${q(filterTimeSlot)}&status=${q(filterStatus)}&specialBed=${bedFilterParam}`;
         const exportRes = await fetch(exportUrl);
         const exportData = await exportRes.json();
         if (!exportData.success) throw new Error(exportData.error || "เกิดข้อผิดพลาดในการดึงข้อมูล Export");
@@ -303,7 +307,13 @@ export default function AllBookingsPage() {
     const providerMatch = filterProvider === "all" || b.provider === filterProvider;
     const dateMatch = !filterDate || formatDate(b.date) === filterDate;
     const timeMatch = filterTimeSlot === "all" || normalizeTimeSlot(b.time_slot) === normalizeTimeSlot(filterTimeSlot);
-    const specialBedMatch = !filterSpecialBed || !!b.has_special_bed;
+    // ✅ กรองเตียงนวด 3 แบบ: all=ไม่กรอง / booked=มีเตียง / none=ยังไม่มีเตียง (ไม่นับคิวที่ยกเลิกแล้ว — ตรงกับ API)
+    const specialBedMatch =
+      filterBed === "all"
+        ? true
+        : filterBed === "booked"
+        ? !!b.has_special_bed
+        : !b.has_special_bed && getStatusLabel(b) !== "ยกเลิก";
     
     const statusLabel = getStatusLabel(b);
 
@@ -703,17 +713,17 @@ export default function AllBookingsPage() {
 
           <div className="w-full sm:w-[220px]">
             <label className="block text-gray-700 font-bold mb-2 text-xs uppercase tracking-wider flex items-center gap-1.5">
-              <BedDouble className="w-4 h-4 text-gray-400"/> เตียงพิเศษ:
+              <BedDouble className="w-4 h-4 text-gray-400"/> เตียงนวด:
             </label>
-            <label className="flex items-center gap-2 h-10 px-4 border border-gray-300 rounded-xl cursor-pointer select-none bg-gray-50 text-gray-700 hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-700 transition">
-              <input
-                type="checkbox"
-                checked={filterSpecialBed}
-                onChange={e => { setFilterSpecialBed(e.target.checked); setPage(1); }}
-                className="w-4 h-4 accent-emerald-600 rounded"
-              />
-              <span className="text-sm font-semibold">เฉพาะที่มีการจองเตียง</span>
-            </label>
+            <select
+              value={filterBed}
+              onChange={e => { setFilterBed(e.target.value as "all" | "none" | "booked"); setPage(1); }}
+              className="w-full px-4 h-10 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900 text-sm bg-gray-50 hover:bg-white transition cursor-pointer"
+            >
+              <option value="all">ทั้งหมด</option>
+              <option value="none">ยังไม่ได้จองเตียง</option>
+              <option value="booked">จองเตียงแล้ว</option>
+            </select>
           </div>
 
           <div className="flex w-full sm:w-auto items-end ml-auto mt-2 sm:mt-0">
@@ -725,7 +735,7 @@ export default function AllBookingsPage() {
                 setFilterDate(""); 
                 setFilterTimeSlot("all"); 
                 setFilterProvider("all");
-                setFilterSpecialBed(false);
+                setFilterBed("all");
                 setPage(1); // ✅ กันค้างหน้าเดิมที่เกินจำนวนหน้าของข้อมูลชุดใหม่
               }}
               className="w-full sm:w-auto h-10 px-5 bg-white text-rose-600 border border-rose-200 rounded-xl font-bold hover:bg-rose-50 transition text-sm flex items-center justify-center gap-2 shadow-sm"
@@ -1083,6 +1093,14 @@ export default function AllBookingsPage() {
                             <button
                               disabled
                               title="ไม่สามารถยืนยันสถานะได้ เนื่องจากยังไม่ถึงวันนัดหมาย"
+                              className="flex items-center justify-center w-15 h-10 bg-gray-300 rounded-md shadow cursor-not-allowed"
+                            >
+                              <FaCheck className="text-gray-400 w-5 h-5" />
+                            </button>
+                          ) : !b.has_special_bed ? (
+                            <button
+                              disabled
+                              title="ไม่สามารถบันทึกบริการสำเร็จได้ เนื่องจากยังไม่ได้จองเตียงพิเศษ — กรุณากดปุ่มเตียงเพื่อจองเตียงก่อน"
                               className="flex items-center justify-center w-15 h-10 bg-gray-300 rounded-md shadow cursor-not-allowed"
                             >
                               <FaCheck className="text-gray-400 w-5 h-5" />

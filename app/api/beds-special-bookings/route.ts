@@ -10,6 +10,11 @@ const normalizeSlot = (slotStr: string) => {
   return s;
 };
 
+// ✅ cache ชื่อหมอนวดในหน่วยความจำ (เปลี่ยนน้อยมาก) — เดิมทุก request ของ user ทั่วไป
+//    ต้องยิง SELECT therapist เพิ่ม 1 query เพื่อหา name/fname ของ role_id ตัวเอง
+const THERAPIST_NAME_CACHE_TTL = 5 * 60 * 1000;
+const therapistNameCache = new Map<number, { names: string[]; at: number }>();
+
 // GET: ดึงข้อมูลการจองเตียง (พร้อม Pagination) และคิวที่รอลงเตียง
 export async function GET(req: Request) {
   try {
@@ -53,7 +58,10 @@ export async function GET(req: Request) {
          sbb.id AS special_booking_id, sbb.bed_id, sbb.booking_id, sbb.date, sbb.time_slot, sbb.note, sbb.created_by, sbb.status,
          sb.bed_code, sb.bed_name, sb.room_name, sb.bed_type,
          b.hn, b.name AS patient_name, b.phone AS patient_phone, b.therapist, b.provider, b.status AS booking_status,
-         (SELECT u.sex FROM med_user u WHERE u.hn = b.hn LIMIT 1) AS sex
+         -- ✅ CONVERT(...) USING tis620: แก้ collation mismatch (med_user.hn=tis620 vs bookings.hn=utf8mb4)
+         --    ที่ทำให้ MySQL ใช้ index ไม่ได้ → full scan med_user 5 หมื่นแถวต่อ 1 แถว (~500ms → ~3ms)
+         --    ค่า HN เป็นตัวเลข ASCII แปลง charset ไม่เสียหาย ผลลัพธ์เหมือนเดิม
+         (SELECT u.sex FROM med_user u WHERE u.hn = CONVERT(b.hn USING tis620) LIMIT 1) AS sex
        FROM special_bed_bookings sbb
        INNER JOIN bookings b ON sbb.booking_id = b.id
        INNER JOIN special_beds sb ON sbb.bed_id = sb.id
@@ -80,7 +88,7 @@ export async function GET(req: Request) {
     let availableQuery = `
       SELECT
          b.id AS booking_id, b.hn, b.name, b.phone, b.therapist, b.provider, b.time_slot, b.date, b.status,
-         (SELECT u.sex FROM med_user u WHERE u.hn = b.hn LIMIT 1) AS sex
+         (SELECT u.sex FROM med_user u WHERE u.hn = CONVERT(b.hn USING tis620) LIMIT 1) AS sex
        FROM bookings b
        LEFT JOIN special_bed_bookings sbb ON b.id = sbb.booking_id
        WHERE b.date = ?
@@ -93,12 +101,17 @@ export async function GET(req: Request) {
     if (!skipAvailable && !isAdmin && roleId !== 909) {
       let ownNames: string[] = [userName];
       try {
-        const [tRows]: any = await pool.execute(
-          "SELECT name, fname FROM therapist WHERE id = ?",
-          [roleId]
-        );
-        if (tRows.length > 0) {
-          ownNames.push(tRows[0].name, tRows[0].fname);
+        const cached = therapistNameCache.get(roleId);
+        if (cached && Date.now() - cached.at < THERAPIST_NAME_CACHE_TTL) {
+          ownNames.push(...cached.names);
+        } else {
+          const [tRows]: any = await pool.execute(
+            "SELECT name, fname FROM therapist WHERE id = ?",
+            [roleId]
+          );
+          const names = tRows.length > 0 ? [tRows[0].name, tRows[0].fname].filter(Boolean) : [];
+          therapistNameCache.set(roleId, { names, at: Date.now() });
+          ownNames.push(...names);
         }
       } catch (e) {
         console.error("Error finding therapist name:", e);

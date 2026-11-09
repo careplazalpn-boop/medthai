@@ -37,8 +37,11 @@ export async function GET(req: Request) {
     const filterProvider = url.searchParams.get("provider") || "";
     const filterTherapist = url.searchParams.get("therapist") || "";
     const filterStatus = url.searchParams.get("status") || "";
-    // ✅ ใหม่: กรองเฉพาะคิวที่มีการจองเตียงพิเศษ
-    const filterSpecialBed = url.searchParams.get("specialBed") === "true";
+    // ✅ ใหม่: กรองเตียงนวด — specialBed=true (มีเตียง) / specialBed=none (ยังไม่มีเตียง)
+    //    ค่าเดิม false/อื่น ๆ = ไม่กรอง (เหมือนเดิมทุกประการ)
+    const filterSpecialBedParam = url.searchParams.get("specialBed") || "";
+    const filterHasBed = filterSpecialBedParam === "true";
+    const filterNoBed = filterSpecialBedParam === "none";
 
     // ✅ ใหม่: ข้อมูลผู้ใช้ที่ login (ส่งมาจากหน้าเว็บ) ใช้เพื่อ "จัดลำดับการแสดงผล" เท่านั้น
     // ไม่ได้ใช้กรองหรือจำกัดสิทธิ์ข้อมูล — ถ้าไม่ส่งมา หรือไม่ใช่ role=user ลำดับเดิมทุกประการ
@@ -109,7 +112,9 @@ export async function GET(req: Request) {
         b.hn,
         -- ✅ ใช้ subquery แทน LEFT JOIN med_user: รับประกัน 1 แถวต่อ 1 booking เสมอ
         -- (ถ้า med_user.hn ซ้ำ การ JOIN จะทำให้แถวเบิ้ล และ pagination/count เพี้ยน)
-        (SELECT u.sex FROM med_user u WHERE u.hn = b.hn LIMIT 1) AS sex,
+        -- ✅ CONVERT(...) USING tis620: แก้ collation mismatch (med_user.hn=tis620 vs bookings.hn=utf8mb4)
+        --    ที่ทำให้ MySQL ใช้ index ไม่ได้ → full scan med_user 5 หมื่นแถวต่อ 1 แถว (~500ms → ~3ms)
+        (SELECT u.sex FROM med_user u WHERE u.hn = CONVERT(b.hn USING tis620) LIMIT 1) AS sex,
         (sbb.id IS NOT NULL) AS has_special_bed,
         sb.bed_name AS bed_name,
         -- ✅ เปลี่ยนมาเช็ค HN จากตาราง bookings โดยตรง (เร็วกว่าเดิมมาก
@@ -155,9 +160,13 @@ export async function GET(req: Request) {
       query += ` AND b.status = ?`;
       queryParams.push(dbStatus);
     }
-    // ✅ ใหม่: กรองเฉพาะคิวที่มีการจองเตียงพิเศษ (ไม่ต้องใช้ param)
-    if (filterSpecialBed) {
+    // ✅ กรองเตียงนวด: มีเตียง (sbb.id IS NOT NULL) หรือยังไม่มีเตียง (sbb.id IS NULL)
+    //    กรณี "ยังไม่ได้จองเตียง" ไม่นับคิวที่ยกเลิกแล้ว (status != 'ยกเลิก')
+    if (filterHasBed) {
       query += ` AND sbb.id IS NOT NULL`;
+    }
+    if (filterNoBed) {
+      query += ` AND sbb.id IS NULL AND b.status != 'ยกเลิก'`;
     }
 
     // ✅ ใหม่: ถ้าผู้ใช้เป็น role=user ให้คิวของตัวเอง (พนักงานนวดคนนั้น) แสดงก่อน
@@ -238,9 +247,12 @@ export async function GET(req: Request) {
       summaryCondition += " AND b.therapist = ?";
       summaryParams.push(filterTherapist);
     }
-    // ✅ ใหม่: ให้ summary สอดคล้องกับตัวกรองเตียงพิเศษด้วย
-    if (filterSpecialBed) {
+    // ✅ ให้ summary สอดคล้องกับตัวกรองเตียงนวดด้วย (ทั้งสองทิศ)
+    if (filterHasBed) {
       summaryCondition += " AND sbb.id IS NOT NULL";
+    }
+    if (filterNoBed) {
+      summaryCondition += " AND sbb.id IS NULL";
     }
     // หมายเหตุ: summary ไม่กรอง status (ตั้งใจ) เพื่อให้การ์ดสรุปแสดงครบทุกสถานะ
 
@@ -266,7 +278,7 @@ export async function GET(req: Request) {
         SUM(CASE WHEN b.status = 'รอดำเนินการ' THEN 1 ELSE 0 END) AS totalPending,
         SUM(CASE WHEN b.status = 'อยู่ในคิว' THEN 1 ELSE 0 END) AS totalInQueue
       FROM bookings b
-      ${filterSpecialBed ? "LEFT JOIN special_bed_bookings sbb ON b.id = sbb.booking_id" : ""}
+      ${filterHasBed || filterNoBed ? "LEFT JOIN special_bed_bookings sbb ON b.id = sbb.booking_id" : ""}
       WHERE 1=1 ${summaryCondition}
     `;
 

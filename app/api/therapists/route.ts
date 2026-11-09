@@ -13,12 +13,6 @@ export async function GET() {
     const isAdmin =
       roleId === "909" || isAdminCookie.toLowerCase() === "true";
 
-    // Debug (ไม่มีผลกับ Logic)
-    console.log("========== THERAPISTS ==========");
-    console.log("roleId:", roleId);
-    console.log("isAdminCookie:", isAdminCookie);
-    console.log("isAdmin:", isAdmin);
-
     let query = "";
 
     if (isAdmin) {
@@ -48,13 +42,7 @@ export async function GET() {
       `;
     }
 
-    console.log("SQL:");
-    console.log(query);
-
     const [rows] = await pool.query(query);
-
-    console.log("Rows:", (rows as any[]).length);
-    console.log("===============================");
 
     return NextResponse.json({
       success: true,

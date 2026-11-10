@@ -1097,14 +1097,6 @@ export default function AllBookingsPage() {
                             >
                               <FaCheck className="text-gray-400 w-5 h-5" />
                             </button>
-                          ) : !b.has_special_bed ? (
-                            <button
-                              disabled
-                              title="ไม่สามารถบันทึกบริการสำเร็จได้ เนื่องจากยังไม่ได้จองเตียงพิเศษ — กรุณากดปุ่มเตียงเพื่อจองเตียงก่อน"
-                              className="flex items-center justify-center w-15 h-10 bg-gray-300 rounded-md shadow cursor-not-allowed"
-                            >
-                              <FaCheck className="text-gray-400 w-5 h-5" />
-                            </button>
                           ) : (
                             <Dialog.Root>
                               <Dialog.Trigger asChild>

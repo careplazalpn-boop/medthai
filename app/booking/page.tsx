@@ -431,7 +431,8 @@ export default function BookingPage() {
       const res = await fetch(`/api/search-users?hn=${encodeURIComponent(clientHN.trim())}`);
       const data = await res.json();
       setSearchResults(data?.success ? data.users : []);
-      if (!data?.success) alert("ไม่พบผู้ใช้");
+      // ✅ แสดงข้อความ error จริงจาก API (เช่น DB ล่ม) แทน "ไม่พบผู้ใช้" ที่ทำให้เข้าใจผิดว่าว่างจริง
+      if (!data?.success) alert(data?.message || "ไม่พบผู้ใช้");
     } catch {
       alert("เกิดข้อผิดพลาดในการค้นหา");
     } finally {
@@ -446,7 +447,8 @@ export default function BookingPage() {
       const res = await fetch(`/api/search-users?name=${encodeURIComponent(clientName.trim())}`);
       const data = await res.json();
       setSearchResults(data?.success ? data.users : []);
-      if (!data?.success) alert("ไม่พบข้อมูลผู้ใช้");
+      // ✅ แสดงข้อความ error จริงจาก API (เช่น DB ล่ม) แทน "ไม่พบข้อมูลผู้ใช้" ที่ทำให้เข้าใจผิดว่าว่างจริง
+      if (!data?.success) alert(data?.message || "ไม่พบข้อมูลผู้ใช้");
     } catch {
       alert("เกิดข้อผิดพลาดในการค้นหา");
     } finally {

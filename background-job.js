@@ -11,9 +11,14 @@ const pool = mysql.createPool({
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
+  // ✅ charset: บังคับ connection เป็น utf8mb4 (เหมือน db.ts) — กันภาษาไทยเพี้ยนบน server ที่ default tis620
+  charset: 'UTF8MB4_GENERAL_CI',
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
+  // ✅ keepAlive: ป้องกัน connection ถูกตัดตอน idle → ลด ECONNRESET
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 10000,
 });
 
 // ----------------- Helper -----------------

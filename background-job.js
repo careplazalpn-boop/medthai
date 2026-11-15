@@ -11,8 +11,8 @@ const pool = mysql.createPool({
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
-  // ✅ charset: บังคับ connection เป็น utf8mb4 (เหมือน db.ts) — กันภาษาไทยเพี้ยนบน server ที่ default tis620
-  charset: 'UTF8MB4_GENERAL_CI',
+  // ✅ charset: บังคับ tis620 (เหมือน db.ts และ sync scripts) — กันภาษาไทยเพี้ยนบน server ที่ default tis620
+  charset: 'TIS620',
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,

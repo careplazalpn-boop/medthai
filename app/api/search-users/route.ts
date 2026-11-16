@@ -8,7 +8,12 @@ export async function GET(req: NextRequest) {
   try {
     let rows: any[] = [];
 
-    // 1. ค้นหาด้วย HN (Exact Match)
+    // ✅ CONVERT(... USING utf8mb4) COLLATE utf8mb4_general_ci: คอลัมน์ med_user/new_user
+    //    เป็น tis620_thai_ci แต่ connection เป็น utf8mb4 → เปรียบเทียบ/LIKE จะ error 1267
+    //    (Illegal mix of collations) บน MariaDB 12.3 — แปลงฝั่ง column ให้ตรงกัน
+    const conv = (expr: string) => `CONVERT(${expr} USING utf8mb4) COLLATE utf8mb4_general_ci`;
+
+    // 1. ค้นหาด้วย HN (Partial Match — พิมพ์บางส่วนของ HN ก็เจอ)
     if (hn) {
       // ตรวจสอบ HN: อนุญาตเฉพาะตัวอักษรและตัวเลขเท่านั้นเพื่อความปลอดภัย
       if (!/^[a-zA-Z0-9]+$/.test(hn)) {
@@ -21,9 +26,9 @@ export async function GET(req: NextRequest) {
       const [r]: any = await pool.query(
         `SELECT hn, CONCAT(pname, fname, ' ', lname) AS name, NULL AS id_card_number, mobile_phone_number AS phone
          FROM med_user
-         WHERE hn = ?
+         WHERE ${conv("hn")} LIKE ?
          LIMIT 100`,
-        [hn]
+        [`%${hn}%`]
       );
       rows = r;
     } 
@@ -59,12 +64,7 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ success: false, message: "คำค้นหาไม่ถูกต้อง" }, { status: 400 });
       }
 
-      // ✅ CONVERT(... USING utf8mb4) COLLATE utf8mb4_general_ci: คอลัมน์ med_user/new_user
-      //    เป็น tis620_thai_ci แต่ connection เป็น utf8mb4 → LIKE จะ error 1267
-      //    (Illegal mix of collations) บน MariaDB 12.3 — แปลงฝั่ง column ให้ตรงกัน
-      const conv = (expr: string) => `CONVERT(${expr} USING utf8mb4) COLLATE utf8mb4_general_ci`;
-
-      // สร้างเงื่อนไข Query (Logic เดิม)
+      // สร้างเงื่อนไข Query (Logic เดิม — ใช้ conv() ที่ประกาศด้านบน)
       const whereClauseMed = sanitizedTerms.map(() => `(${conv("CONCAT(pname, fname, ' ', lname)")} LIKE ? OR ${conv("CONCAT(fname, ' ', lname)")} LIKE ?)` ).join(" AND ");
       const whereClauseNew = sanitizedTerms.map(() => `${conv("name")} LIKE ?`).join(" AND ");
 

@@ -63,24 +63,29 @@ export async function GET(req: NextRequest) {
       const whereClauseMed = sanitizedTerms.map(() => `(CONCAT(pname, fname, ' ', lname) LIKE ? OR CONCAT(fname, ' ', lname) LIKE ?)` ).join(" AND ");
       const whereClauseNew = sanitizedTerms.map(() => `name LIKE ?`).join(" AND ");
 
-      const params: string[] = [];
-      sanitizedTerms.forEach(term => params.push(`%${term}%`, `%${term}%`)); // สำหรับ med_user
-      sanitizedTerms.forEach(term => params.push(`%${term}%`)); // สำหรับ new_user
+      // ✅ แยกเป็น 2 query แทน UNION ALL — med_user (tis620) กับ new_user (utf8mb4)
+      //    มี collation ต่างกัน UNION บน MariaDB จะ throw "Illegal mix of collations"
+      //    (error 1267) → ถูก catch แล้วฟ้อง "เกิดข้อผิดพลาดในการเชื่อมต่อฐานข้อมูล"
+      const paramsMed = sanitizedTerms.flatMap(term => [`%${term}%`, `%${term}%`]);
+      const paramsNew = sanitizedTerms.map(term => `%${term}%`);
 
-      const [r]: any = await pool.query(
-        `
-        SELECT hn, CONCAT(pname, fname, ' ', lname) AS name, NULL AS id_card_number, mobile_phone_number AS phone
-        FROM med_user
-        WHERE ${whereClauseMed}
-        UNION ALL
-        SELECT NULL AS hn, name, id_card_number, mobile_phone_number AS phone
-        FROM new_user
-        WHERE ${whereClauseNew}
-        LIMIT 100
-        `,
-        params
-      );
-      rows = r;
+      const [rMed, rNew]: any = await Promise.all([
+        pool.query(
+          `SELECT hn, CONCAT(pname, fname, ' ', lname) AS name, NULL AS id_card_number, mobile_phone_number AS phone
+           FROM med_user
+           WHERE ${whereClauseMed}
+           LIMIT 100`,
+          paramsMed
+        ),
+        pool.query(
+          `SELECT NULL AS hn, name, id_card_number, mobile_phone_number AS phone
+           FROM new_user
+           WHERE ${whereClauseNew}
+           LIMIT 100`,
+          paramsNew
+        ),
+      ]);
+      rows = [...rMed[0], ...rNew[0]].slice(0, 100);
     } else {
       return NextResponse.json({ success: false, message: "กรุณาระบุ HN หรือชื่อที่ต้องการค้นหา" });
     }
@@ -93,8 +98,15 @@ export async function GET(req: NextRequest) {
     }));
 
     return NextResponse.json({ success: true, users });
-  } catch (error) {
-    console.error("Search API Error:", error);
+  } catch (error: any) {
+    // ✅ log รายละเอียด error จริง (code/errno/sqlState/sqlMessage) เพื่อ diagnose บน server
+    console.error("Search API Error:", {
+      code: error?.code,
+      errno: error?.errno,
+      sqlState: error?.sqlState,
+      message: error?.sqlMessage || error?.message || error,
+      sql: error?.sql,
+    });
     return NextResponse.json({ success: false, message: "เกิดข้อผิดพลาดในการเชื่อมต่อฐานข้อมูล" }, { status: 500 });
   }
 }

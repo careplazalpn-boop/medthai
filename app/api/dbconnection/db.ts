@@ -5,11 +5,11 @@ const pool = mysql.createPool({
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
-  // ✅ charset: บังคับ tis620 — server CentOS (MariaDB 12.3) default เป็น tis620
-  //    และไม่มี utf8mb4_general_ci → utf8mb4_general_ci ถูก fallback กลับ tis620 เงียบ ๆ
-  //    ทำให้ภาษาไทยที่ส่งเป็น utf8 ถูกตีความผิดจนค้นหา med_user ไม่เจอ
-  //    (PC ใช้ได้เพราะ MySQL default เป็น utf8mb4) — ตรงกับ sync scripts ที่ใช้ TIS620
-  charset: 'TIS620',
+  // ✅ charset: utf8mb4 — server CentOS (MariaDB 12.3) ไม่ยอมรับ collation id 18 (tis620)
+  //    ใน handshake แล้ว fallback เป็น utf8mb4_uca1400_ai_ci เสมอ → ถ้าตั้ง TIS620
+  //    client จะ encode ภาษาไทยเป็น tis620 แต่ server อ่านเป็น utf8mb4 → ตัวอักษรเพี้ยน
+  //    คอลัมน์ที่เป็น tis620_thai_ci (med_user/new_user) ถูก CONVERT เป็น utf8mb4 ตอน query
+  charset: 'UTF8MB4_GENERAL_CI',
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,

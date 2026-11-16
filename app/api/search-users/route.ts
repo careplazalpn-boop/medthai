@@ -59,9 +59,14 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ success: false, message: "คำค้นหาไม่ถูกต้อง" }, { status: 400 });
       }
 
+      // ✅ CONVERT(... USING utf8mb4) COLLATE utf8mb4_general_ci: คอลัมน์ med_user/new_user
+      //    เป็น tis620_thai_ci แต่ connection เป็น utf8mb4 → LIKE จะ error 1267
+      //    (Illegal mix of collations) บน MariaDB 12.3 — แปลงฝั่ง column ให้ตรงกัน
+      const conv = (expr: string) => `CONVERT(${expr} USING utf8mb4) COLLATE utf8mb4_general_ci`;
+
       // สร้างเงื่อนไข Query (Logic เดิม)
-      const whereClauseMed = sanitizedTerms.map(() => `(CONCAT(pname, fname, ' ', lname) LIKE ? OR CONCAT(fname, ' ', lname) LIKE ?)` ).join(" AND ");
-      const whereClauseNew = sanitizedTerms.map(() => `name LIKE ?`).join(" AND ");
+      const whereClauseMed = sanitizedTerms.map(() => `(${conv("CONCAT(pname, fname, ' ', lname)")} LIKE ? OR ${conv("CONCAT(fname, ' ', lname)")} LIKE ?)` ).join(" AND ");
+      const whereClauseNew = sanitizedTerms.map(() => `${conv("name")} LIKE ?`).join(" AND ");
 
       // ✅ แยกเป็น 2 query แทน UNION ALL — med_user (tis620) กับ new_user (utf8mb4)
       //    มี collation ต่างกัน UNION บน MariaDB จะ throw "Illegal mix of collations"

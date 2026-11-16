@@ -45,17 +45,20 @@ export async function GET(req: Request) {
         const words = keyword.split(/\s+/).filter(Boolean);
         const conditions: string[] = [];
         const params: string[] = [];
+        // ✅ CONVERT(... USING utf8mb4) COLLATE utf8mb4_general_ci: คอลัมน์ med_user
+        //    เป็น tis620_thai_ci แต่ connection เป็น utf8mb4 → LIKE จะ error 1267 บน MariaDB 12.3
+        const conv = (expr: string) => `CONVERT(${expr} USING utf8mb4) COLLATE utf8mb4_general_ci`;
         for (const w of words) {
           const like = `%${w}%`;
           conditions.push(`
             (
-              hn LIKE ?
-              OR name LIKE ?
-              OR fname LIKE ?
-              OR lname LIKE ?
-              OR mobile_phone_number LIKE ?
-              OR CONCAT(IFNULL(fname,''), ' ', IFNULL(lname,'')) LIKE ?
-              OR CONCAT(IFNULL(pname,''), IFNULL(fname,''), ' ', IFNULL(lname,'')) LIKE ?
+              ${conv("hn")} LIKE ?
+              OR ${conv("name")} LIKE ?
+              OR ${conv("fname")} LIKE ?
+              OR ${conv("lname")} LIKE ?
+              OR ${conv("mobile_phone_number")} LIKE ?
+              OR ${conv("CONCAT(IFNULL(fname,''), ' ', IFNULL(lname,''))")} LIKE ?
+              OR ${conv("CONCAT(IFNULL(pname,''), IFNULL(fname,''), ' ', IFNULL(lname,''))")} LIKE ?
             )
           `);
           params.push(like, like, like, like, like, like, like);

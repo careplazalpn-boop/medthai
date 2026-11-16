@@ -11,8 +11,9 @@ const pool = mysql.createPool({
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
-  // ✅ charset: บังคับ tis620 (เหมือน db.ts และ sync scripts) — กันภาษาไทยเพี้ยนบน server ที่ default tis620
-  charset: 'TIS620',
+  // ✅ charset: utf8mb4 — server CentOS (MariaDB 12.3) ไม่ยอมรับ tis620 ใน handshake
+  //    แล้ว fallback เป็น utf8mb4 เสมอ → ตั้ง TIS620 ทำให้ภาษาไทยเพี้ยน (เหมือน db.ts)
+  charset: 'UTF8MB4_GENERAL_CI',
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,

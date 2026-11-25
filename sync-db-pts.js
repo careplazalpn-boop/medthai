@@ -11,26 +11,26 @@ const ERROR_LOG_FILE = "sync-pts-error.log";
 let isSyncing = false;
 
 // 🔹 1. แก้ไข Connection Pool ต้นทาง (DB1)
-// เปลี่ยนจาก BINARY -> TIS620 เพื่อให้ Driver อ่านภาษาไทยถูกต้องอัตโนมัติ
+// เปลี่ยนเป็น UTF8MB4_GENERAL_CI — MariaDB 12.3 ไม่รับ tis620 ใน handshake ทำให้ภาษาไทย error 1366
 const db1Pool = mysql.createPool({
   host: process.env.DB1_HOST,
   user: process.env.DB1_USER,
   password: process.env.DB1_PASSWORD,
   database: process.env.DB1_NAME,
-  charset: "TIS620", // ✅ แก้จุดนี้: อ่านไทยได้เลย ไม่ต้อง decode เอง
+  charset: "UTF8MB4_GENERAL_CI", // ✅ utf8mb4: ตรงกับ connection ที่ server ต่อรองจริง (MariaDB 12.3)
   connectionLimit: 3,
   connectTimeout: 20000,
   enableKeepAlive: true
 });
 
 // 🔹 2. แก้ไข Connection Pool ปลายทาง (DB3)
-// กำหนด charset ให้ชัดเจน (ใช้ TIS620 หรือ utf8mb4 ตาม Database ปลายทาง)
+// กำหนด charset ให้ชัดเจน
 const db3Pool = mysql.createPool({
   host: process.env.DB3_HOST,
   user: process.env.DB3_USER,
   password: process.env.DB3_PASSWORD,
   database: process.env.DB3_NAME,
-  charset: "TIS620", // ✅ แนะนำ TIS620 เพื่อความชัวร์ หรือใช้ utf8mb4 ก็ได้ถ้าปลายทางรองรับ
+  charset: "UTF8MB4_GENERAL_CI", // ✅ utf8mb4 — server จะแปลง tis620 column ให้อัตโนมัติ
   connectionLimit: 3,
   connectTimeout: 20000,
   enableKeepAlive: true
@@ -72,7 +72,7 @@ async function runSync() {
 
   isSyncing = true;
   try {
-    logPts("=== Start Sync DB1 → DB3 (Fixed Encoding TIS620) ===");
+    logPts("=== Start Sync DB1 → DB3 (Fixed Encoding UTF8MB4) ===");
 
     // 1. หาเวลาล่าสุดจากปลายทาง
     const [maxDateRow] = await db3Pool.execute(`SELECT MAX(last_update) AS last_sync FROM patient`);

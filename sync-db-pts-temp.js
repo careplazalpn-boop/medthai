@@ -17,7 +17,7 @@ const db1Pool = mysql.createPool({
   user: process.env.DB1_USER,
   password: process.env.DB1_PASSWORD,
   database: process.env.DB1_NAME,
-  charset: "TIS620", 
+  charset: "UTF8MB4_GENERAL_CI", 
   connectionLimit: 3,
   connectTimeout: 20000,
   enableKeepAlive: true
@@ -29,7 +29,7 @@ const db3Pool = mysql.createPool({
   user: process.env.DB3_USER,
   password: process.env.DB3_PASSWORD,
   database: process.env.DB3_NAME,
-  charset: "TIS620", 
+  charset: "UTF8MB4_GENERAL_CI", 
   connectionLimit: 3,
   connectTimeout: 20000,
   enableKeepAlive: true

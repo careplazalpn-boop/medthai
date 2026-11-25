@@ -10,7 +10,7 @@ const db1Pool = mysql.createPool({
   user: process.env.DB1_USER,
   password: process.env.DB1_PASSWORD,
   database: process.env.DB1_NAME,
-  charset: "TIS620",
+  charset: "UTF8MB4_GENERAL_CI",
   connectionLimit: 5,
   connectTimeout: 20000
 });
@@ -21,7 +21,7 @@ const db4Pool = mysql.createPool({
   user: process.env.DB4_USER,
   password: process.env.DB4_PASSWORD,
   database: process.env.DB4_NAME,
-  charset: "TIS620",
+  charset: "UTF8MB4_GENERAL_CI",
   connectionLimit: 5,
   connectTimeout: 20000
 });

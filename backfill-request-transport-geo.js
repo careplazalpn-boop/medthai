@@ -17,7 +17,7 @@ async function backfillRequestTransportGeo() {
     user: process.env.DB3_USER,
     password: process.env.DB3_PASSWORD,
     database: process.env.DB3_NAME,
-    charset: "TIS620",
+    charset: "UTF8MB4_GENERAL_CI",
     connectionLimit: 3,
     connectTimeout: 20000,
   });

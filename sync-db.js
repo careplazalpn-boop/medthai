@@ -20,13 +20,16 @@ const log = (msg, level = "INFO") => {
 };
 
 // 🔹 Pool DB1
+// ✅ charset: utf8mb4 — MariaDB 12.3 ไม่ยอมรับ tis620 ใน handshake (fallback เป็น utf8mb4)
+//    tis620 bytes ที่ส่งไปจะ error 1366 "Incorrect string value" ตอน insert ชื่อไทย
+//    → sync พังเงียบ ๆ มาตลอด (สาเหตุที่ update ไม่มา) — ใช้ utf8mb4 ให้ตรงกับ connection จริง
 const db1Pool = mysql.createPool({
   host: process.env.DB1_HOST,
   user: process.env.DB1_USER,
   password: process.env.DB1_PASSWORD,
   database: process.env.DB1_NAME,
   connectionLimit: 5,
-  charset: "TIS620",
+  charset: "UTF8MB4_GENERAL_CI",
   connectTimeout: 20000,
   enableKeepAlive: true
 });
@@ -38,7 +41,7 @@ const db2Pool = mysql.createPool({
   password: process.env.DB2_PASSWORD,
   database: process.env.DB2_NAME,
   connectionLimit: 5,
-  charset: "TIS620",
+  charset: "UTF8MB4_GENERAL_CI",
   connectTimeout: 20000,
   enableKeepAlive: true
 });

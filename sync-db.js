@@ -94,31 +94,69 @@ async function getLastUpdate(db2Pool) {
   return lastSync;
 }
 
-// 🔹 Sync Logic (เดิมทั้งหมด)
-async function syncPatients() {
+// 🔹 เช็คว่า med_user มี column is_manual หรือยัง
+//    (is_manual=1 = คนไข้ที่เพิ่มเองผ่านระบบ /api/add-patient — ห้ามถูก full sync ลบ)
+let isManualChecked = false;
+let hasIsManualColumn = false;
+async function checkIsManualColumn() {
+  if (isManualChecked) return hasIsManualColumn;
+  isManualChecked = true;
   try {
-    log("🚀 เริ่ม sync ข้อมูล (patient -> med_user)");
+    const rows = await safeQuery(
+      db2Pool,
+      `SELECT COUNT(*) AS c FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'med_user' AND COLUMN_NAME = 'is_manual'`,
+      [process.env.DB2_NAME],
+      "DB2"
+    );
+    hasIsManualColumn = Number(rows[0]?.c) > 0;
+    if (!hasIsManualColumn) {
+      log("⚠️ med_user ยังไม่มี column is_manual — จะ sync ปกติแต่ข้ามการลบข้อมูล", "WARN");
+      log("   รันก่อน: ALTER TABLE med_user ADD COLUMN is_manual TINYINT(1) NOT NULL DEFAULT 0;", "WARN");
+    }
+  } catch (e) {
+    log(`⚠️ check is_manual column failed: ${e.message}`, "WARN");
+  }
+  return hasIsManualColumn;
+}
 
-    const lastSyncTime = await getLastUpdate(db2Pool);
-    log(`🔍 ค้นหาข้อมูลที่มีการแก้ไขหลังเวลา: ${lastSyncTime}`);
+// 🔹 Sync Logic
+//    full=false → incremental (เฉพาะ last_update ใหม่กว่า checkpoint, สูงสุด 1000/รอบ)
+//    full=true  → full sync (ทุก record) + ลบ record ใน med_user ที่ไม่มีในต้นทางแล้ว
+//                 (เฉพาะ is_manual=0 — คนไข้ที่เพิ่มเองผ่านระบบจะไม่ถูกลบ)
+async function syncPatients(full = false) {
+  try {
+    log(`🚀 เริ่ม sync ข้อมูล (patient -> med_user)${full ? " [FULL]" : ""}`);
+
+    const lastSyncTime = full ? "1970-01-01 00:00:00" : await getLastUpdate(db2Pool);
+    if (!full) log(`🔍 ค้นหาข้อมูลที่มีการแก้ไขหลังเวลา: ${lastSyncTime}`);
 
     const patients = await safeQuery(
       db1Pool,
-      `
-      SELECT hn, pname, fname, lname, deathday, hometel, informname,
-             worktel, last_update, death, mobile_phone_number
-      FROM patient
-      WHERE last_update > ?
-        AND hn NOT LIKE '999%'
-      ORDER BY last_update ASC
-      LIMIT 1000
-      `,
-      [lastSyncTime],
+      full
+        ? `
+        SELECT hn, pname, fname, lname, deathday, hometel, informname,
+               worktel, last_update, death, mobile_phone_number
+        FROM patient
+        WHERE hn NOT LIKE '999%'
+        ORDER BY last_update ASC
+        `
+        : `
+        SELECT hn, pname, fname, lname, deathday, hometel, informname,
+               worktel, last_update, death, mobile_phone_number
+        FROM patient
+        WHERE last_update > ?
+          AND hn NOT LIKE '999%'
+        ORDER BY last_update ASC
+        LIMIT 1000
+        `,
+      full ? [] : [lastSyncTime],
       "DB1"
     );
 
+    // ⚠️ full sync แต่ source ว่าง → ข้ามทั้งหมด (กันลบ med_user ทิ้งทั้งหมดกรณี DB1 มีปัญหา)
     if (patients.length === 0) {
-      log("✅ ข้อมูลเป็นปัจจุบันแล้ว");
+      log(full ? "⚠️ FULL sync: ไม่พบข้อมูลต้นทาง — ข้าม (ไม่ลบอะไรทั้งสิ้น)" : "✅ ข้อมูลเป็นปัจจุบันแล้ว");
       return;
     }
 
@@ -171,8 +209,31 @@ async function syncPatients() {
         );
       }
 
+      // ✅ full sync เท่านั้น: ลบ record ใน med_user ที่ไม่มีในต้นทางแล้ว
+      //    (is_manual=1 = คนไข้ที่เพิ่มเองผ่านระบบ → ไม่ถูกลบ)
+      let deletedCount = 0;
+      if (full && (await checkIsManualColumn())) {
+        const sourceHns = new Set(patients.map(p => p.hn));
+        const [existingRows] = await db2Conn.query(
+          "SELECT hn FROM med_user WHERE is_manual = 0"
+        );
+        const toDelete = existingRows
+          .map(r => r.hn)
+          .filter(h => h && !sourceHns.has(h));
+
+        // ลบเป็นชุดละ 500 กัน SQL ยาวเกิน/packet ใหญ่เกิน
+        for (let i = 0; i < toDelete.length; i += 500) {
+          const chunk = toDelete.slice(i, i + 500);
+          await db2Conn.query(
+            `DELETE FROM med_user WHERE hn IN (${chunk.map(() => "?").join(",")})`,
+            chunk
+          );
+        }
+        deletedCount = toDelete.length;
+      }
+
       await db2Conn.commit();
-      log(`✅ Sync สำเร็จ ${patients.length} รายการ`);
+      log(`✅ Sync สำเร็จ ${patients.length} รายการ${deletedCount ? `, ลบที่ไม่มีในต้นทาง ${deletedCount} รายการ` : ""}`);
     } catch (err) {
       await db2Conn.rollback();
       throw err;
@@ -187,11 +248,15 @@ async function syncPatients() {
 // 🔹 เริ่ม Service
 console.log("Service Started: sync-db.js (Native TIS620 + Smart Date)");
 
-// ▶️ รันทันทีเมื่อ start
-syncPatients();
+// ▶️ รันทันทีเมื่อ start (incremental)
+syncPatients(false);
 
-// ⏰ รันทุก ๆ 2 ชั่วโมง (นาทีที่ 0)
-cron.schedule("0 */2 * * *", syncPatients);
+// ⏰ incremental: ทุก 1 ชั่วโมง — เก็บเฉพาะ record ที่ last_update เปลี่ยน
+cron.schedule("0 * * * *", () => syncPatients(false), { timezone: "Asia/Bangkok" });
+
+// ⏰ full sync: ทุก 6 ชั่วโมง — upsert ทุก record + ลบ record ที่หายไปจากต้นทาง
+//    (กันกรณี last_update ต้นทางไม่ถูกอัปเดตตอนแก้ไข → ข้อมูลค้างไม่ sync)
+cron.schedule("30 */6 * * *", () => syncPatients(true), { timezone: "Asia/Bangkok" });
 
 // กัน process exit
 setInterval(() => {}, 1 << 30);

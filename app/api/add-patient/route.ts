@@ -17,11 +17,23 @@ export async function POST(req: NextRequest) {
     }
 
     // ✅ ถ้าไม่ซ้ำ -> insert
-    await pool.query(
-      `INSERT INTO med_user (hn, pname, fname, lname, name, mobile_phone_number, last_update)
-      VALUES (?, ?, ?, ?, ?, ?, CURDATE())`,
-      [hn, pname, fname, lname, name, mobile_phone_number]
-    );
+    // is_manual=1: เป็นคนไข้ที่เพิ่มเองผ่านระบบ → full sync จะไม่ลบ record นี้
+    const baseParams = [hn, pname, fname, lname, name, mobile_phone_number];
+    try {
+      await pool.query(
+        `INSERT INTO med_user (hn, pname, fname, lname, name, mobile_phone_number, last_update, is_manual)
+        VALUES (?, ?, ?, ?, ?, ?, CURDATE(), 1)`,
+        baseParams
+      );
+    } catch (e: any) {
+      // fallback: ถ้ายังไม่ได้ ALTER TABLE เพิ่ม column is_manual
+      if (e?.code !== "ER_BAD_FIELD_ERROR") throw e;
+      await pool.query(
+        `INSERT INTO med_user (hn, pname, fname, lname, name, mobile_phone_number, last_update)
+        VALUES (?, ?, ?, ?, ?, ?, CURDATE())`,
+        baseParams
+      );
+    }
 
     return NextResponse.json({ success: true, message: "บันทึกสำเร็จ" });
   } catch (error) {

@@ -120,10 +120,112 @@ async function checkIsManualColumn() {
   return hasIsManualColumn;
 }
 
+// 🔹 Helpers สำหรับ diff-then-write (full sync)
+//    เทียบค่าที่ควรเป็น (จากต้นทาง) กับค่าจริงใน med_user — upsert เฉพาะ field ที่ต่างจริง
+//    ลด write/binlog/lock มาก: รอบที่ไม่มีอะไรเปลี่ยนจะเขียนแทบไม่เลย
+const isEmptyVal = (v) => v === null || v === undefined || v === "";
+const normVal = (v) => (isEmptyVal(v) ? "" : String(v));
+
+function dateOnlyStr(v) {
+  if (isEmptyVal(v)) return "";
+  if (v instanceof Date) return formatDateTime(v).split(" ")[0];
+  return String(v).slice(0, 10);
+}
+
+// สร้างค่าที่ควรเป็นของ 1 record (รูปแบบเดียวกับที่จะ upsert)
+function expectedValues(p) {
+  return {
+    name: `${p.pname || ""}${p.fname || ""} ${p.lname || ""}`.trim(),
+    pname: p.pname,
+    fname: p.fname,
+    lname: p.lname,
+    deathday: p.deathday ? formatDateTime(p.deathday).split(" ")[0] : null,
+    hometel: p.hometel,
+    informname: p.informname,
+    worktel: p.worktel,
+    last_update: formatDateTime(p.last_update),
+    death: p.death,
+    mobile_phone_number: p.mobile_phone_number,
+  };
+}
+
+const DIFF_FIELDS = ["name", "pname", "fname", "lname", "hometel", "informname", "worktel", "death", "mobile_phone_number"];
+function rowDiffers(ex, exp) {
+  for (const f of DIFF_FIELDS) {
+    if (normVal(ex[f]) !== normVal(exp[f])) return true;
+  }
+  // deathday เป็น DATE → เทียบเฉพาะส่วนวันที่ (DB อาจคืน Date object)
+  // ⚠️ ไม่เทียบ last_update — เป็น metadata ของ sync ไม่ใช่ข้อมูลคนไข้
+  //    ถ้าเทียบด้วย format คนละแบบจะทำให้ทุก row "ต่าง" แล้ว upsert ซ้ำทั้ง 60k ทุกรอบ
+  return dateOnlyStr(ex.deathday) !== (exp.deathday || "");
+}
+
+function upsertParams(p) {
+  const e = expectedValues(p);
+  return [p.hn, e.name, e.pname, e.fname, e.lname, e.deathday, e.hometel,
+          e.informname, e.worktel, e.last_update, e.death, e.mobile_phone_number];
+}
+
+const UPSERT_SQL = `
+  INSERT INTO med_user
+  (hn, name, pname, fname, lname, deathday, hometel,
+   informname, worktel, last_update, death, mobile_phone_number)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  ON DUPLICATE KEY UPDATE
+    name=VALUES(name),
+    pname=VALUES(pname),
+    fname=VALUES(fname),
+    lname=VALUES(lname),
+    deathday=VALUES(deathday),
+    hometel=VALUES(hometel),
+    informname=VALUES(informname),
+    worktel=VALUES(worktel),
+    last_update=VALUES(last_update),
+    death=VALUES(death),
+    mobile_phone_number=VALUES(mobile_phone_number)
+`;
+
+const CHUNK = 500;
+// upsert เป็นชุดละ 500 + commit ทีละชุด → lock สั้น ไม่ต้องรอ transaction ยาว ๆ
+async function applyUpserts(conn, patients) {
+  for (let i = 0; i < patients.length; i += CHUNK) {
+    const chunk = patients.slice(i, i + CHUNK);
+    await conn.beginTransaction();
+    try {
+      for (const p of chunk) await conn.execute(UPSERT_SQL, upsertParams(p));
+      await conn.commit();
+    } catch (e) {
+      await conn.rollback();
+      throw e;
+    }
+    if (patients.length > CHUNK) {
+      log(`   ...upsert ${Math.min(i + CHUNK, patients.length)}/${patients.length}`);
+    }
+  }
+}
+
+async function applyDeletes(conn, hns) {
+  for (let i = 0; i < hns.length; i += CHUNK) {
+    const chunk = hns.slice(i, i + CHUNK);
+    await conn.beginTransaction();
+    try {
+      await conn.query(
+        `DELETE FROM med_user WHERE hn IN (${chunk.map(() => "?").join(",")})`,
+        chunk
+      );
+      await conn.commit();
+    } catch (e) {
+      await conn.rollback();
+      throw e;
+    }
+  }
+}
+
 // 🔹 Sync Logic
 //    full=false → incremental (เฉพาะ last_update ใหม่กว่า checkpoint, สูงสุด 1000/รอบ)
 //    full=true  → full sync (ทุก record) + ลบ record ใน med_user ที่ไม่มีในต้นทางแล้ว
 //                 (เฉพาะ is_manual=0 — คนไข้ที่เพิ่มเองผ่านระบบจะไม่ถูกลบ)
+//                 ใช้ diff-then-write: upsert เฉพาะ record ที่ต่างจริง
 async function syncPatients(full = false) {
   try {
     log(`🚀 เริ่ม sync ข้อมูล (patient -> med_user)${full ? " [FULL]" : ""}`);
@@ -131,7 +233,7 @@ async function syncPatients(full = false) {
     const lastSyncTime = full ? "1970-01-01 00:00:00" : await getLastUpdate(db2Pool);
     if (!full) log(`🔍 ค้นหาข้อมูลที่มีการแก้ไขหลังเวลา: ${lastSyncTime}`);
 
-    const patients = await safeQuery(
+    const patients = (await safeQuery(
       db1Pool,
       full
         ? `
@@ -152,7 +254,7 @@ async function syncPatients(full = false) {
         `,
       full ? [] : [lastSyncTime],
       "DB1"
-    );
+    )).filter(p => p.hn); // กัน record ที่ hn ว่างพังทั้ง chunk
 
     // ⚠️ full sync แต่ source ว่าง → ข้ามทั้งหมด (กันลบ med_user ทิ้งทั้งหมดกรณี DB1 มีปัญหา)
     if (patients.length === 0) {
@@ -160,83 +262,53 @@ async function syncPatients(full = false) {
       return;
     }
 
-    log(`📦 พบข้อมูลใหม่/แก้ไข ${patients.length} รายการ`);
+    log(`📦 พบข้อมูลต้นทาง ${patients.length} รายการ`);
 
     const db2Conn = await db2Pool.getConnection();
     try {
-      await db2Conn.beginTransaction();
-
-      for (const p of patients) {
-        const name = `${p.pname || ""}${p.fname || ""} ${p.lname || ""}`.trim();
-        const pLastUpdate = formatDateTime(p.last_update);
-        const pDeathDay = p.deathday
-          ? formatDateTime(p.deathday).split(" ")[0]
-          : null;
-
-        await db2Conn.execute(
-          `
-          INSERT INTO med_user
-          (hn, name, pname, fname, lname, deathday, hometel,
-           informname, worktel, last_update, death, mobile_phone_number)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          ON DUPLICATE KEY UPDATE
-            name=VALUES(name),
-            pname=VALUES(pname),
-            fname=VALUES(fname),
-            lname=VALUES(lname),
-            deathday=VALUES(deathday),
-            hometel=VALUES(hometel),
-            informname=VALUES(informname),
-            worktel=VALUES(worktel),
-            last_update=VALUES(last_update),
-            death=VALUES(death),
-            mobile_phone_number=VALUES(mobile_phone_number)
-          `,
-          [
-            p.hn,
-            name,
-            p.pname,
-            p.fname,
-            p.lname,
-            pDeathDay,
-            p.hometel,
-            p.informname,
-            p.worktel,
-            pLastUpdate,
-            p.death,
-            p.mobile_phone_number
-          ]
-        );
-      }
-
-      // ✅ full sync เท่านั้น: ลบ record ใน med_user ที่ไม่มีในต้นทางแล้ว
-      //    (is_manual=1 = คนไข้ที่เพิ่มเองผ่านระบบ → ไม่ถูกลบ)
-      let deletedCount = 0;
-      if (full && (await checkIsManualColumn())) {
-        const sourceHns = new Set(patients.map(p => p.hn));
+      if (full) {
+        // ---- FULL sync: เทียบกับ med_user ทั้งหมด แล้วเขียนเฉพาะที่ต่างจริง ----
+        const hasManual = await checkIsManualColumn();
         const [existingRows] = await db2Conn.query(
-          "SELECT hn FROM med_user WHERE is_manual = 0"
+          `SELECT hn, name, pname, fname, lname, deathday, hometel,
+                  informname, worktel, death, mobile_phone_number${hasManual ? ", is_manual" : ""}
+           FROM med_user`
         );
-        const toDelete = existingRows
-          .map(r => r.hn)
-          .filter(h => h && !sourceHns.has(h));
+        const existingMap = new Map(existingRows.map(r => [r.hn, r]));
 
-        // ลบเป็นชุดละ 500 กัน SQL ยาวเกิน/packet ใหญ่เกิน
-        for (let i = 0; i < toDelete.length; i += 500) {
-          const chunk = toDelete.slice(i, i + 500);
-          await db2Conn.query(
-            `DELETE FROM med_user WHERE hn IN (${chunk.map(() => "?").join(",")})`,
-            chunk
-          );
+        const sourceHns = new Set();
+        const changed = [];
+        let inserted = 0, updated = 0, skipped = 0;
+        for (const p of patients) {
+          sourceHns.add(p.hn);
+          const ex = existingMap.get(p.hn);
+          if (!ex) {
+            changed.push(p); inserted++;
+          } else if (rowDiffers(ex, expectedValues(p))) {
+            changed.push(p); updated++;
+          } else {
+            skipped++;
+          }
         }
-        deletedCount = toDelete.length;
-      }
 
-      await db2Conn.commit();
-      log(`✅ Sync สำเร็จ ${patients.length} รายการ${deletedCount ? `, ลบที่ไม่มีในต้นทาง ${deletedCount} รายการ` : ""}`);
-    } catch (err) {
-      await db2Conn.rollback();
-      throw err;
+        // record ใน med_user ที่ไม่มีในต้นทาง → ลบ (เฉพาะเมื่อมี is_manual column
+        // เพื่อให้คนไข้ที่เพิ่มเองผ่านระบบไม่ถูกลบ)
+        const toDelete = hasManual
+          ? existingRows
+              .filter(r => r.hn && !r.is_manual && !sourceHns.has(r.hn))
+              .map(r => r.hn)
+          : [];
+
+        log(`📊 full sync: ใหม่ ${inserted}, แก้ไข ${updated}, ไม่เปลี่ยน ${skipped}, ลบ ${toDelete.length}`);
+
+        await applyUpserts(db2Conn, changed);
+        await applyDeletes(db2Conn, toDelete);
+        log(`✅ Full sync เสร็จ — upsert ${changed.length} รายการ, ลบ ${toDelete.length} รายการ`);
+      } else {
+        // ---- incremental: upsert ทุก record ที่ last_update ใหม่กว่า checkpoint ----
+        await applyUpserts(db2Conn, patients);
+        log(`✅ Sync สำเร็จ ${patients.length} รายการ`);
+      }
     } finally {
       db2Conn.release();
     }
